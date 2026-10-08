@@ -1,0 +1,121 @@
+# POPME 예시 설정 — config.toml로 복사해서 고치세요 (config.toml은 저장소에 올라가지 않음).
+# 고친 뒤 캐릭터 우클릭 > 종료 후 다시 실행하면 반영됩니다.
+
+[character]
+file = "character.toml"           # 캐릭터 파일. 없으면 character.example.toml(기본 캐릭터 "포피"). docs/CHARACTER.md
+
+[user]
+plan = "Claude Pro"               # 내 요금제 — 혜택·크레딧 대상 여부 판단 기준
+tools = "Claude Code"              # 주로 쓰는 도구 — 소식이 "나한테 해당"인지 판단 기준 (쉼표로 여러 개)
+
+[schedule]
+briefing_after = "09:00"          # 이 시각 이후 앱이 켜져 있고 오늘 브리핑이 없으면 수집+브리핑
+
+[chrome]
+port = 9333                       # POPME 전용 Chrome 디버깅 포트
+minimize_while_collecting = false # true면 수집 중 Chrome 창을 최소화
+
+[x]
+list_url = ""                     # X 리스트가 생기면 넣으세요(있으면 계정별 방문 대신 리스트 1번만 봄)
+scrolls_per_page = 3              # 페이지당 스크롤 횟수 (사람 속도, 작게 유지)
+
+accounts = [
+  { handle = "thsottiaux",    name = "Tibo",              group = "제품 당사자",   focus = "Codex 업데이트·사용량 공지" },
+  { handle = "bcherny",       name = "Boris Cherny",      group = "제품 당사자",   focus = "Claude Code 기능·사용법" },
+  { handle = "trq212",        name = "Thariq Shihipar",   group = "제품 당사자",   focus = "Claude Code 기능·사용법" },
+  { handle = "_catwu",        name = "Cat Wu",            group = "제품 당사자",   focus = "Claude Code 제품 방향·출시" },
+  { handle = "embirico",      name = "Alexander Embiricos", group = "제품 당사자", focus = "Codex 제품 방향·출시" },
+  { handle = "badlogicgames", name = "Mario Zechner",     group = "에이전트 제작자", focus = "pi 하네스 설계·구현" },
+  { handle = "steipete",      name = "Peter Steinberger", group = "에이전트 제작자", focus = "OpenClaw·에이전트 개발 도구" },
+  { handle = "hwchase17",     name = "Harrison Chase",    group = "에이전트 제작자", focus = "LangChain·Deep Agents·메모리·평가" },
+  { handle = "mitsuhiko",     name = "Armin Ronacher",    group = "에이전트 제작자", focus = "에이전트 코딩 실전기" },
+  { handle = "GeoffreyHuntley", name = "Geoffrey Huntley", group = "에이전트 제작자", focus = "에이전트 루프 패턴" },
+  { handle = "HamelHusain",   name = "Hamel Husain",      group = "에이전트 제작자", focus = "평가(evals) 실무" },
+  { handle = "simonw",        name = "Simon Willison",    group = "실사용 검증",   focus = "실험·활용법·비용/보안 함정" },
+  { handle = "swyx",          name = "swyx",              group = "흐름 정리",     focus = "AI 엔지니어링 업계 흐름" },
+  { handle = "karpathy",      name = "Andrej Karpathy",   group = "흐름 정리",     focus = "큰 흐름" },
+]
+
+# 발굴 모드: 한국어 반응 많은 글을 찾는 X 검색 (작성자가 후보로 올라옴)
+discovery_searches = [
+  "(\"Claude Code\" OR Codex OR 클로드코드 OR 코덱스) lang:ko min_faves:20",
+  "(AI 에이전트 OR MCP OR 바이브코딩) lang:ko min_faves:50",
+]
+
+[threads]
+accounts = []                     # 꾸준히 볼 Threads 계정 (발굴 탭에서 "추가"하면 자동 포함)
+scrolls_per_page = 3
+# 발굴: 여러 태그에 반복 등장 + 반응 큰 한국어 작성자를 후보로 (점수 = 2×등장 수 + 좋아요합/100)
+# 태그 중심 (Threads 프로필 "관심사" 목록 = 토픽 태그). 키워드 검색은 필요할 때만 searches에 추가
+searches = []
+tags = ["AI Threads", "Tech Threads", "AI", "인공지능AI", "AGI", "OpenAI", "Claude", "클로드코드", "코덱스", "바이브코딩", "MCP"]
+
+[timetree]
+url = "https://timetreeapp.com/calendars"   # 로그인 후 보이는 캘린더 주소로 바꿔도 됨
+days_ahead = 2
+default_calendar = ""              # 캐릭터에게 일정 부탁할 때 기본 캘린더 이름 (비우면 첫 캘린더). 다른 캘린더 서비스: docs/CALENDAR.md
+
+[weather]                          # 날씨 대사용 (Open-Meteo, 키 불필요)
+use_windows_location = true        # Windows 위치 서비스로 현재 지역 (실패하면 아래 고정 지역)
+name = "서울"
+lat = 37.57
+lon = 126.98
+
+# 교차 확인·새 오픈소스 발굴용 (로그인 불필요)
+[[rss]]
+name = "Claude Code 릴리스"
+url = "https://github.com/anthropics/claude-code/releases.atom"
+group = "공식 변경내역"
+max_chars = 1500
+
+[[rss]]
+name = "Codex 릴리스"
+url = "https://github.com/openai/codex/releases.atom"
+group = "공식 변경내역"
+max_chars = 1500
+
+[[rss]]
+name = "pi 릴리스"
+url = "https://github.com/badlogic/pi-mono/releases.atom"
+group = "공식 변경내역"
+max_chars = 1000
+
+[[rss]]
+name = "OpenClaw 릴리스"
+url = "https://github.com/openclaw/openclaw/releases.atom"
+group = "공식 변경내역"
+max_chars = 1000
+
+[[rss]]
+name = "Deep Agents 릴리스"
+url = "https://github.com/langchain-ai/deepagents/releases.atom"
+group = "공식 변경내역"
+max_chars = 1000
+
+[[rss]]
+name = "OpenAI 뉴스"
+url = "https://openai.com/news/rss.xml"
+group = "공식 발표"
+max_chars = 400
+
+[[rss]]
+name = "Simon Willison 블로그"
+url = "https://simonwillison.net/atom/everything/"
+group = "실사용 검증"
+max_chars = 600
+
+[[rss]]
+name = "GeekNews"
+url = "https://news.hada.io/rss/news"
+group = "한국 커뮤니티"
+max_chars = 300
+
+[[rss]]
+name = "Hacker News 인기"
+url = "https://hnrss.org/frontpage?points=300"
+group = "새 오픈소스·화제"
+max_chars = 200
+
+[llm]
+claude_path = ""   # 비우면 PATH → VS Code 확장 내장 claude.exe 순으로 자동 탐색
+model = ""         # 비우면 Claude Code 기본 모델

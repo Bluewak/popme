@@ -1,0 +1,29 @@
+# --- 개인 설정·캐릭터 (예시 파일 *.example.toml만 올림) ---
+config.toml
+character.toml
+shisa.toml
+PLAN.md
+
+# --- 개인 캐릭터 이미지 (저작권 있는 캐릭터일 수 있음) ---
+assets/pet*.png
+assets/pet*.gif
+assets/pet*.webp
+assets/pet*.svg
+assets/pet.ico
+assets/backup/
+docs/bubble_mockups.png
+
+# --- 공개용 묶음 (만든 결과물) ---
+*.zip
+
+# --- 파이썬 ---
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# --- 실행 데이터는 %LOCALAPPDATA%\POPME 에 저장되지만, 혹시 몰라서 ---
+*.db
+*.log
+raw/
+chrome-profile/

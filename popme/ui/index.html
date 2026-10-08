@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>POPME</title>
+<style>
+  /* 말풍선 디자인: 게임 대화창 틀 + 손그림 외곽선 (popme/bubble.py와 같은 색·폰트). 이름·문구는 캐릭터 파일 [ui] */
+  @font-face { font-family: "Jua"; src: url("fonts/Jua-Regular.ttf"); }
+  :root {
+    --cream: #fff6de; --paper: #fffbf1; --brown: #3b2219; --ink: #52382a; --muted: #8a7465; --line: #ecdcbf;
+    --accent: #e8865a; --ok: #3f9e6e; --warn: #d79a1e; --err: #d65151;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--cream); color: var(--ink); overflow: hidden;
+    font: 13px/1.6 "Malgun Gothic", system-ui, sans-serif; }
+  .jua, h1, h3, header .logo, nav button, button, #say, .heads li, .day { font-family: "Jua", "Malgun Gothic", sans-serif; font-weight: 400; }
+  a { color: #c4673f; }
+  .muted { color: var(--muted); }
+  button { background: var(--paper); color: var(--ink); border: 2px solid var(--brown); border-radius: 999px;
+    padding: 2px 12px; font-size: 13px; cursor: pointer; }
+  button:hover { background: #fff; }
+  button.primary { background: var(--accent); color: #fff; }
+  button.icon { border: none; background: transparent; color: var(--muted); padding: 2px 6px; }
+  .tag { display: inline-block; background: var(--accent); color: #fff; border: 2px solid var(--brown); border-radius: 999px;
+    padding: 0 10px; font: 13px/20px "Jua", sans-serif; }
+
+  /* 테두리·둥근 모서리는 Windows 11이 창에 그려주고(app.py DWM), 꼬리는 캐릭터 창이 그린다(pet.py) */
+
+  /* ---- 큰 말풍선 ---- */
+  #bubble { display: none; width: 330px; padding: 12px 16px 12px; background: var(--cream); }
+  body.bubble #bubble { display: block; width: 100vw; min-height: 100vh; }
+  #say { font-size: 15px; margin: 8px 0 6px; }
+  #say.urgent { color: var(--err); }
+  #bubble ul { margin: 4px 0 10px; padding-left: 16px; }
+  #bubble li { margin: 3px 0; }
+  #bubble .row { display: flex; gap: 6px; justify-content: flex-end; align-items: center; }
+
+  /* ---- 패널 ---- */
+  #panel { display: none; height: 100vh; flex-direction: column; background: var(--paper); overflow: hidden; }
+  body.panel #panel { display: flex; }
+  header { display: flex; align-items: center; gap: 6px; padding: 9px 10px 9px 12px; background: var(--cream); border-bottom: 2px solid var(--line); flex: none; }
+  header .logo { font-size: 15px; }
+  #status { color: var(--muted); font-size: 12px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  nav { display: flex; background: var(--cream); border-bottom: 2px solid var(--line); flex: none; }
+  nav button { flex: 1; border: none; border-radius: 0; background: transparent; padding: 6px 0; font-size: 14px; color: var(--muted); }
+  nav button.on { color: var(--text); box-shadow: inset 0 -2px var(--accent); }
+  main { flex: 1; overflow-y: auto; padding: 12px 14px 16px; }
+  section { display: none; } section.on { display: block; }
+  .warn { background: color-mix(in srgb, var(--warn) 15%, transparent); border-radius: 8px; padding: 6px 9px; margin-bottom: 10px; font-size: 12px; }
+  h1.title { font-size: 15px; margin: 0 0 10px; }
+  h3 { font-size: 12px; color: var(--muted); font-weight: 600; margin: 14px 0 6px; }
+  .agenda { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; }
+  .ev { display: flex; gap: 8px; padding: 3px 0; align-items: baseline; }
+  .ev .when { color: var(--muted); width: 40px; flex: none; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .ev.deleted .title { text-decoration: line-through; color: var(--muted); }
+  .day { font-size: 12px; font-weight: 600; color: var(--accent); margin-top: 4px; }
+  .heads { list-style: none; margin: 0; padding: 0; }
+  .heads li { display: flex; gap: 8px; padding: 8px 2px; border-bottom: 1px solid var(--line); align-items: baseline; }
+  .heads li:last-child { border-bottom: none; }
+  .mark { flex: none; width: 18px; height: 18px; border-radius: 50%; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; color: #fff; }
+  .mark.ok { background: var(--ok); } .mark.unk { background: var(--muted); } .mark.urgent { background: var(--err); }
+  #more { margin-top: 12px; width: 100%; padding: 7px; }
+  #details { display: none; margin-top: 10px; }
+  #details.on { display: block; }
+  #details h2 { font-size: 13.5px; margin: 16px 0 6px; color: var(--accent); }
+  #details ul { padding-left: 18px; margin: 4px 0; }
+  /* 카드 형식 브리핑: 카드 누르면 그 항목만 펼침, 분류 버튼, 덜 중요한 건 접힘 */
+  .filters { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
+  .filters button { padding: 1px 10px; font-size: 12.5px; border-width: 1.5px; }
+  .filters button.on { background: var(--accent); color: #fff; }
+  .news { background: #fff; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 7px; }
+  .news.todo { border-left: 4px solid var(--accent); }
+  .news .top { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; cursor: pointer; }
+  .news .t { font-family: "Jua", "Malgun Gothic", sans-serif; font-size: 14px; line-height: 1.4; color: var(--brown); }
+  .news.dim .t { color: #7d6a5d; }
+  .news .arrow { color: var(--muted); font-size: 11px; padding-top: 3px; }
+  .news.open .arrow { transform: rotate(180deg); }
+  .news .b { display: none; padding: 0 12px 9px 36px; font-size: 12.5px; color: #5d4c40; }
+  .news.open .b { display: block; }
+  .chips { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+  .chip { font-size: 11px; border-radius: 999px; padding: 0 7px; background: #f3ebdb; color: #6b5646; line-height: 18px; }
+  .chip.me { background: #e5f3ea; color: #2f7a52; } .chip.no { background: #eee; color: #999; }
+  .chip.do { background: #fde3d6; color: #b6522a; } .chip.cat { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+  .fold { width: 100%; margin: 4px 0 8px; padding: 5px; border-style: dashed; color: var(--muted); background: transparent; }
+  #details table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  #details th, #details td { border: 1px solid var(--line); padding: 3px 5px; vertical-align: top; }
+  .badge { font-size: 11px; border-radius: 4px; padding: 0 5px; margin-left: 4px; color: #fff; }
+  .badge.new { background: var(--ok); } .badge.changed { background: var(--warn); color: #000; } .badge.deleted { background: var(--err); }
+  .cand { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .cand .row { display: flex; gap: 6px; align-items: center; } .cand .row b { flex: 1; }
+  #ask-form { display: flex; gap: 6px; }
+  #q { flex: 1; background: #fff; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font: inherit; }
+  #answer { margin-top: 12px; }
+  .wx { display: inline-block; font-size: 11px; color: #5b6f86; background: #eef4fb; border: 1px solid #d6e3f2;
+    border-radius: 999px; padding: 0 7px; margin-left: 4px; white-space: nowrap; }
+  #plan-form { display: flex; gap: 6px; margin-bottom: 10px; }
+  #plan-q { flex: 1; background: #fff; color: var(--ink); border: 2px solid var(--line); border-radius: 999px; padding: 5px 12px; font: inherit; }
+  #plan-q:focus { outline: none; border-color: var(--accent); }
+  .card { background: var(--cream); border: 2px solid var(--brown); border-radius: 14px; padding: 10px 12px; margin-bottom: 12px; }
+  .card .say { font-family: "Jua", sans-serif; font-size: 14px; margin-bottom: 8px; }
+  .card label { display: flex; align-items: center; gap: 8px; margin: 5px 0; font-size: 12px; color: var(--muted); }
+  .card label span { width: 40px; flex: none; }
+  .card input, .card select { flex: 1; background: #fff; color: var(--ink); border: 1.5px solid var(--line); border-radius: 8px; padding: 4px 8px; font: inherit; }
+  .card .row { display: flex; gap: 6px; justify-content: flex-end; margin-top: 8px; }
+  .card .unsure { color: #b5652f; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div id="bubble">
+  <span class="tag"></span>
+  <div id="say"></div>
+  <ul id="bubble-list"></ul>
+  <div class="row"><button class="icon" id="bubble-close">닫기</button><button class="primary" id="bubble-more">자세히</button></div>
+</div>
+<div id="panel">
+  <header>
+    <span class="tag"></span><span class="logo" id="panel-title"></span>
+    <span id="status">…</span>
+    <button id="run" title="X·Threads·TimeTree·RSS 수집 후 브리핑">지금 수집</button>
+    <button class="icon" id="to-pet" title="닫기 (캐릭터 누르면 다시 열림)">✕</button>
+  </header>
+  <nav>
+    <button data-tab="brief" class="on">브리핑</button>
+    <button data-tab="events">일정</button>
+    <button data-tab="cands">발굴</button>
+    <button data-tab="ask">질문</button>
+  </nav>
+  <main>
+    <div id="warnings"></div>
+    <section id="brief" class="on"></section>
+    <section id="events">
+      <form id="plan-form"><input id="plan-q" placeholder="" autocomplete="off"><button>부탁하기</button></form>
+      <div id="plan-card"></div>
+      <div id="events-list"></div>
+    </section>
+    <section id="cands"></section>
+    <section id="ask">
+      <form id="ask-form"><input id="q" placeholder="예: Codex 리셋 언제 적용돼?" autocomplete="off"><button>묻기</button></form>
+      <div id="answer" class="muted">수집한 자료만 근거로 답해요.</div>
+    </section>
+  </main>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let api, wasRunning = false, alertTimer = null;
+// 캐릭터 이름·화면 문구 (캐릭터 파일 [ui])
+let P = {name: "", ui: {}};
+const u = (k, v = {}) => (P.ui[k] || "").replace("{n}", v.n ?? "").replace("{msg}", v.msg ?? "");
+const ready = new Promise(r => window.addEventListener("pywebviewready", async () => {
+  api = window.pywebview.api;
+  P = await api.get_persona();
+  document.querySelectorAll(".tag").forEach(t => { t.textContent = P.name; t.style.display = P.name ? "" : "none"; });
+  $("#panel-title").textContent = P.name ? u("panel_title") : "POPME 브리핑";
+  $("#plan-q").placeholder = u("plan_placeholder");
+  r();
+}));
+
+// 파이썬이 창 모드를 바꿀 때 부름
+window.setMode = m => {
+  document.body.className = m;
+  if (m === "panel") loadBrief();
+  if (m !== "bubble") clearTimeout(alertTimer);
+};
+
+window.fillBubble = async (alert) => {
+  await ready;
+  const b = await api.get_briefing();
+  const today = b.agenda.filter(e => e.day.startsWith("오늘"));
+  const say = $("#say");
+  if (alert) {
+    say.className = alert.kind === "urgent" || alert.kind === "warn" ? "urgent" : "";
+    // 머리말은 파이썬이 캐릭터 파일 대사로 정해 보내고(alert.lead), 없으면 기본 문구
+    const lead = alert.lead ?? ({briefing: u("briefing_lead"), urgent: u("urgent_lead"),
+                  schedule: u("schedule_lead"), warn: u("warn_lead")}[alert.kind] || "");
+    say.innerHTML = lead + alert.text;
+  } else {
+    say.className = "";
+    say.innerHTML = today.length
+      ? `${u("today_events", {n: today.length})}<br><span class="muted">${today.slice(0, 3).map(e => esc(e.title)).join(" · ")}</span>`
+      : u("no_events");
+  }
+  $("#bubble-list").innerHTML = b.headlines.slice(0, 3).map(h => `<li>${h.urgent ? "🔥 " : ""}${h.html}</li>`).join("")
+    || `<li class="muted">${u("no_briefing")}</li>`;
+  measure("bubble");
+};
+
+// 내용 높이를 재서 창 크기를 맞춘다 (보이지 않아도, 지금 창 높이에 끌려가지 않게 min-height 무시)
+function measure(id) {
+  const el = $("#" + id), was = [el.style.display, el.style.minHeight];
+  el.style.display = "block"; el.style.minHeight = "0";
+  const h = el.offsetHeight;
+  [el.style.display, el.style.minHeight] = was;
+  api.fit(id, h);
+}
+
+// 새 브리핑·긴급 혜택·일정 임박·경고 — 20초 뒤 혼자 닫힘
+window.showAlert = async a => {
+  await fillBubble(a);
+  clearTimeout(alertTimer);
+  alertTimer = setTimeout(() => { if (document.body.className === "bubble") api.set_mode("pet"); }, 20000);
+};
+
+$("#bubble-more").onclick = () => api.set_mode("panel");
+$("#bubble-close").onclick = () => api.set_mode("pet");
+$("#to-pet").onclick = () => api.set_mode("pet");
+$("#bubble").addEventListener("mouseenter", () => clearTimeout(alertTimer));
+
+document.addEventListener("click", e => {
+  const a = e.target.closest("a[href]");
+  if (a) { e.preventDefault(); api.open_url(a.href); }
+});
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button, main section").forEach(x => x.classList.remove("on"));
+  b.classList.add("on"); $("#" + b.dataset.tab).classList.add("on");
+  ({brief: loadBrief, events: loadEvents, cands: loadCands})[b.dataset.tab]?.();
+});
+
+const CLS = {"새로 생김": "new", "바뀜": "changed", "지워짐": "deleted"};
+function agendaHtml(rows) {
+  let cur = null, h = "";
+  for (const e of rows) {
+    if (e.day !== cur) { h += `<div class="day">${esc(e.day)}</div>`; cur = e.day; }
+    h += `<div class="ev ${e.badge === "지워짐" ? "deleted" : ""}"><span class="when">${esc(e.time)}</span>
+      <span class="title">${esc(e.title)}${e.holiday ? ` <span class="muted">· 공휴일</span>` : ""}${e.badge ? `<span class="badge ${CLS[e.badge]}">${esc(e.badge)}</span>` : ""}${e.weather ? ` <span class="wx">${esc(e.weather)}</span>` : ""}</span></div>`;
+  }
+  return h || `<span class="muted">일정 없음</span>`;
+}
+
+const CATS = ["전체", "혜택", "업데이트", "흐름", "오픈소스", "커뮤니티", "발굴"];
+let briefCat = "전체", briefLow = false, briefData = null;
+function newsCard(it) {
+  const st = it.urgent ? "urgent" : it.status === "확인됨" ? "ok" : "unk";
+  const chips = [];
+  if (briefCat === "전체") chips.push(`<span class="chip cat">${esc(it.cat)}</span>`);
+  if (it.me) chips.push(`<span class="chip ${/해당 없음|비추천/.test(it.me) ? "no" : "me"}">${esc(it.me)}</span>`);
+  if (it.todo) chips.push(`<span class="chip do">할 일: ${esc(it.todo)}</span>`);
+  (it.chips || []).forEach(c => chips.push(`<span class="chip">${esc(c)}</span>`));
+  const links = (it.links || []).map(l => `<a href="${esc(l.url)}">${esc(l.label)}</a>`).join(", ");
+  return `<div class="news ${it.todo ? "todo" : ""} ${it.rel === 1 ? "dim" : ""}">
+    <div class="top"><span class="mark ${st}">${{urgent: "!", ok: "✓", unk: "?"}[st]}</span>
+      <div style="flex:1"><div class="t">${esc(it.title)}</div>${chips.length ? `<div class="chips">${chips.join("")}</div>` : ""}</div>
+      <span class="arrow">▼</span></div>
+    <div class="b">${esc(it.body)}${links ? ` → ${links}` : ""}</div></div>`;
+}
+function renderNews() {
+  const items = briefData.items;
+  const counts = c => c === "전체" ? items.length : items.filter(x => x.cat === c).length;
+  $("#filters").innerHTML = CATS.filter(c => counts(c)).map(c =>
+    `<button class="${c === briefCat ? "on" : ""}" data-c="${c}">${c} ${counts(c)}</button>`).join("");
+  $("#filters").querySelectorAll("button").forEach(b => b.onclick = () => { briefCat = b.dataset.c; briefLow = false; renderNews(); });
+  const list = items.filter(it => briefCat === "전체" || it.cat === briefCat)
+    .map((it, i) => [it, i]).sort((a, b) => (b[0].rel - a[0].rel) || (b[0].urgent - a[0].urgent) || (a[1] - b[1])).map(x => x[0]);
+  const group = (rows, name) => rows.length ? (name ? `<h3>${name}</h3>` : "") + rows.map(newsCard).join("") : "";
+  const lo = list.filter(it => it.rel < 2);
+  let h = briefCat === "전체"
+    ? group(list.filter(it => it.rel === 3), "꼭 볼 것") + group(list.filter(it => it.rel === 2), "알아두면 좋은 것")
+    : group(list.filter(it => it.rel >= 2));
+  if (lo.length) h += briefLow ? group(lo, "나머지") : `<button class="fold" id="fold">나머지 ${lo.length}개 보기 ▾</button>`;
+  $("#news").innerHTML = h || `<p class="muted">이 분류엔 소식이 없어요.</p>`;
+  $("#fold")?.addEventListener("click", () => { briefLow = true; renderNews(); });
+  $("#news").querySelectorAll(".news .top").forEach(t => t.onclick = () => t.parentNode.classList.toggle("open"));
+}
+
+async function loadBrief() {
+  await ready;
+  const b = await api.get_briefing();
+  if (b.items) {  // 카드 형식
+    briefData = b;
+    if (!CATS.includes(briefCat)) briefCat = "전체";
+    $("#brief").innerHTML = `<h1 class="title">${esc(b.title)} <span class="muted" style="font-size:12px">· ${b.items.length}개</span></h1>
+      <h3>일정</h3><div class="agenda">${agendaHtml(b.agenda)}</div>
+      <h3>소식</h3><div class="filters" id="filters"></div><div id="news"></div>`;
+    renderNews();
+    return;
+  }
+  const heads = b.headlines.map(h => `<li><span class="mark ${h.urgent ? "urgent" : h.status === "확인됨" ? "ok" : "unk"}">${h.urgent ? "!" : h.status === "확인됨" ? "✓" : "?"}</span><span>${h.html}</span></li>`).join("");
+  $("#brief").innerHTML = `<h1 class="title">${esc(b.title)}</h1>
+    <h3>일정</h3><div class="agenda">${agendaHtml(b.agenda)}</div>
+    <h3>헤드라인</h3>${heads ? `<ul class="heads">${heads}</ul>` : `<p class="muted">헤드라인이 없는 예전 형식이에요. 트레이 메뉴 > 브리핑만 다시 만들기</p>`}
+    ${b.details ? `<button id="more">자세히 ▾</button><div id="details">${b.details}</div>` : ""}`;
+  $("#more")?.addEventListener("click", () => {
+    const d = $("#details"); d.classList.toggle("on");
+    $("#more").textContent = d.classList.contains("on") ? "접기 ▴" : "자세히 ▾";
+  });
+}
+async function loadEvents() { $("#events-list").innerHTML = agendaHtml(await api.get_events()); }
+
+// 캐릭터에게 일정 부탁 → 승인 카드 → [넣어줘]를 눌러야만 TimeTree에 추가
+$("#plan-form").onsubmit = async e => {
+  e.preventDefault();
+  const q = $("#plan-q").value.trim(); if (!q) return;
+  $("#plan-card").innerHTML = `<div class="card"><div class="say">${u("plan_thinking")}</div></div>`;
+  const d = await api.plan_event(q);
+  if (d.error) { $("#plan-card").innerHTML = `<div class="card"><div class="say">${u("plan_fail", {msg: esc(d.error)})}</div></div>`; return; }
+  $("#plan-card").innerHTML = `<div class="card">
+    <div class="say">${u("plan_confirm")}</div>
+    <label><span>제목</span><input id="pc-title" value="${esc(d.title)}"></label>
+    <label><span>날짜</span><input id="pc-date" type="date" value="${esc(d.date)}"></label>
+    <label><span>캘린더</span><select id="pc-cal">${d.calendars.map(c => `<option value="${esc(c.id)}" ${c.id === d.calendar_id ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label>
+    ${d.unsure ? `<div class="unsure">확인해 주세요: ${esc(d.unsure)}</div>` : ""}
+    <div class="muted" style="font-size:11px">종일 일정으로 들어가요 · 공유 캘린더면 멤버에게 알림이 가요</div>
+    <div class="row"><button class="icon" id="pc-cancel">취소</button><button class="primary" id="pc-ok">넣어줘</button></div></div>`;
+  $("#pc-cancel").onclick = () => { $("#plan-card").innerHTML = ""; };
+  $("#pc-ok").onclick = async () => {
+    $("#pc-ok").disabled = true; $("#pc-ok").textContent = "넣는 중…";
+    const r = await api.add_event($("#pc-cal").value, $("#pc-title").value.trim(), $("#pc-date").value);
+    $("#plan-card").innerHTML = r.ok ? "" : `<div class="card"><div class="say">${u("add_fail", {msg: esc(r.error)})}</div></div>`;
+    if (r.ok) { $("#plan-q").value = ""; loadEvents(); }
+  };
+};
+async function loadCands() {
+  const rows = await api.get_candidates();
+  const link = c => c.platform === "threads"
+    ? `<span class="badge changed">Threads</span> <a href="https://www.threads.com/@${esc(c.handle.split("/")[1])}">@${esc(c.handle.split("/")[1])}</a>`
+    : `<span class="badge new">X</span> <a href="https://x.com/${esc(c.handle)}">@${esc(c.handle)}</a>`;
+  $("#cands").innerHTML = rows.length ? rows.map(c => `
+    <div class="cand"><div class="row"><b>${link(c)} ${esc(c.name || "")}</b>
+      <button data-h="${esc(c.handle)}" data-s="added">추가</button><button data-h="${esc(c.handle)}" data-s="dismissed">무시</button></div>
+      <div class="muted">${esc(c.reason)}</div></div>`).join("")
+    : `<p class="muted">아직 후보가 없어요.</p>`;
+  $("#cands").querySelectorAll("button[data-h]").forEach(b => b.onclick = async () => {
+    await api.set_candidate(b.dataset.h, b.dataset.s); loadCands();
+  });
+}
+
+async function poll() {
+  const s = await api.get_state();
+  $("#status").textContent = s.status + (s.last_run && !s.running ? ` · ${s.last_run}` : "");
+  $("#run").disabled = s.running;
+  $("#warnings").innerHTML = s.warnings.map(w => `<div class="warn">${esc(w)}</div>`).join("");
+  if (wasRunning && !s.running && s.mode === "panel") loadBrief();
+  wasRunning = s.running;
+}
+
+ready.then(() => {
+  $("#run").onclick = () => api.run_now().then(poll);
+  $("#ask-form").onsubmit = async e => {
+    e.preventDefault();
+    const q = $("#q").value.trim(); if (!q) return;
+    $("#answer").innerHTML = `<p class="muted">생각 중…</p>`;
+    $("#answer").innerHTML = await api.ask(q);
+  };
+  poll(); setInterval(poll, 2000);
+});
+</script>
+</body>
+</html>
