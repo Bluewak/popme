@@ -5,11 +5,16 @@ import threading
 import time
 from datetime import datetime
 
-from popme import briefing, chrome, config, discovery, event_weather
-from popme.collectors import NeedLogin, rss, threads, timetree, x
+from popme import briefing, chrome, config, discovery, event_weather, llm
+from popme.collectors import NeedLogin, ics, rss, threads, timetree, x
 from popme.db import DB
 
 log = logging.getLogger(__name__)
+
+
+def calendar_source(cfg):
+    """일정을 어디서 읽나: "timetree"(기본) | "ics"(구글·iCloud 등 ICS 주소) | "none"."""
+    return cfg.get("calendar", {}).get("source", "timetree")
 
 
 class Jobs:
@@ -37,17 +42,22 @@ class Jobs:
             first = ctx.pages[0] if ctx.pages else ctx.new_page()
             if self.cfg.get("chrome", {}).get("minimize_while_collecting"):
                 chrome.set_minimized(first, True)
+            source = calendar_source(self.cfg)
             try:
-                self.db.upsert_events(*timetree.collect(ctx, self.cfg, self._progress))
-                try:
-                    event_weather.refresh(self.cfg, self.db)  # 새 일정의 장소 → 그날 날씨
-                except Exception:
-                    log.exception("일정 장소 확인 실패")
+                if source == "ics":
+                    self.db.upsert_events(*ics.collect(self.cfg, self._progress, warnings))
+                elif source == "timetree":
+                    self.db.upsert_events(*timetree.collect(ctx, self.cfg, self._progress))
+                if source != "none":
+                    try:
+                        event_weather.refresh(self.cfg, self.db)  # 새 일정의 장소 → 그날 날씨
+                    except Exception:
+                        log.exception("일정 장소 확인 실패")
             except NeedLogin as e:
                 warnings.append(str(e))
             except Exception as e:
-                log.exception("TimeTree 실패")
-                warnings.append(f"TimeTree 수집 실패: {e}")
+                log.exception("일정 수집 실패")
+                warnings.append(f"일정 수집 실패: {e}")
             try:
                 handles = [a["handle"] for a in briefing.core_accounts(self.cfg, self.db)]
                 tweets = x.collect(ctx, self.cfg, handles, self._progress)
@@ -81,7 +91,7 @@ class Jobs:
                 self.db.upsert_items(items)
                 warnings += [f"RSS 실패 — {e}" for e in errs]
             if make_brief:
-                self._progress("브리핑 작성 중 (Claude)")
+                self._progress(f"브리핑 작성 중 ({llm.provider_name(self.cfg)})")
                 date, md, payload = briefing.make_briefing(self.cfg, self.db)
                 if warnings:
                     md += "\n\n---\n수집 경고\n" + "\n".join(f"- {w}" for w in warnings)

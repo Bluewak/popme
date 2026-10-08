@@ -116,7 +116,8 @@ BADGE = {"new": "새로 생김", "changed": "바뀜", "deleted": "지워짐"}
 
 def events_block(db, cfg):
     """반환: (위젯용 항목 리스트, 브리핑용 텍스트). 최근 36시간 안에 바뀐 일정에는 배지를 단다."""
-    today, items = agenda.upcoming(db, int(cfg.get("timetree", {}).get("days_ahead", 2)))
+    days = cfg.get("calendar", {}).get("days_ahead", cfg.get("timetree", {}).get("days_ahead", 2))
+    today, items = agenda.upcoming(db, int(days))
     try:
         event_weather.attach(db, items)  # 장소가 있는 일정에 그날 그곳 날씨
     except Exception:

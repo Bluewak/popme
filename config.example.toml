@@ -50,7 +50,16 @@ scrolls_per_page = 3
 searches = []
 tags = ["AI Threads", "Tech Threads", "AI", "인공지능AI", "AGI", "OpenAI", "Claude", "클로드코드", "코덱스", "바이브코딩", "MCP"]
 
-[timetree]
+[calendar]
+source = "timetree"                # 일정 어디서 읽나: "timetree" | "ics"(구글·iCloud·네이버 등 ICS 주소, 읽기 전용) | "none"
+days_ahead = 2                     # 오늘부터 며칠 뒤까지 보여줄지
+holidays = true                    # source = "ics"일 때 대한민국 공휴일도 표시 (구글 공휴일 캘린더)
+# source = "ics"일 때 읽을 캘린더 (여러 개 가능). 주소 얻는 법: docs/CALENDAR.md
+# ics = [
+#   { name = "내 캘린더", url = "https://calendar.google.com/calendar/ical/.../private-.../basic.ics" },
+#   { name = "iCloud",   url = "webcal://p00-caldav.icloud.com/published/2/..." },
+# ]
+[timetree]                         # source = "timetree"일 때
 url = "https://timetreeapp.com/calendars"   # 로그인 후 보이는 캘린더 주소로 바꿔도 됨
 days_ahead = 2
 default_calendar = ""              # 캐릭터에게 일정 부탁할 때 기본 캘린더 이름 (비우면 첫 캘린더). 다른 캘린더 서비스: docs/CALENDAR.md
@@ -117,5 +126,8 @@ group = "새 오픈소스·화제"
 max_chars = 200
 
 [llm]
+provider = "claude"   # 브리핑 쓸 AI: "claude"(Claude 구독, claude CLI) | "codex"(ChatGPT 구독, Codex CLI)
 claude_path = ""   # 비우면 PATH → VS Code 확장 내장 claude.exe 순으로 자동 탐색
 model = ""         # 비우면 Claude Code 기본 모델
+codex_path = ""    # 비우면 PATH → winget 설치 위치 순으로 자동 탐색 (설치: winget install OpenAI.Codex → codex login)
+codex_model = ""   # 비우면 Codex 기본 모델

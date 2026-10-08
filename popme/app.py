@@ -26,7 +26,7 @@ from PIL import Image, ImageDraw
 
 from popme import agenda, briefing, chrome, config, discovery, event_weather, planner, character, weather
 from popme.collectors import timetree
-from popme.jobs import Jobs
+from popme.jobs import Jobs, calendar_source
 from popme.pet import PetWindow
 
 log = logging.getLogger(__name__)
@@ -408,7 +408,9 @@ class Api:
 
     def get_persona(self):
         """화면 문구용: 캐릭터 이름·호칭·문구 (캐릭터 파일 [ui])."""
-        return {"name": self._char.name, "user": self._char.user, "ui": self._char.ui}
+        # can_add_event: TimeTree일 때만 일정 부탁(쓰기) 가능 — ICS는 읽기 전용
+        return {"name": self._char.name, "user": self._char.user, "ui": self._char.ui,
+                "can_add_event": calendar_source(self._jobs.cfg) == "timetree"}
 
     def plan_event(self, text):
         """부탁 문장 → 승인 카드용 일정 초안 (아직 TimeTree에 안 씀)."""
@@ -462,7 +464,8 @@ class Api:
 
     def open_chrome_login(self):
         threading.Thread(target=chrome.open_for_login,
-                         args=(int(self._jobs.cfg.get("chrome", {}).get("port", 9333)),), daemon=True).start()
+                         args=(int(self._jobs.cfg.get("chrome", {}).get("port", 9333)),
+                               calendar_source(self._jobs.cfg) == "timetree"), daemon=True).start()
 
     def open_folder(self):
         os.startfile(config.BRIEFING_DIR)

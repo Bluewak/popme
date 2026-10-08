@@ -151,6 +151,7 @@ const u = (k, v = {}) => (P.ui[k] || "").replace("{n}", v.n ?? "").replace("{msg
 const ready = new Promise(r => window.addEventListener("pywebviewready", async () => {
   api = window.pywebview.api;
   P = await api.get_persona();
+  if (!P.can_add_event) $("#plan-form").style.display = "none";  // ICS 캘린더는 읽기 전용
   document.querySelectorAll(".tag").forEach(t => { t.textContent = P.name; t.style.display = P.name ? "" : "none"; });
   $("#panel-title").textContent = P.name ? u("panel_title") : "POPME 브리핑";
   $("#plan-q").placeholder = u("plan_placeholder");

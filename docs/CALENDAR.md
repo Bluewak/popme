@@ -1,6 +1,6 @@
 # 일정: TimeTree 대신 다른 캘린더 쓰기
 
-POPME v1은 **TimeTree**를 씁니다. TimeTree 공식 API는 2023-12-22에 종료됐기 때문에, 로그인해 둔 전용 Chrome에서 TimeTree 웹 앱과 같은 요청을 보내 일정을 읽고 씁니다.
+POPME는 기본으로 **TimeTree**를 씁니다. 구글·iCloud 등은 **A(ICS 주소)를 설정만 하면** 바로 쓸 수 있습니다. TimeTree 공식 API는 2023-12-22에 종료됐기 때문에, 로그인해 둔 전용 Chrome에서 TimeTree 웹 앱과 같은 요청을 보내 일정을 읽고 씁니다.
 
 다른 캘린더(Google, 네이버, Outlook, Apple 등)를 쓰려면 **일정을 다루는 4곳만** 바꾸면 됩니다. 브리핑·수집·캐릭터 쪽은 손대지 않아도 됩니다.
 
@@ -37,49 +37,29 @@ POPME v1은 **TimeTree**를 씁니다. TimeTree 공식 API는 2023-12-22에 종�
 
 ## 3. 서비스별 방법
 
-### A. ICS(iCal) 주소로 읽기 — 가장 쉬움, 읽기 전용
-Google 캘린더(설정 > 캘린더 통합 > **iCal 형식의 비공개 주소**), 네이버 캘린더(캘린더 관리 > 공유/내보내기), Outlook(게시된 캘린더), Apple iCloud(공개 캘린더) 모두 ICS 주소를 줍니다.
-
-```python
-# popme/collectors/ics.py (예시 뼈대) — pip install icalendar
-import json, urllib.request
-from datetime import date, datetime, timezone
-from icalendar import Calendar
-
-def collect(cfg, progress=lambda s: None):
-    events, synced = [], []
-    for cal in cfg["ics"]["calendars"]:            # config.toml: [[ics.calendars]] name, url
-        progress(f"캘린더: {cal['name']}")
-        data = urllib.request.urlopen(cal["url"], timeout=20).read()
-        cid = f"{cal['name']}:{cal['name']}"
-        synced.append(cid)
-        for ev in Calendar.from_ical(data).walk("VEVENT"):
-            s = ev.decoded("DTSTART"); e = ev.decoded("DTEND", s)
-            all_day = isinstance(s, date) and not isinstance(s, datetime)
-            to_iso = lambda v: (datetime(v.year, v.month, v.day, tzinfo=timezone.utc) if all_day
-                                else v.astimezone(timezone.utc)).isoformat()
-            rr = ev.get("RRULE")
-            events.append({
-                "id": str(ev.get("UID")), "calendar_id": cid, "title": str(ev.get("SUMMARY", "(제목 없음)")),
-                "start_at": to_iso(s), "end_at": to_iso(e if not all_day else s), "all_day": int(all_day),
-                "updated_at": str(ev.get("LAST-MODIFIED", ev.get("DTSTAMP", ""))), "deleted": 0,
-                "recurrences": json.dumps([f"RRULE:{rr.to_ical().decode()}"] if rr else []),
-                "location": str(ev.get("LOCATION")) if ev.get("LOCATION") else None,
-            })
-    return events, synced
-```
+### A. ICS(iCal) 주소로 읽기 — 설정만 하면 됨 (내장), 읽기 전용
+코드가 이미 들어 있습니다 (`popme/collectors/ics.py`). `config.toml`에 주소만 넣으세요.
 
 ```toml
-# config.toml
-[[ics.calendars]]
-name = "개인"
-url = "https://calendar.google.com/calendar/ical/.../basic.ics"   # 비공개 주소는 비밀번호처럼 다루기
+[calendar]
+source = "ics"
+holidays = true      # 대한민국 공휴일도 표시 (구글 공휴일 캘린더)
+ics = [
+  { name = "내 캘린더", url = "https://calendar.google.com/calendar/ical/.../private-.../basic.ics" },
+]
 ```
 
-그다음 `jobs.py`에서 `self.db.upsert_events(*ics.collect(self.cfg, self._progress))`로 바꾸고, 일정 추가는 생략합니다 (ICS는 읽기만 가능).
+캘린더별 주소 얻는 법 (비공개 주소는 **비밀번호처럼** 다루세요 — 주소만 알면 누구나 일정을 볼 수 있음)
+- **구글 캘린더**: PC에서 calendar.google.com → 왼쪽 캘린더 이름 옆 ⋮ → 설정 및 공유 → 맨 아래 **"iCal 형식의 비공개 주소"** 복사
+- **iCloud(아이폰 기본 캘린더)**: 아이폰 캘린더 앱 → 아래 '캘린더' → 캘린더 옆 ⓘ → **"공개 캘린더" 켜기** → 링크 공유로 `webcal://...` 주소 복사 (그대로 붙여 넣어도 됨)
+- **네이버 캘린더**: 환경설정 → 캘린더 관리 → 내보내기/공유의 ICS 주소
+- **Outlook**: 설정 → 캘린더 → 공유 캘린더 → 캘린더 게시 → ICS 링크
+- **미니캘·타임블럭스 같은 아이폰 캘린더 앱**: 일정을 직접 갖지 않고 iCloud·구글 캘린더와 동기화하는 앱이 많습니다. 앱 설정에서 어느 계정과 연결돼 있는지 보고, **그 원본 캘린더**의 주소를 위 방법으로 넣으세요.
 
-> 참고: ICS의 종일 일정 `DTEND`는 "다음 날"입니다. 위 예시는 하루짜리로 단순화했으니, 여러 날 일정이 중요하면 `end_at = DTEND - 1일`로 바꾸세요.
-
+알아둘 점
+- 수집할 때마다 전체를 다시 받아서, 새로 생김·바뀜·지워짐 표시와 반복 일정(뺀 날·옮긴 회차 포함), 여러 날 일정, 일정 장소 날씨가 모두 그대로 동작합니다.
+- ICS는 읽기만 되므로 일정 탭의 "부탁하기"(일정 추가)는 숨겨집니다.
+- 구글 비공개 주소는 반영이 몇 분~몇 시간 늦을 수 있습니다 (구글 쪽 캐시).
 ### B. Google Calendar API — 읽기·쓰기
 1. Google Cloud에서 프로젝트 생성 → Calendar API 사용 설정 → OAuth 클라이언트(데스크톱 앱) 만들기 → `credentials.json` 받기
 2. `pip install google-api-python-client google-auth-oauthlib`
@@ -92,7 +72,7 @@ url = "https://calendar.google.com/calendar/ical/.../basic.ics"   # 비공개 �
 - TimeTree처럼 **전용 Chrome에 로그인해 두고 웹 앱의 요청을 따라 하는** 방법도 있습니다. `timetree.py`의 `_session()`(헤더 얻기)과 `FETCH_JS`(페이지 안에서 fetch) 패턴을 그대로 참고하세요. 웹 앱이 바뀌면 깨질 수 있습니다.
 
 ### D. 일정 기능 끄기
-`jobs.py`의 TimeTree 수집 부분을 지우면 됩니다. 브리핑·캐릭터·날씨는 그대로 동작하고, 일정 관련 대사와 표시만 빠집니다.
+`config.toml`에서 `[calendar] source = "none"`으로 두면 됩니다. 브리핑·캐릭터·날씨는 그대로 동작하고, 일정 관련 대사와 표시만 빠집니다.
 
 ## 4. 사용자 습관에 맞는 부분 (필요하면 같이 바꾸기)
 - 일정 추가는 **종일 일정 + 제목에 시간**("3시 치과")으로 넣습니다. 시간 지정 일정으로 넣고 싶으면 `planner.py`의 프롬프트와 ③에서 시간을 쓰도록 바꾸세요.
