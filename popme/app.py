@@ -449,6 +449,14 @@ class Api:
             self._say("event_failed", msg=str(e)[:40])
             return {"ok": False, "error": str(e)}
 
+    def get_weather(self):
+        """말풍선·브리핑 위쪽 날씨 칸. 위치를 처음 잡을 땐 몇 초 걸려서 화면이 따로 불러 나중에 채운다."""
+        try:
+            return weather.summary(self._jobs.cfg)
+        except Exception:
+            log.exception("날씨 칸 실패")
+            return None
+
     def get_candidates(self):
         return discovery.candidates(self._jobs.db, limit=15)
 

@@ -103,3 +103,15 @@ def test_event_place_reasked_when_location_changes(tmp_path, monkeypatch):
                        "end_at": None, "all_day": 0, "updated_at": "2", "deleted": 0, "recurrences": "[]",
                        "location": "해운대"}])
     assert event_weather.refresh({}, db) == 1 and "해운대" in asked[-1]  # 장소 칸만 바뀌어도 다시 물음
+
+
+def test_summary_today_and_tomorrow(monkeypatch):
+    tomorrow = (datetime.now(KST).date() + timedelta(days=1)).isoformat()
+    hours = [f"{TODAY}T{h:02d}:00" for h in range(24)]
+    serve(monkeypatch, daily=daily_json([(TODAY, 3, 25, 12, 0), (tomorrow, 61, 18, 14, 70)]),
+          air={"hourly": {"time": hours, "pm10": [90] * 24, "pm2_5": [20] * 24}})
+    monkeypatch.setattr(weather.location, "current", lambda cfg: {"lat": 1, "lon": 2, "name": "서울"})
+    s = weather.summary({})
+    assert s["place"] == "서울" and [d["label"] for d in s["days"]] == ["오늘", "내일"]
+    assert s["days"][0]["desc"] == "일교차 큼" and s["days"][0]["air_bad"]  # 오늘 미세먼지 나쁨
+    assert s["days"][1]["desc"] == "비 소식" and s["days"][1]["air"] is None  # 내일 대기질 자료 없음

@@ -8,6 +8,7 @@ import json
 import logging
 import time
 import urllib.request
+from datetime import timedelta
 
 from popme import clock, location
 
@@ -118,6 +119,22 @@ def today(cfg):
         return None
     w = on(pos["lat"], pos["lon"], clock.today().isoformat())  # 캐시가 자정을 넘기면 맨 앞 날짜는 어제라 날짜로 고른다
     return {**w, "place": pos["name"]} if w else None
+
+
+def summary(cfg):
+    """화면 위쪽 날씨 칸: 지금 있는 곳의 오늘·내일 (말풍선은 오늘만 쓴다)."""
+    pos = location.current(cfg)
+    if not pos:
+        return None
+    days = []
+    for i, label in enumerate(("오늘", "내일")):
+        w = on(pos["lat"], pos["lon"], (clock.today() + timedelta(days=i)).isoformat())
+        if w:
+            cat = category(w)
+            icon, desc = DESC[cat]
+            days.append({"label": label, "icon": icon, "desc": desc, "min": w["min"], "max": w["max"],
+                         "rain": w["rain"], "air": w.get("air"), "air_bad": air_bad(w)})
+    return {"place": pos["name"], "days": days} if days else None
 
 
 def category(w):

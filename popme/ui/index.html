@@ -33,6 +33,11 @@
   #say.urgent { color: var(--err); }
   #bubble ul { margin: 4px 0 10px; padding-left: 16px; }
   #bubble li { margin: 3px 0; }
+  /* 날씨 칸: 말풍선은 오늘 한 줄, 브리핑은 오늘·내일 */
+  .wx { font-size: 12px; color: var(--muted); margin: 4px 0 2px; } .wx:empty { display: none; }
+  .wx .bad, .wx-strip .bad { color: var(--err); }
+  .wx-strip { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 5px 10px; font-size: 12.5px; margin-bottom: 4px; }
+  .wx-strip:empty { display: none; } .wx-strip div { margin: 2px 0; } .wx-strip b { color: var(--brown); margin-right: 6px; }
   #bubble .row { display: flex; gap: 6px; justify-content: flex-end; align-items: center; }
 
   /* ---- 패널 ---- */
@@ -120,6 +125,7 @@
 <div id="bubble">
   <span class="tag"></span>
   <div id="say"></div>
+  <div id="bubble-wx" class="wx"></div>
   <ul id="bubble-list"></ul>
   <div class="row"><button class="icon" id="bubble-close">닫기</button><button class="primary" id="bubble-more">자세히</button></div>
 </div>
@@ -195,7 +201,26 @@ window.fillBubble = async (alert) => {
   $("#bubble-list").innerHTML = b.headlines.slice(0, 3).map(h => `<li>${h.urgent ? "🔥 " : ""}${h.html}</li>`).join("")
     || `<li class="muted">${u("no_briefing")}</li>`;
   measure("bubble");
+  // 날씨는 위치 확인에 몇 초 걸릴 수 있어 따로 받아 채우고, 창 높이를 다시 맞춘다
+  api.get_weather().then(w => {
+    const d = w && w.days[0];
+    $("#bubble-wx").innerHTML = d ? `${esc(w.place)} · ${wxText(d, true)}` : "";
+    measure("bubble");
+  });
 };
+
+// 날씨 한 줄: "🌡 12~25° 일교차 큼 · 강수 40% · 😷 미세먼지 나쁨" (short = 말풍선용, 미세먼지는 나쁠 때만)
+function wxText(d, short) {
+  const rain = d.rain >= 30 ? ` · 강수 ${d.rain}%` : "";
+  const air = d.air && (!short || d.air_bad)
+    ? ` · <span class="${d.air_bad ? "bad" : ""}">${d.air_bad ? "😷 " : ""}미세먼지 ${esc(d.air)}</span>` : "";
+  return `${d.icon} ${d.min}~${d.max}° ${esc(d.desc)}${rain}${air}`;
+}
+async function fillBriefWeather() {
+  const w = await api.get_weather(), el = $("#brief-wx");
+  if (el) el.innerHTML = w ? w.days.map(d => `<div><b>${d.label}</b>${wxText(d)}</div>`).join("")
+    + `<div class="muted" style="font-size:11px">${esc(w.place)} 기준</div>` : "";
+}
 
 // 내용 높이를 재서 창 크기를 맞춘다 (보이지 않아도, 지금 창 높이에 끌려가지 않게 min-height 무시)
 function measure(id) {
@@ -281,16 +306,20 @@ async function loadBrief() {
     briefData = b;
     if (!CATS.includes(briefCat)) briefCat = "전체";
     $("#brief").innerHTML = `<h1 class="title">${esc(b.title)} <span class="muted" style="font-size:12px">· ${b.items.length}개</span></h1>
+      <div class="wx-strip" id="brief-wx"></div>
       <h3>일정</h3><div class="agenda">${agendaHtml(b.agenda)}</div>
       <h3>소식</h3><div class="filters" id="filters"></div><div id="news"></div>`;
     renderNews();
+    fillBriefWeather();
     return;
   }
   const heads = b.headlines.map(h => `<li><span class="mark ${h.urgent ? "urgent" : h.status === "확인됨" ? "ok" : "unk"}">${h.urgent ? "!" : h.status === "확인됨" ? "✓" : "?"}</span><span>${h.html}</span></li>`).join("");
   $("#brief").innerHTML = `<h1 class="title">${esc(b.title)}</h1>
+    <div class="wx-strip" id="brief-wx"></div>
     <h3>일정</h3><div class="agenda">${agendaHtml(b.agenda)}</div>
     <h3>헤드라인</h3>${heads ? `<ul class="heads">${heads}</ul>` : `<p class="muted">헤드라인이 없는 예전 형식이에요. 트레이 메뉴 > 브리핑만 다시 만들기</p>`}
     ${b.details ? `<button id="more">자세히 ▾</button><div id="details">${b.details}</div>` : ""}`;
+  fillBriefWeather();
   $("#more")?.addEventListener("click", () => {
     const d = $("#details"); d.classList.toggle("on");
     $("#more").textContent = d.classList.contains("on") ? "접기 ▴" : "자세히 ▾";
