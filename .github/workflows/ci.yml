@@ -10,14 +10,14 @@ jobs:
   check:
     runs-on: windows-latest   # 위젯이 Windows 전용이라 같은 환경에서
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: 개인 파일·문구 검사
         env:
           PRIVATE_WORDS: ${{ secrets.PRIVATE_WORDS }}   # 개인 단어 목록 (Settings > Secrets). 코드엔 안 적음
         run: python tools/check_private.py --all
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: pip
