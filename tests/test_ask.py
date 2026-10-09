@@ -35,20 +35,22 @@ def test_answer_reports_stages_and_search(tmp_path, monkeypatch):
             {"date": "2026-09-10", "text": "simonw가 MCP 서버 소개", "status": "미확인",
              "links": [{"label": "원문", "url": "https://x.com/simonw/status/1"}]}]}),
     ])
-    monkeypatch.setattr(briefing.llm, "ask", lambda *a, **k: next(replies))
+    systems = []
+    monkeypatch.setattr(briefing.llm, "ask", lambda cfg, system, *a, **k: (systems.append(system), next(replies))[1])
     stages = []
     res = briefing.answer({}, db, "지난달 MCP 누가 얘기했어?", lambda s, i=None: stages.append((s, i)))
     assert [s for s, _ in stages] == ["plan", "search", "write"]
     assert stages[1][1] == {"keywords": ["MCP"], "since": "2026-09-01", "until": "2026-09-30"}
     assert res["search"]["counts"]["posts"] == 1
     assert res["points"][0]["links"][0]["url"] == "https://x.com/simonw/status/1"  # 검색 결과에 있던 링크라 남음
+    assert "높임말" in systems[1] and "반말" in briefing.SYSTEM  # 답은 높임말, 브리핑 카드는 반말 그대로
 
 
 def test_character_ask_defaults(tmp_path, monkeypatch):
     f = tmp_path / "c.toml"
-    f.write_text('[persona]\nname = "X"\ncall_user = "님"\n[ui]\nask_thinking = "{user}, 「{q}」 볼게요"\n'
-                 '[behavior]\nchatter_bubble_sec = 5\n[lines]\ngreet_morning = ["hi"]\n', encoding="utf-8")
+    f.write_text('[persona]\nname = "X"\ncall_user = "님"\n[behavior]\nchatter_bubble_sec = 5\n'
+                 '[lines]\nask_start = ["「{q}」 볼게요"]\n', encoding="utf-8")
     monkeypatch.setattr(character, "character_path", lambda: f)
     c = character.Character()
-    assert c.ui["ask_thinking"] == "님, 「{q}」 볼게요"  # {q}는 화면에서 채운다
+    assert c.line("ask_start", q="MCP") == "「MCP」 볼게요"  # 질문 시작: 옆 말풍선
     assert c.line("ask_failed", msg="x") == "답을 못 했어요: x"  # 캐릭터 파일에 없으면 기본 대사

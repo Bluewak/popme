@@ -36,7 +36,7 @@ UI_STATE = config.DATA_DIR / "ui.json"
 SIZES = {"bubble": (330, 200), "panel": (420, 640)}  # 논리 px. 말풍선 높이는 내용에 맞춰 바뀜
 # 창이 열려 있어도 (옆으로) 말하는 '사건' 대사. 나머지(인사·잡담·잠꼬대)는 창이 닫혀 있을 때만
 EVENT_LINES = {"collecting", "warn", "petted", "return_from_away", "event_added", "event_failed",
-               "ask_done", "ask_none", "ask_failed"}
+               "ask_start", "ask_done", "ask_none", "ask_failed"}
 PET_FILES = {"idle": "pet", "busy": "pet_busy", "happy": "pet_happy", "alert": "pet_alert", "sleepy": "pet_sleepy"}
 
 user32 = ctypes.windll.user32
@@ -473,6 +473,7 @@ class Api:
             self._ask.update(stage=stage, info={**self._ask["info"], **(info or {})})
 
         self._ask.update(running=True, stage="plan", info={})
+        self._say("ask_start", q=question if len(question) <= 30 else question[:30] + "…")  # 옆 말풍선으로 안내
         try:
             res = briefing.answer(self._jobs.cfg, self._jobs.db, question, progress)
             self._say("ask_done" if res["found"] else "ask_none")

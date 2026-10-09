@@ -157,7 +157,7 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;
 let api, wasRunning = false, alertTimer = null;
 // 캐릭터 이름·화면 문구 (캐릭터 파일 [ui])
 let P = {name: "", ui: {}};
-const u = (k, v = {}) => (P.ui[k] || "").replace("{n}", v.n ?? "").replace("{msg}", v.msg ?? "").replace("{q}", v.q ?? "");
+const u = (k, v = {}) => (P.ui[k] || "").replace("{n}", v.n ?? "").replace("{msg}", v.msg ?? "");
 const ready = new Promise(r => window.addEventListener("pywebviewready", async () => {
   api = window.pywebview.api;
   P = await api.get_persona();
@@ -394,10 +394,9 @@ ready.then(() => {
     const q = $("#q").value.trim(); if (!q || asking) return;
     asking = true; $("#q").value = "";
     const btn = $("#ask-form button"); btn.disabled = true; btn.textContent = "생각 중…";
-    const short = q.length > 40 ? q.slice(0, 40) + "…" : q;
     const box = document.createElement("div"); box.className = "qa";
     box.innerHTML = `<div class="myq">${esc(q)}</div>
-      <div class="card"><div class="say">${u("ask_thinking", {q: esc(short)})}</div><ul class="steps"></ul></div>`;
+      <div class="card"><ul class="steps"></ul></div>`;  // 안내 문구는 캐릭터가 옆 말풍선으로 (ask_start)
     if (!$("#answer .qa")) $("#answer").innerHTML = "";
     $("#answer").prepend(box);
     const timer = setInterval(async () => drawSteps(box, (await api.get_state()).ask), 700);
