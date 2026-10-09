@@ -11,8 +11,9 @@ from datetime import date, datetime, timedelta, timezone
 
 import icalendar
 
+from popme import clock
+
 log = logging.getLogger(__name__)
-KST = timezone(timedelta(hours=9))
 HOLIDAY_URL = ("https://calendar.google.com/calendar/ical/"
                "ko.south_korea.official%23holiday%40group.v.calendar.google.com/public/basic.ics")
 
@@ -27,8 +28,8 @@ def fetch(url, timeout=30):
 
 
 def _utc_iso(dt):
-    if dt.tzinfo is None:  # 시간대 없는 시각은 한국 시간으로 본다
-        dt = dt.replace(tzinfo=KST)
+    if dt.tzinfo is None:  # 시간대 없는 시각(floating)은 PC 시간대로 본다
+        dt = dt.replace(tzinfo=clock.tz())
     return dt.astimezone(timezone.utc).isoformat()
 
 
@@ -39,7 +40,7 @@ def _day_iso(d):
 
 def _local_date(v):
     if isinstance(v, datetime):
-        return (v.replace(tzinfo=KST) if v.tzinfo is None else v).astimezone(KST).date()
+        return (v.replace(tzinfo=clock.tz()) if v.tzinfo is None else v).astimezone(clock.tz()).date()
     return v
 
 

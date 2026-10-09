@@ -6,8 +6,8 @@ from datetime import datetime, timedelta, timezone
 from popme import event_weather, weather
 from popme.db import DB
 
-KST = timezone(timedelta(hours=9))
-TODAY = datetime.now(KST).date().isoformat()  # 앱처럼 한국 시간 기준 (CI 서버는 UTC)
+from conftest import KST  # conftest가 PC를 한국 시간으로 고정
+TODAY = datetime.now(KST).date().isoformat()
 
 
 def daily_json(days):

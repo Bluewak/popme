@@ -4,7 +4,7 @@ import logging
 import re
 from datetime import datetime, timedelta, timezone
 
-from popme import agenda, discovery, event_weather, llm, search
+from popme import agenda, clock, discovery, event_weather, llm, search
 from popme.character import Character
 
 log = logging.getLogger(__name__)
@@ -97,13 +97,12 @@ SEARCH_PLAN = """오늘은 {today}(한국 시간)다. 아래 질문에 답하려
 질문: {question}"""
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
-KST = timezone(timedelta(hours=9))
 
 
 def _local(iso):
     if not iso:
         return "?"
-    return datetime.fromisoformat(iso).astimezone(KST).strftime("%m-%d %H:%M")
+    return datetime.fromisoformat(iso).astimezone(clock.tz()).strftime("%m-%d %H:%M")
 
 
 def _tweet_line(t):
@@ -357,8 +356,8 @@ def make_briefing(cfg, db):
     payload = fix_titles(cfg, clean_items(raw, data))
     if not payload["items"]:
         raise RuntimeError("브리핑 카드가 비어 있음")
-    today = datetime.now(KST).strftime("%Y-%m-%d")
-    header = f"# {datetime.now(KST).strftime('%m월 %d일')} 아침 브리핑\n"
+    today = clock.now().strftime("%Y-%m-%d")
+    header = f"# {clock.now().strftime('%m월 %d일')} 아침 브리핑\n"
     return today, to_markdown(header, payload), payload
 
 
@@ -400,7 +399,7 @@ def load_payload(b):
 
 def today_character_lines(db):
     b = db.latest_briefing()
-    if not b or b["date"] != datetime.now(KST).strftime("%Y-%m-%d"):
+    if not b or b["date"] != clock.now().strftime("%Y-%m-%d"):
         return []
     p = load_payload(b)
     if p:
@@ -417,7 +416,7 @@ def plan_search(cfg, question):
     """질문 → (검색어, 시작일, 끝일). Claude가 못 뽑으면 단어에서 조사를 떼어 쓴다."""
     try:
         p = parse_json(llm.ask(cfg, SEARCH_SYSTEM, SEARCH_PLAN.format(
-            today=datetime.now(KST).strftime("%Y-%m-%d (%a)"), question=question), timeout=120))
+            today=clock.now().strftime("%Y-%m-%d (%a)"), question=question), timeout=120))
         kw = [str(k).strip()[:40] for k in (p.get("keywords") or []) if str(k).strip()][:8]
         day = lambda v: v if isinstance(v, str) and DATE_RE.match(v) else None
         return kw, day(p.get("since")), day(p.get("until"))

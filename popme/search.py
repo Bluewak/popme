@@ -7,7 +7,8 @@ import math
 import re
 from datetime import datetime, timedelta, timezone
 
-KST = timezone(timedelta(hours=9))
+from popme import clock
+
 STOP = {"누가", "누구", "뭐", "무엇", "무슨", "언제", "어디", "어떻게", "왜", "알려줘", "알려", "있었어", "있어", "했어",
         "했지", "얘기", "이야기", "관련", "소식", "요즘", "최근", "오늘", "어제", "지난", "이번", "정리", "해줘", "좀"}
 PARTICLE = re.compile(r"(에서|으로|이랑|한테|에게|까지|부터|은|는|이|가|을|를|에|의|로|와|과|도|만|랑|야|지)$")
@@ -28,9 +29,9 @@ def fallback_keywords(question):
 
 
 def _range(since, until):
-    """'YYYY-MM-DD'(KST) → UTC ISO 범위. until은 그날 끝까지."""
+    """'YYYY-MM-DD'(PC 시간대 날짜) → UTC ISO 범위. until은 그날 끝까지."""
     def utc(d, plus=0):
-        return (datetime.fromisoformat(d).replace(tzinfo=KST) + timedelta(days=plus)).astimezone(timezone.utc).isoformat()
+        return (datetime.fromisoformat(d).replace(tzinfo=clock.tz()) + timedelta(days=plus)).astimezone(timezone.utc).isoformat()
     return (utc(since) if since else "", utc(until, 1) if until else "9999")
 
 
@@ -48,7 +49,7 @@ def _hits(text, keywords):
 
 
 def _day(iso):
-    return datetime.fromisoformat(iso).astimezone(KST).strftime("%Y-%m-%d") if iso else "?"
+    return datetime.fromisoformat(iso).astimezone(clock.tz()).strftime("%Y-%m-%d") if iso else "?"
 
 
 def find(db, keywords, since=None, until=None, limits=(60, 30, 20, 10)):

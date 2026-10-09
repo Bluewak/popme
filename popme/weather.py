@@ -8,15 +8,13 @@ import json
 import logging
 import time
 import urllib.request
-from datetime import datetime, timedelta, timezone
 
-from popme import location
+from popme import clock, location
 
 log = logging.getLogger(__name__)
-KST = timezone(timedelta(hours=9))  # 예보·일정 날짜는 한국 시간 기준 (PC·서버 시계와 무관하게)
 _cache = {}  # (종류, lat, lon) → (만료 시각, 데이터)
 
-BASE = "latitude={lat:.2f}&longitude={lon:.2f}&timezone=Asia%2FSeoul"
+BASE = "latitude={lat:.2f}&longitude={lon:.2f}&timezone=auto"  # 날짜 구분은 예보 장소의 현지 시간
 URLS = {
     "daily": "https://api.open-meteo.com/v1/forecast?" + BASE + "&forecast_days=16"
              "&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
@@ -118,7 +116,7 @@ def today(cfg):
     pos = location.current(cfg)
     if not pos:
         return None
-    w = on(pos["lat"], pos["lon"], datetime.now(KST).date().isoformat())  # 캐시가 자정을 넘기면 맨 앞 날짜는 어제라 날짜로 고른다
+    w = on(pos["lat"], pos["lon"], clock.today().isoformat())  # 캐시가 자정을 넘기면 맨 앞 날짜는 어제라 날짜로 고른다
     return {**w, "place": pos["name"]} if w else None
 
 
