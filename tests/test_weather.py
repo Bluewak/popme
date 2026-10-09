@@ -1,12 +1,13 @@
 """날씨 (popme/weather.py): Open-Meteo 응답 처리·캐시·판단 기준, 일정 장소 다시 뽑기."""
 import io
 import json
-from datetime import date, timedelta
+from datetime import datetime, timedelta, timezone
 
 from popme import event_weather, weather
 from popme.db import DB
 
-TODAY = date.today().isoformat()
+KST = timezone(timedelta(hours=9))
+TODAY = datetime.now(KST).date().isoformat()  # 앱처럼 한국 시간 기준 (CI 서버는 UTC)
 
 
 def daily_json(days):
@@ -48,7 +49,7 @@ def test_failure_is_cached_briefly(monkeypatch):
 
 
 def test_today_uses_todays_date_not_first_key(monkeypatch):
-    yesterday = (date.today() - timedelta(days=1)).isoformat()
+    yesterday = (datetime.now(KST).date() - timedelta(days=1)).isoformat()
     serve(monkeypatch, daily=daily_json([(yesterday, 61, 10, 5, 90), (TODAY, 0, 22, 18, 0)]))  # 자정 넘긴 캐시처럼
     monkeypatch.setattr(weather.location, "current", lambda cfg: {"lat": 1, "lon": 2, "name": "서울"})
     t = weather.today({})
