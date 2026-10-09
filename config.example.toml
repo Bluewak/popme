@@ -45,10 +45,36 @@ discovery_searches = [
 [threads]
 accounts = []                     # 꾸준히 볼 Threads 계정 (발굴 탭에서 "추가"하면 자동 포함)
 scrolls_per_page = 3
-# 발굴: 여러 태그에 반복 등장 + 반응 큰 한국어 작성자를 후보로 (점수 = 2×등장 수 + 좋아요합/100)
+# 발굴: 여러 태그에 반복 등장 + 반응 큰 한국어 작성자를 후보 풀로 (점수 = 2×등장 곳(넓은 태그는 0.5) + 3×log10(좋아요합)).
+# 풀에서 [discovery] 기준(팔로워·꾸준함)을 통과한 계정만 발굴 탭에 보인다
 # 태그 중심 (Threads 프로필 "관심사" 목록 = 토픽 태그). 키워드 검색은 필요할 때만 searches에 추가
 searches = []
 tags = ["AI Threads", "Tech Threads", "AI", "인공지능AI", "AGI", "OpenAI", "Claude", "클로드코드", "코덱스", "바이브코딩", "MCP"]
+
+# 발굴 기준 (전부 생략 가능, 아래가 기본값). 자세한 단계 설명은 popme/discovery.py 맨 위
+# 1단계 인기: 카테고리별 팔로워 [통과, 지켜보기] — 시장 크기가 달라 기준이 다르다
+# 2단계 꾸준함: 국내 X·Threads만 (세계 기업·개인은 가끔 올려도 파급력이 커서 면제)
+[discovery]
+person_min_orgs = 2         # 개인: 서로 다른 회사의 핵심 계정 몇 곳이 반응해야 하나 (같은 회사끼리는 1곳)
+person_window_days = 14
+company_min_orgs = 3        # 기업: 서로 다른 회사 몇 곳이
+company_min_weeks = 3       #       최근 company_window_days 중 몇 주에 걸쳐 반응해야 하나
+company_window_days = 56
+recent_days = 14            # 꾸준함: 마지막 글이 며칠 이내
+min_posts_30d = 4           #         30일 글 수
+min_active_weeks = 3        #         최근 4주 중 글 쓴 주
+min_topic_share = 0.5       #         AI·개발 글 비율
+liked_min = 10              #         좋아요 liked_min 이상인 글이
+min_liked_posts = 3         #         몇 개 이상
+checks_per_run = 5          # 실행마다 프로필을 열어 확인할 후보 수 (플랫폼별)
+recheck_days = 14           # 한 번 확인한 후보는 며칠 동안 다시 열지 않음
+review_after_days = 28      # 승인 계정이 이 기간 넘게 꾸준함 미달이면 정리 추천
+
+[discovery.followers]
+company = [10000, 10000]    # 세계 기업
+global = [30000, 15000]     # 세계 개인
+ko = [15000, 7000]          # 국내 X
+threads = [10000, 3000]     # Threads
 
 [calendar]
 source = "timetree"                # 일정 어디서 읽나: "timetree" | "ics"(구글·iCloud·네이버 등 ICS 주소, 읽기 전용) | "none"

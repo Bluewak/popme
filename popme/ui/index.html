@@ -62,7 +62,7 @@
   #more { margin-top: 12px; width: 100%; padding: 7px; }
   #details { display: none; margin-top: 10px; }
   #details.on { display: block; }
-  #details h2 { font-size: 13.5px; margin: 16px 0 6px; color: var(--accent); }
+  #details h2, #cands h2 { font-size: 13.5px; margin: 16px 0 6px; color: var(--accent); }
   #details ul { padding-left: 18px; margin: 4px 0; }
   /* 카드 형식 브리핑: 카드 누르면 그 항목만 펼침, 분류 버튼, 덜 중요한 건 접힘 */
   .filters { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
@@ -312,15 +312,20 @@ $("#plan-form").onsubmit = async e => {
   };
 };
 async function loadCands() {
-  const rows = await api.get_candidates();
+  const [rows, review] = await Promise.all([api.get_candidates(), api.get_review()]);
   const link = c => c.platform === "threads"
     ? `<span class="badge changed">Threads</span> <a href="https://www.threads.com/@${esc(c.handle.split("/")[1])}">@${esc(c.handle.split("/")[1])}</a>`
     : `<span class="badge new">X</span> <a href="https://x.com/${esc(c.handle)}">@${esc(c.handle)}</a>`;
-  $("#cands").innerHTML = rows.length ? rows.map(c => `
+  // 후보: 팔로워·꾸준함 단계를 통과한 것만 온다. check_note = 단계 판정 요약
+  $("#cands").innerHTML = (rows.length ? rows.map(c => `
     <div class="cand"><div class="row"><b>${link(c)} ${esc(c.name || "")}</b>
       <button data-h="${esc(c.handle)}" data-s="added">추가</button><button data-h="${esc(c.handle)}" data-s="dismissed">무시</button></div>
-      <div class="muted">${esc(c.reason)}</div></div>`).join("")
-    : `<p class="muted">아직 후보가 없어요.</p>`;
+      <div class="muted">${esc(c.check_note || "")}</div><div class="muted">${esc(c.reason)}</div></div>`).join("")
+    : `<p class="muted">아직 기준을 통과한 후보가 없어요.</p>`)
+    + (review.length ? `<h2>정리 추천</h2>` + review.map(c => `
+    <div class="cand"><div class="row"><b>${link(c)} ${esc(c.name || "")}</b>
+      <button data-h="${esc(c.handle)}" data-s="dismissed">빼기</button></div>
+      <div class="muted">${esc(c.check_note || "")}</div></div>`).join("") : "");
   $("#cands").querySelectorAll("button[data-h]").forEach(b => b.onclick = async () => {
     await api.set_candidate(b.dataset.h, b.dataset.s); loadCands();
   });
