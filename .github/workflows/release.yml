@@ -1,0 +1,42 @@
+# v로 시작하는 태그를 올리면 (예: git tag v1.1.0 && git push origin v1.1.0)
+# 검사·테스트를 다시 돌리고, 저장소 내용 그대로 zip을 만들어 GitHub Releases에 올린다.
+# 받는 사람은 zip을 풀고 install.ps1만 실행하면 된다.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write   # 릴리스 만들기
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 개인 파일·문구 검사
+        env:
+          PRIVATE_WORDS: ${{ secrets.PRIVATE_WORDS }}
+        run: python tools/check_private.py --all
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: 테스트
+        run: |
+          python -m pip install -r requirements.txt pytest
+          python -m pytest -q tests
+
+      - name: zip 만들기 (저장소에 올라간 파일만 — 개발용 tests·tools·.github 제외)
+        shell: bash
+        run: git archive --format=zip --prefix=POPME/ -o "POPME-${GITHUB_REF_NAME}.zip" HEAD -- . ':!tests' ':!tools' ':!.github'
+
+      - name: 릴리스 올리기
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: gh release create "$GITHUB_REF_NAME" "POPME-${GITHUB_REF_NAME}.zip" --title "POPME $GITHUB_REF_NAME" --generate-notes

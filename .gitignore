@@ -3,6 +3,8 @@ config.toml
 character.toml
 shisa.toml
 PLAN.md
+.private-words.txt
+local/
 
 # --- 개인 캐릭터 이미지 (저작권 있는 캐릭터일 수 있음) ---
 assets/pet*.png
@@ -19,6 +21,7 @@ docs/bubble_mockups.png
 # --- 파이썬 ---
 __pycache__/
 *.pyc
+.pytest_cache/
 .venv/
 venv/
 

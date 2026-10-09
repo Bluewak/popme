@@ -26,7 +26,7 @@ from PIL import Image, ImageDraw
 
 from popme import agenda, briefing, chrome, config, discovery, event_weather, planner, character, weather
 from popme.collectors import timetree
-from popme.jobs import Jobs
+from popme.jobs import Jobs, calendar_source
 from popme.pet import PetWindow
 
 log = logging.getLogger(__name__)
@@ -35,7 +35,8 @@ ASSETS = config.ROOT / "assets"
 UI_STATE = config.DATA_DIR / "ui.json"
 SIZES = {"bubble": (330, 200), "panel": (420, 640)}  # 논리 px. 말풍선 높이는 내용에 맞춰 바뀜
 # 창이 열려 있어도 (옆으로) 말하는 '사건' 대사. 나머지(인사·잡담·잠꼬대)는 창이 닫혀 있을 때만
-EVENT_LINES = {"collecting", "warn", "petted", "return_from_away", "event_added", "event_failed"}
+EVENT_LINES = {"collecting", "warn", "petted", "return_from_away", "event_added", "event_failed",
+               "ask_start", "ask_done", "ask_none", "ask_failed"}
 PET_FILES = {"idle": "pet", "busy": "pet_busy", "happy": "pet_happy", "alert": "pet_alert", "sleepy": "pet_sleepy"}
 
 user32 = ctypes.windll.user32
@@ -123,6 +124,9 @@ class Api:
         self._happy_until = self._alert_until = self._pet_cool_until = 0.0
         self._char = character.Character()
         self._said_today = {}  # 하루 한 번 대사 종류 → 마지막으로 말한 날짜
+        # 질문 처리 상태 (화면이 진행 단계를 그린다). stage: plan → search → write
+        self._ask = {"running": False, "stage": "", "info": {}}
+        self._ask_bubble_until = 0.0  # 이 시각 전에 말풍선을 누르면 질문 탭을 연다 ("답 찾아왔어요")
 
     # --- 모드 전환·배치 ---
     def set_mode(self, mode):
@@ -237,7 +241,7 @@ class Api:
                     next_expr = now + random.uniform(*beh["expression_every_sec"])
                 if now < self._happy_until:
                     mood = "happy"
-                elif st["running"]:
+                elif st["running"] or self._ask["running"]:
                     mood = "busy"
                 elif now < self._alert_until:
                     mood = "alert"
@@ -288,6 +292,8 @@ class Api:
         wcat = weather.category(w)
         if wcat and fresh("weather"):
             options.append((wcat, 3, w))
+        if weather.air_bad(w) and fresh("air_bad"):  # 미세먼지는 날씨와 따로 하루 한 번
+            options.append(("air_bad", 4, {"grade": w["air"], "place": w["place"], "pm10": w["pm10"], "pm25": w["pm25"]}))
         for e in items:
             if e["holiday"] and e["day"][:2] in ("오늘", "내일"):
                 cat = "holiday_today" if e["day"].startswith("오늘") else "holiday_tomorrow"
@@ -346,6 +352,11 @@ class Api:
             self._pet.say(text, self._char.beh["chatter_bubble_sec"], side=self._mode != "pet")
 
     def _on_bubble_click(self):
+        if time.time() < self._ask_bubble_until:  # "답 찾아왔어요" 말풍선 → 질문 탭
+            self._ask_bubble_until = 0.0
+            self.set_mode("panel")
+            self._window.evaluate_js("openTab('ask')")
+            return
         if self._mode != "pet":  # 옆 말풍선을 누른 거면 그냥 닫기만
             return
         self._window.evaluate_js("fillBubble()")
@@ -374,7 +385,7 @@ class Api:
 
     # --- 데이터 ---
     def get_state(self):
-        return {**self._jobs.state, "mode": self._mode}
+        return {**self._jobs.state, "mode": self._mode, "ask": self._ask}
 
     def get_briefing(self):
         items, _ = briefing.events_block(self._jobs.db, self._jobs.cfg)
@@ -408,7 +419,9 @@ class Api:
 
     def get_persona(self):
         """화면 문구용: 캐릭터 이름·호칭·문구 (캐릭터 파일 [ui])."""
-        return {"name": self._char.name, "user": self._char.user, "ui": self._char.ui}
+        # can_add_event: TimeTree일 때만 일정 부탁(쓰기) 가능 — ICS는 읽기 전용
+        return {"name": self._char.name, "user": self._char.user, "ui": self._char.ui,
+                "can_add_event": calendar_source(self._jobs.cfg) == "timetree"}
 
     def plan_event(self, text):
         """부탁 문장 → 승인 카드용 일정 초안 (아직 TimeTree에 안 씀)."""
@@ -436,8 +449,20 @@ class Api:
             self._say("event_failed", msg=str(e)[:40])
             return {"ok": False, "error": str(e)}
 
+    def get_weather(self):
+        """말풍선·브리핑 위쪽 날씨 칸. 위치를 처음 잡을 땐 몇 초 걸려서 화면이 따로 불러 나중에 채운다."""
+        try:
+            return weather.summary(self._jobs.cfg)
+        except Exception:
+            log.exception("날씨 칸 실패")
+            return None
+
     def get_candidates(self):
         return discovery.candidates(self._jobs.db, limit=15)
+
+    def get_review(self):
+        """정리 추천: 꾸준함 기준에 4주 넘게 못 미친 승인 계정."""
+        return discovery.to_review(self._jobs.db, self._jobs.cfg)
 
     def set_candidate(self, handle, status):
         self._jobs.db.set_candidate_status(handle, status)
@@ -450,19 +475,34 @@ class Api:
         return self._jobs.run_full(collect=False)
 
     def ask(self, question):
+        """질문 → 정리된 답 (JSON). 진행 단계는 get_state()["ask"]로 화면이 그리고, 끝나면 말풍선으로 알린다."""
+        if self._ask["running"]:
+            return {"error": "이전 질문을 아직 생각하는 중이에요."}
+
+        def progress(stage, info=None):  # info는 누적 (화면이 지난 단계 내용도 보여줄 수 있게)
+            self._ask.update(stage=stage, info={**self._ask["info"], **(info or {})})
+
+        self._ask.update(running=True, stage="plan", info={})
+        self._say("ask_start", q=question if len(question) <= 30 else question[:30] + "…")  # 옆 말풍선으로 안내
         try:
-            md = briefing.answer(self._jobs.cfg, self._jobs.db, question)
-            return markdown.markdown(md, extensions=["tables", "sane_lists"])
+            res = briefing.answer(self._jobs.cfg, self._jobs.db, question, progress)
+            self._say("ask_done" if res["found"] else "ask_none")
+            self._ask_bubble_until = time.time() + self._char.beh["chatter_bubble_sec"] + 2
+            return res
         except Exception as e:
             log.exception("질문 실패")
-            return f"<p class='err'>실패: {e}</p>"
+            self._say("ask_failed", msg=str(e)[:40])
+            return {"error": str(e)}
+        finally:
+            self._ask.update(running=False, stage="", info={})
 
     def open_url(self, url):
         webbrowser.open(url)
 
     def open_chrome_login(self):
         threading.Thread(target=chrome.open_for_login,
-                         args=(int(self._jobs.cfg.get("chrome", {}).get("port", 9333)),), daemon=True).start()
+                         args=(int(self._jobs.cfg.get("chrome", {}).get("port", 9333)),
+                               calendar_source(self._jobs.cfg) == "timetree"), daemon=True).start()
 
     def open_folder(self):
         os.startfile(config.BRIEFING_DIR)

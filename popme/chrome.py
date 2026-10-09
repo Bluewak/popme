@@ -62,9 +62,10 @@ def ensure_chrome(port: int, urls=()):
     raise RuntimeError("POPME 전용 Chrome에 연결하지 못했어요.")
 
 
-def open_for_login(port: int):
-    """처음 한 번: 전용 Chrome에서 X·Threads·TimeTree에 로그인하도록 탭을 연다."""
-    urls = ["https://x.com/login", "https://timetreeapp.com/signin", "https://www.threads.com/login"]
+def open_for_login(port: int, timetree: bool = True):
+    """처음 한 번: 전용 Chrome에서 X·Threads(·TimeTree)에 로그인하도록 탭을 연다."""
+    urls = ["https://x.com/login"] + (["https://timetreeapp.com/signin"] if timetree else []) + \
+           ["https://www.threads.com/login"]
     if is_running(port):
         from playwright.sync_api import sync_playwright
         with sync_playwright() as p:

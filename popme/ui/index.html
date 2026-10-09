@@ -33,6 +33,11 @@
   #say.urgent { color: var(--err); }
   #bubble ul { margin: 4px 0 10px; padding-left: 16px; }
   #bubble li { margin: 3px 0; }
+  /* 날씨 칸: 말풍선은 오늘 한 줄, 브리핑은 오늘·내일 */
+  .wx { font-size: 12px; color: var(--muted); margin: 4px 0 2px; } .wx:empty { display: none; }
+  .wx .bad, .wx-strip .bad { color: var(--err); }
+  .wx-strip { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 5px 10px; font-size: 12.5px; margin-bottom: 4px; }
+  .wx-strip:empty { display: none; } .wx-strip div { margin: 2px 0; } .wx-strip b { color: var(--brown); margin-right: 6px; }
   #bubble .row { display: flex; gap: 6px; justify-content: flex-end; align-items: center; }
 
   /* ---- 패널 ---- */
@@ -62,7 +67,7 @@
   #more { margin-top: 12px; width: 100%; padding: 7px; }
   #details { display: none; margin-top: 10px; }
   #details.on { display: block; }
-  #details h2 { font-size: 13.5px; margin: 16px 0 6px; color: var(--accent); }
+  #details h2, #cands h2 { font-size: 13.5px; margin: 16px 0 6px; color: var(--accent); }
   #details ul { padding-left: 18px; margin: 4px 0; }
   /* 카드 형식 브리핑: 카드 누르면 그 항목만 펼침, 분류 버튼, 덜 중요한 건 접힘 */
   .filters { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
@@ -91,6 +96,16 @@
   #ask-form { display: flex; gap: 6px; }
   #q { flex: 1; background: #fff; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font: inherit; }
   #answer { margin-top: 12px; }
+  /* 질문: 내 질문 → 캐릭터 안내 + 진행 단계 → 정리된 답 카드 */
+  .qa { margin-bottom: 14px; }
+  .qa .myq { margin: 0 0 6px auto; width: fit-content; max-width: 85%; background: #fff; border: 1px solid var(--line); border-radius: 12px 12px 2px 12px; padding: 5px 10px; font-size: 12.5px; }
+  .qa .steps { list-style: none; padding: 0; margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+  .qa .steps li { margin: 2px 0; } .qa .steps li.done { color: var(--ok); } .qa .steps li.now { color: var(--brown); }
+  .qa .steps .d { color: var(--muted); margin-left: 4px; }
+  .qa .sum { font-family: "Jua", "Malgun Gothic", sans-serif; font-size: 14px; line-height: 1.45; color: var(--brown); margin-bottom: 6px; }
+  .qa .pt { display: flex; gap: 7px; align-items: flex-start; font-size: 12.5px; margin: 5px 0; }
+  .qa .pt .when { color: var(--muted); font-size: 11px; margin-right: 3px; }
+  .qa .range { font-size: 11px; color: var(--muted); border-top: 1px dashed var(--line); margin-top: 8px; padding-top: 5px; }
   .wx { display: inline-block; font-size: 11px; color: #5b6f86; background: #eef4fb; border: 1px solid #d6e3f2;
     border-radius: 999px; padding: 0 7px; margin-left: 4px; white-space: nowrap; }
   #plan-form { display: flex; gap: 6px; margin-bottom: 10px; }
@@ -110,6 +125,7 @@
 <div id="bubble">
   <span class="tag"></span>
   <div id="say"></div>
+  <div id="bubble-wx" class="wx"></div>
   <ul id="bubble-list"></ul>
   <div class="row"><button class="icon" id="bubble-close">닫기</button><button class="primary" id="bubble-more">자세히</button></div>
 </div>
@@ -151,6 +167,7 @@ const u = (k, v = {}) => (P.ui[k] || "").replace("{n}", v.n ?? "").replace("{msg
 const ready = new Promise(r => window.addEventListener("pywebviewready", async () => {
   api = window.pywebview.api;
   P = await api.get_persona();
+  if (!P.can_add_event) $("#plan-form").style.display = "none";  // ICS 캘린더는 읽기 전용
   document.querySelectorAll(".tag").forEach(t => { t.textContent = P.name; t.style.display = P.name ? "" : "none"; });
   $("#panel-title").textContent = P.name ? u("panel_title") : "POPME 브리핑";
   $("#plan-q").placeholder = u("plan_placeholder");
@@ -184,7 +201,26 @@ window.fillBubble = async (alert) => {
   $("#bubble-list").innerHTML = b.headlines.slice(0, 3).map(h => `<li>${h.urgent ? "🔥 " : ""}${h.html}</li>`).join("")
     || `<li class="muted">${u("no_briefing")}</li>`;
   measure("bubble");
+  // 날씨는 위치 확인에 몇 초 걸릴 수 있어 따로 받아 채우고, 창 높이를 다시 맞춘다
+  api.get_weather().then(w => {
+    const d = w && w.days[0];
+    $("#bubble-wx").innerHTML = d ? `${esc(w.place)} · ${wxText(d, true)}` : "";
+    measure("bubble");
+  });
 };
+
+// 날씨 한 줄: "🌡 12~25° 일교차 큼 · 강수 40% · 😷 미세먼지 나쁨" (short = 말풍선용, 미세먼지는 나쁠 때만)
+function wxText(d, short) {
+  const rain = d.rain >= 30 ? ` · 강수 ${d.rain}%` : "";
+  const air = d.air && (!short || d.air_bad)
+    ? ` · <span class="${d.air_bad ? "bad" : ""}">${d.air_bad ? "😷 " : ""}미세먼지 ${esc(d.air)}</span>` : "";
+  return `${d.icon} ${d.min}~${d.max}° ${esc(d.desc)}${rain}${air}`;
+}
+async function fillBriefWeather() {
+  const w = await api.get_weather(), el = $("#brief-wx");
+  if (el) el.innerHTML = w ? w.days.map(d => `<div><b>${d.label}</b>${wxText(d)}</div>`).join("")
+    + `<div class="muted" style="font-size:11px">${esc(w.place)} 기준</div>` : "";
+}
 
 // 내용 높이를 재서 창 크기를 맞춘다 (보이지 않아도, 지금 창 높이에 끌려가지 않게 min-height 무시)
 function measure(id) {
@@ -270,16 +306,20 @@ async function loadBrief() {
     briefData = b;
     if (!CATS.includes(briefCat)) briefCat = "전체";
     $("#brief").innerHTML = `<h1 class="title">${esc(b.title)} <span class="muted" style="font-size:12px">· ${b.items.length}개</span></h1>
+      <div class="wx-strip" id="brief-wx"></div>
       <h3>일정</h3><div class="agenda">${agendaHtml(b.agenda)}</div>
       <h3>소식</h3><div class="filters" id="filters"></div><div id="news"></div>`;
     renderNews();
+    fillBriefWeather();
     return;
   }
   const heads = b.headlines.map(h => `<li><span class="mark ${h.urgent ? "urgent" : h.status === "확인됨" ? "ok" : "unk"}">${h.urgent ? "!" : h.status === "확인됨" ? "✓" : "?"}</span><span>${h.html}</span></li>`).join("");
   $("#brief").innerHTML = `<h1 class="title">${esc(b.title)}</h1>
+    <div class="wx-strip" id="brief-wx"></div>
     <h3>일정</h3><div class="agenda">${agendaHtml(b.agenda)}</div>
     <h3>헤드라인</h3>${heads ? `<ul class="heads">${heads}</ul>` : `<p class="muted">헤드라인이 없는 예전 형식이에요. 트레이 메뉴 > 브리핑만 다시 만들기</p>`}
     ${b.details ? `<button id="more">자세히 ▾</button><div id="details">${b.details}</div>` : ""}`;
+  fillBriefWeather();
   $("#more")?.addEventListener("click", () => {
     const d = $("#details"); d.classList.toggle("on");
     $("#more").textContent = d.classList.contains("on") ? "접기 ▴" : "자세히 ▾";
@@ -311,19 +351,61 @@ $("#plan-form").onsubmit = async e => {
   };
 };
 async function loadCands() {
-  const rows = await api.get_candidates();
+  const [rows, review] = await Promise.all([api.get_candidates(), api.get_review()]);
   const link = c => c.platform === "threads"
     ? `<span class="badge changed">Threads</span> <a href="https://www.threads.com/@${esc(c.handle.split("/")[1])}">@${esc(c.handle.split("/")[1])}</a>`
     : `<span class="badge new">X</span> <a href="https://x.com/${esc(c.handle)}">@${esc(c.handle)}</a>`;
-  $("#cands").innerHTML = rows.length ? rows.map(c => `
+  // 후보: 팔로워·꾸준함 단계를 통과한 것만 온다. check_note = 단계 판정 요약
+  $("#cands").innerHTML = (rows.length ? rows.map(c => `
     <div class="cand"><div class="row"><b>${link(c)} ${esc(c.name || "")}</b>
       <button data-h="${esc(c.handle)}" data-s="added">추가</button><button data-h="${esc(c.handle)}" data-s="dismissed">무시</button></div>
-      <div class="muted">${esc(c.reason)}</div></div>`).join("")
-    : `<p class="muted">아직 후보가 없어요.</p>`;
+      <div class="muted">${esc(c.check_note || "")}</div><div class="muted">${esc(c.reason)}</div></div>`).join("")
+    : `<p class="muted">아직 기준을 통과한 후보가 없어요.</p>`)
+    + (review.length ? `<h2>정리 추천</h2>` + review.map(c => `
+    <div class="cand"><div class="row"><b>${link(c)} ${esc(c.name || "")}</b>
+      <button data-h="${esc(c.handle)}" data-s="dismissed">빼기</button></div>
+      <div class="muted">${esc(c.check_note || "")}</div></div>`).join("") : "");
   $("#cands").querySelectorAll("button[data-h]").forEach(b => b.onclick = async () => {
     await api.set_candidate(b.dataset.h, b.dataset.s); loadCands();
   });
 }
+
+// --- 질문: 진행 단계와 정리된 답 ---
+let asking = false;
+function drawSteps(box, a) {
+  const ul = box.querySelector(".steps");
+  if (!ul || !a || !a.running) return;  // 답이 이미 그려졌으면 늦게 온 진행 상황은 무시
+  // 검색은 순식간이라 search 단계를 못 볼 수 있다 — info가 누적되므로 지난 단계 내용도 여기 있다
+  const at = ["plan", "search", "write"].indexOf(a.stage), info = a.info || {};
+  const step = (i, label, detail) => `<li class="${i < at ? "done" : i === at ? "now" : ""}">
+    ${i < at ? "✓" : i === at ? "…" : "·"} ${label}${i < at && detail ? `<span class="d">${esc(detail)}</span>` : ""}</li>`;
+  ul.innerHTML = step(0, "검색어 고르기", info.keywords ? searchText(info) : "")
+    + step(1, "기록 찾기", info.counts ? countText(info.counts) : "") + step(2, "답 정리하기", "");
+}
+function searchText(s) {
+  if (!s || !s.keywords || !s.keywords.length) return "최근 자료 위주로";
+  const range = s.since || s.until ? ` (${s.since || "처음"}~${s.until || "지금"})` : "";
+  return s.keywords.join(" · ") + range;
+}
+function countText(c) {
+  if (!c) return "";
+  const parts = [["posts", "글"], ["items", "RSS"], ["briefing", "브리핑"], ["events", "일정"]]
+    .filter(([k]) => c[k]).map(([k, label]) => `${label} ${c[k]}`);
+  return parts.length ? parts.join(" · ") : "전체 기록에선 못 찾음 (최근 자료로 답해요)";
+}
+function answerCard(r) {
+  if (!r || r.error) return `<div class="card"><div class="say">${u("plan_fail", {msg: esc(r ? r.error : "응답 없음")})}</div></div>`;
+  const pts = (r.points || []).map(p => {
+    const st = p.status === "확인됨" ? "ok" : "unk";
+    const links = (p.links || []).map(l => `<a href="${esc(l.url)}">${esc(l.label)}</a>`).join(", ");
+    return `<div class="pt"><span class="mark ${st}">${st === "ok" ? "✓" : "?"}</span>
+      <div>${p.date ? `<span class="when">${esc(p.date.slice(5).replace("-", "/"))}</span>` : ""}${esc(p.text)}${links ? ` → ${links}` : ""}</div></div>`;
+  }).join("");
+  const s = r.search || {};
+  return `<div class="card"><div class="sum">${esc(r.summary)}</div>${pts}
+    <div class="range">찾아본 범위: ${esc(searchText(s))} — ${esc(countText(s.counts))}</div></div>`;
+}
+function openTab(t) { document.querySelector(`nav button[data-tab="${t}"]`)?.click(); }
 
 async function poll() {
   const s = await api.get_state();
@@ -338,9 +420,18 @@ ready.then(() => {
   $("#run").onclick = () => api.run_now().then(poll);
   $("#ask-form").onsubmit = async e => {
     e.preventDefault();
-    const q = $("#q").value.trim(); if (!q) return;
-    $("#answer").innerHTML = `<p class="muted">생각 중…</p>`;
-    $("#answer").innerHTML = await api.ask(q);
+    const q = $("#q").value.trim(); if (!q || asking) return;
+    asking = true; $("#q").value = "";
+    const btn = $("#ask-form button"); btn.disabled = true; btn.textContent = "생각 중…";
+    const box = document.createElement("div"); box.className = "qa";
+    box.innerHTML = `<div class="myq">${esc(q)}</div>
+      <div class="card"><ul class="steps"></ul></div>`;  // 안내 문구는 캐릭터가 옆 말풍선으로 (ask_start)
+    if (!$("#answer .qa")) $("#answer").innerHTML = "";
+    $("#answer").prepend(box);
+    const timer = setInterval(async () => drawSteps(box, (await api.get_state()).ask), 700);
+    drawSteps(box, {running: true, stage: "plan", info: {}});
+    try { box.querySelector(".card").outerHTML = answerCard(await api.ask(q)); }
+    finally { clearInterval(timer); asking = false; btn.disabled = false; btn.textContent = "묻기"; }
   };
   poll(); setInterval(poll, 2000);
 });

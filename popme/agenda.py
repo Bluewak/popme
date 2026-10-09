@@ -1,20 +1,20 @@
-"""일정 날짜 계산: 종일 일정은 날짜 그대로(UTC 자정 = 그 날짜), 시간 일정은 한국시간으로. 반복 일정은 펼친다."""
+"""일정 날짜 계산: 종일 일정은 날짜 그대로(UTC 자정 = 그 날짜), 시간 일정은 PC 시간대로(clock.py). 반복 일정은 펼친다."""
 import json
 import re
 from datetime import date, datetime, timedelta, timezone
 
 from dateutil.rrule import rrulestr
 
-KST = timezone(timedelta(hours=9))
+from popme import clock
 
 
 def _span(e):
-    """일정의 (시작 날짜, 끝 날짜, 시작 시각 or None) — 날짜는 한국 달력 기준."""
+    """일정의 (시작 날짜, 끝 날짜, 시작 시각 or None) — 날짜는 PC 시간대 달력 기준."""
     s = datetime.fromisoformat(e["start_at"])
     en = datetime.fromisoformat(e["end_at"] or e["start_at"])
     if e["all_day"]:
         return s.astimezone(timezone.utc).date(), en.astimezone(timezone.utc).date(), None
-    s, en = s.astimezone(KST), en.astimezone(KST)
+    s, en = s.astimezone(clock.tz()), en.astimezone(clock.tz())
     end_day = (en - timedelta(seconds=1)).date() if en > s else s.date()  # 자정에 끝나면 전날까지
     return s.date(), max(end_day, s.date()), s.strftime("%H:%M")
 
@@ -43,7 +43,7 @@ def occurrences(e, first: date, last: date):
 
 def upcoming(db, days_ahead=2):
     """오늘부터 days_ahead일 뒤까지의 일정 (날짜·시각 순)."""
-    today = datetime.now(KST).date()
+    today = clock.today()
     last = today + timedelta(days=days_ahead)
     since = (datetime.now(timezone.utc) - timedelta(days=400)).isoformat()
     rows = db.q("SELECT * FROM events WHERE deleted=0 AND (start_at >= ? OR recurrences != '[]')", since)
@@ -81,7 +81,7 @@ def parse_time(title):
 
 def imminent(db, within_min=30):
     """지금부터 within_min분 안에 시작하는 오늘 일정 (시간 일정 + 제목에 시각이 적힌 종일 일정)."""
-    now = datetime.now(KST)
+    now = clock.now()
     today, items = upcoming(db, 0)
     out = []
     for e in items:

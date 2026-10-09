@@ -1,0 +1,33 @@
+# 푸시·PR마다: 개인 파일·문구 검사 → 테스트 → 문법 검사
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: windows-latest   # 위젯이 Windows 전용이라 같은 환경에서
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 개인 파일·문구 검사
+        env:
+          PRIVATE_WORDS: ${{ secrets.PRIVATE_WORDS }}   # 개인 단어 목록 (Settings > Secrets). 코드엔 안 적음
+        run: python tools/check_private.py --all
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: 패키지 설치
+        run: |
+          python -m pip install -r requirements.txt pytest
+
+      - name: 테스트
+        run: python -m pytest -q tests
+
+      - name: 문법 검사 (모든 .py 컴파일)
+        run: python -m compileall -q popme tools tests

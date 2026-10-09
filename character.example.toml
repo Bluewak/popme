@@ -34,6 +34,7 @@ snow = "미끄럼 조심하세요."
 rain = "우산 챙기세요."
 hot = "물 챙기세요."
 cold = "따뜻하게 입으세요."
+gap = "겉옷 챙기세요."
 nice = "좋은 날이에요."
 cloudy = ""
 
@@ -71,6 +72,10 @@ collected = ["다 모았어요. 브리핑 보실래요?"]
 warn = ["문제가 생겼어요: {msg}"]
 event_added = ["{date} {title} 넣어뒀어요.", "{title} 캘린더에 넣었어요."]
 event_failed = ["일정을 못 넣었어요: {msg}"]
+ask_start = ["「{q}」… 생각해볼게요."]          # 질문했을 때 ({q} = 질문 앞부분)
+ask_done = ["답을 찾아왔어요. 질문 탭을 봐주세요."]   # 질문 답이 나왔을 때 (말풍선을 누르면 질문 탭)
+ask_none = ["모아둔 자료에서는 못 찾았어요."]
+ask_failed = ["답을 못 했어요: {msg}"]
 monday = ["월요일이에요. 이번 주도 힘내요."]
 friday = ["금요일이에요! 조금만 더 힘내요."]
 weekend = ["주말이에요. 푹 쉬세요."]
@@ -80,6 +85,8 @@ weather_hot = ["오늘 {max}도래요. 물 많이 드세요."]
 weather_cold = ["아침 {min}도래요. 따뜻하게 입으세요."]
 weather_nice = ["{place} 오늘 날씨 좋대요. 최고 {max}도예요."]
 weather_cloudy = ["오늘은 구름 낀 날이에요. {min}~{max}도래요."]
+weather_gap = ["오늘 일교차가 {gap}도예요. 아침 {min}도, 낮 {max}도래요. 겉옷 챙기세요."]
+air_bad = ["오늘 {place} 미세먼지 {grade}이래요. 마스크 챙기세요."]   # {grade} 나쁨·매우나쁨, {pm10} {pm25}
 event_weather = ["{day} {title}… {place_eun} {desc}이래요. {min}~{max}도예요. {advice}"]
 holiday_today = ["오늘은 {name}이에요."]
 holiday_tomorrow = ["내일은 {name}이에요."]

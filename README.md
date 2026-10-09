@@ -5,10 +5,10 @@ Windows 화면 구석에 사는 **데스크톱 브리핑 비서**. 내 PC의 로
 클라우드 에이전트는 로그인이 필요한 SNS를 못 본다는 문제에서 시작했습니다. POPME는 **내 PC에서, 내 세션으로** 읽습니다.
 
 ## 할 수 있는 것
-- **아침 브리핑**: 헤드라인 5~8개(✓확인됨 / ?미확인 / !긴급) + 자세히. 혜택·크레딧은 "무료? / 내 요금제 대상? / 기한"으로 나눠 보여 줌. 사람 말은 공식 변경내역·저장소와 맞춰 봄
+- **아침 브리핑**: 소식을 **카드**로(뉴스 제목처럼 한 줄 + 누르면 설명·링크). ✓확인됨 / ?미확인 / !긴급, "꼭 볼 것 / 알아두면 좋은 것 / 나머지", 분류별 보기. 카드마다 "나한테 해당? · 할 일 · 무료/기한" 표시. 사람 말은 공식 변경내역·저장소와 맞춰 보고, 자료에 없는 링크는 코드가 버림
 - **수집**: X 계정·검색, Threads 토픽 태그, RSS(공식 릴리스·블로그·GeekNews·HN). 수집은 브라우저가 받는 JSON을 가로채는 방식이라 **LLM 토큰 0**
 - **발굴**: 핵심 계정이 자주 리포스트하는 사람, 여러 태그에 반복 등장하고 반응이 큰 한국어 작성자를 후보로 추천
-- **일정**: 오늘/내일/모레, 반복 일정, 바뀐 일정 표시, 30분 전 알림, **일정 장소의 그날 날씨**. "금요일 3시 치과" 부탁 → 승인 카드 → 캘린더에 추가 (v1은 TimeTree, [다른 캘린더 쓰기](docs/CALENDAR.md))
+- **일정**: 오늘/내일/모레, 반복 일정, 바뀐 일정 표시, 30분 전 알림, **일정 장소의 그날 날씨**. "금요일 3시 치과" 부탁 → 승인 카드 → 캘린더에 추가. 캘린더: **TimeTree**(읽기·쓰기) 또는 **구글·iCloud·네이버·아웃룩 등 ICS 주소**(읽기 전용) — [설정법](docs/CALENDAR.md)
 - **캐릭터**: 표정이 바뀌고, 말을 걸고, 졸고, 쓰다듬으면 반응. 말투·대사·이미지는 [바꿀 수 있음](docs/CHARACTER.md)
 - **질문**: 수집한 자료만 근거로 답변
 
@@ -16,7 +16,9 @@ Windows 화면 구석에 사는 **데스크톱 브리핑 비서**. 내 PC의 로
 - Windows 11 (둥근 창 테두리·위치 서비스. Windows 10에서도 대부분 동작)
 - Python 3.11+
 - Google Chrome
-- **Claude Code** (요약·답변에 `claude -p`를 씀. Claude 구독으로 동작, 별도 API 키 불필요). PATH에 없으면 VS Code 확장의 claude.exe를 자동으로 찾음
+- 요약·답변용 AI 구독 하나 (별도 API 키 불필요, `config.toml` `[llm] provider`로 고름)
+  - **Claude** (`provider = "claude"`, 기본): Claude Code의 `claude -p`. PATH에 없으면 VS Code 확장의 claude.exe를 자동으로 찾음
+  - **ChatGPT** (`provider = "codex"`): Codex CLI의 `codex exec`. `install.ps1`이 설치(`winget install OpenAI.Codex`)와 `codex login`까지 안내
 
 ## 설치
 ```powershell
@@ -28,7 +30,7 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 
 ## 처음 한 번
 1. 바탕화면 **POPME** 실행 → 트레이 아이콘 우클릭 → **전용 Chrome 열기 (로그인)**
-2. 열린 Chrome에서 X, Threads, TimeTree에 로그인 (평소 Chrome과 별개 프로필)
+2. 열린 Chrome에서 X, Threads(, TimeTree)에 로그인 (평소 Chrome과 별개 프로필). ICS 캘린더는 로그인 대신 `config.toml`에 주소만 넣음
 3. `config.toml`에서 볼 X 계정·Threads 태그·RSS·요금제를 내 관심사로 수정
 4. 캐릭터 우클릭 → **지금 수집**
 
@@ -53,11 +55,18 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 ## 꼭 알아둘 점
 - **계정 위험**: X·Threads·TimeTree를 브라우저 자동화로 읽습니다. 사람 속도로 읽기만 하도록 만들었지만, 각 서비스 약관상 자동화는 제한될 수 있고 계정 제재 가능성이 0은 아닙니다. 본인 책임으로 쓰세요.
 - **잘 깨지는 부분**: 서비스들이 내부 API를 자주 바꿉니다. 수집이 0개가 되면 `%LOCALAPPDATA%\POPME\raw\`의 원본 응답을 보고 `popme/collectors/*.py` 파서를 고치세요 (X는 이름이 아니라 내용으로 트윗을 찾게 해 둠).
-- **보내는 데이터**: 요약·해석은 Claude(내 구독)로. 현재 위치·일정 장소는 약 1km로 반올림한 좌표를 OpenStreetMap Nominatim(지명)과 Open-Meteo(날씨)로 보냅니다. 끄려면 `config.toml` `[weather] use_windows_location = false`.
-- **프롬프트 인젝션 대비**: 수집한 글을 요약하는 단계에는 도구 권한이 없고(`claude -p --tools ""`), 일정 추가처럼 쓰기 동작은 사용자가 승인 카드를 눌러야만 실행됩니다.
+- **보내는 데이터**: 요약·해석은 고른 AI(Claude 또는 ChatGPT, 내 구독)로. 현재 위치·일정 장소는 약 1km로 반올림한 좌표를 OpenStreetMap Nominatim(지명)과 Open-Meteo(날씨)로 보냅니다. 끄려면 `config.toml` `[weather] use_windows_location = false`.
+- **프롬프트 인젝션 대비**: 수집한 글을 요약하는 단계에는 도구 권한이 없고(`claude -p --tools ""` / Codex는 셸·코드 실행·브라우저 등 도구를 전부 끄고 빈 폴더·읽기 전용으로 실행), 일정 추가처럼 쓰기 동작은 사용자가 승인 카드를 눌러야만 실행됩니다.
 
-## 디버깅
-- `python -m popme run-once`: 위젯 없이 수집+브리핑 1회
+## 개발
+- 테스트: `python -m pip install pytest` → `python -m pytest -q tests`
+- **개인 정보 지킴이**: 이 저장소는 개인용 POPME 폴더에서 바로 올립니다. 개인 파일은 `.gitignore`로 빼고, 실수로 섞이지 않게 두 겹으로 검사합니다 (`tools/check_private.py`)
+  - 커밋 직전(pre-commit 훅): `python tools/check_private.py --install`로 한 번 설치
+  - 푸시마다(GitHub Actions `CI`): 같은 검사 + 테스트 + 문법 검사
+  - 막는 것: 개인 설정·캐릭터 파일, 이미지·DB·로그·zip, 개인 이메일, 개인 단어(목록은 공개하지 않음 — 로컬 `.private-words.txt` / Secret `PRIVATE_WORDS`)
+- 배포: `git tag v1.1.0` → `git push origin v1.1.0` 하면 Actions `Release`가 검사·테스트 후 zip을 Releases에 올림
+
+## 디버깅- `python -m popme run-once`: 위젯 없이 수집+브리핑 1회
 - 로그: `%LOCALAPPDATA%\POPME\popme.log`
 
 ## 라이선스·출처
