@@ -17,6 +17,7 @@ UA = {"User-Agent": "POPME-personal/0.1 (personal desktop widget)"}
 _lock = threading.Lock()
 _last_call = [0.0]
 _cache = {"t": 0.0, "pos": None}
+UNKNOWN_NAME = "현재 위치"  # 좌표는 받았는데 지역 이름을 못 받았을 때
 
 PS = r"""
 Add-Type -AssemblyName System.Device
@@ -76,7 +77,8 @@ def current(cfg):
             except Exception as e:
                 log.info("지역 이름 못 받음: %s", e)
                 name = None
-            pos = {"lat": p[0], "lon": p[1], "name": name or w.get("name", "")}
+            # 이름을 못 받았을 때 설정 지역 이름을 붙이면, 출장 중엔 좌표와 이름이 어긋난다
+            pos = {"lat": p[0], "lon": p[1], "name": name or UNKNOWN_NAME}
     if not pos and "lat" in w:
         pos = {"lat": w["lat"], "lon": w["lon"], "name": w.get("name", "")}
     _cache.update(t=time.time(), pos=pos)

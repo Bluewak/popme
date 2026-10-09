@@ -72,6 +72,7 @@ MIGRATIONS = [
     "ALTER TABLE candidates ADD COLUMN check_note TEXT",
     "ALTER TABLE candidates ADD COLUMN checked_at TEXT",
     "ALTER TABLE candidates ADD COLUMN fail_since TEXT",  # 승인 계정이 꾸준함 기준에 처음 못 미친 때
+    "ALTER TABLE event_places ADD COLUMN loc TEXT",  # 일정 장소 칸 (바뀌면 장소를 다시 뽑는다)
     "ALTER TABLE profiles ADD COLUMN org TEXT",
     "ALTER TABLE profiles ADD COLUMN lang TEXT",
     # 초기 버전은 공휴일만 잘못 저장했으므로 정리 (holiday: 접두사 없는 공휴일 행)

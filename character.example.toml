@@ -34,6 +34,7 @@ snow = "미끄럼 조심하세요."
 rain = "우산 챙기세요."
 hot = "물 챙기세요."
 cold = "따뜻하게 입으세요."
+gap = "겉옷 챙기세요."
 nice = "좋은 날이에요."
 cloudy = ""
 
@@ -84,6 +85,8 @@ weather_hot = ["오늘 {max}도래요. 물 많이 드세요."]
 weather_cold = ["아침 {min}도래요. 따뜻하게 입으세요."]
 weather_nice = ["{place} 오늘 날씨 좋대요. 최고 {max}도예요."]
 weather_cloudy = ["오늘은 구름 낀 날이에요. {min}~{max}도래요."]
+weather_gap = ["오늘 일교차가 {gap}도예요. 아침 {min}도, 낮 {max}도래요. 겉옷 챙기세요."]
+air_bad = ["오늘 {place} 미세먼지 {grade}이래요. 마스크 챙기세요."]   # {grade} 나쁨·매우나쁨, {pm10} {pm25}
 event_weather = ["{day} {title}… {place_eun} {desc}이래요. {min}~{max}도예요. {advice}"]
 holiday_today = ["오늘은 {name}이에요."]
 holiday_tomorrow = ["내일은 {name}이에요."]

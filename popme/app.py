@@ -292,6 +292,8 @@ class Api:
         wcat = weather.category(w)
         if wcat and fresh("weather"):
             options.append((wcat, 3, w))
+        if weather.air_bad(w) and fresh("air_bad"):  # 미세먼지는 날씨와 따로 하루 한 번
+            options.append(("air_bad", 4, {"grade": w["air"], "place": w["place"], "pm10": w["pm10"], "pm25": w["pm25"]}))
         for e in items:
             if e["holiday"] and e["day"][:2] in ("오늘", "내일"):
                 cat = "holiday_today" if e["day"].startswith("오늘") else "holiday_tomorrow"
