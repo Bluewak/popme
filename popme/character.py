@@ -26,6 +26,13 @@ UI_DEFAULTS = {
     "plan_confirm": "이렇게 넣을까요?",
     "plan_fail": "잘 모르겠어요: {msg}",
     "add_fail": "일정을 못 넣었어요: {msg}",
+    "ask_thinking": "「{q}」… 생각해볼게요.",
+}
+# 캐릭터 파일에 없으면 쓰는 대사 (나중에 생긴 종류라 예전 캐릭터 파일엔 없을 수 있음)
+LINE_DEFAULTS = {
+    "ask_done": ["답을 찾아왔어요. 질문 탭을 봐주세요."],
+    "ask_none": ["모아둔 자료에서는 못 찾았어요."],
+    "ask_failed": ["답을 못 했어요: {msg}"],
 }
 WEATHER_ADVICE_DEFAULTS = {"snow": "미끄럼 조심하세요.", "rain": "우산 챙기세요.", "hot": "물 챙기세요.",
                            "cold": "따뜻하게 입으세요.", "nice": "좋은 날이에요.", "cloudy": ""}
@@ -80,7 +87,7 @@ class Character:
         self.beh = self.cfg["behavior"]
         p = self.cfg.get("persona", {})
         self.name, self.user = p.get("name", "포피"), p.get("call_user", "")
-        self.ui = {k: v.format(name=self.name, user=self.user, n="{n}", msg="{msg}")
+        self.ui = {k: v.format(name=self.name, user=self.user, n="{n}", msg="{msg}", q="{q}")
                    for k, v in {**UI_DEFAULTS, **self.cfg.get("ui", {})}.items()}
         self.advice = {**WEATHER_ADVICE_DEFAULTS, **self.cfg.get("weather_advice", {})}
         self._used, self._used_day = set(), date.today()
@@ -92,7 +99,7 @@ class Character:
         return random.choice(left) if left else None
 
     def line(self, cat, **kw):
-        pool = self.lines.get(cat, [])
+        pool = self.lines.get(cat) or LINE_DEFAULTS.get(cat, [])
         pick = self._fresh(pool)
         if not pick:
             return None

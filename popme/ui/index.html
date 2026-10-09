@@ -91,6 +91,16 @@
   #ask-form { display: flex; gap: 6px; }
   #q { flex: 1; background: #fff; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font: inherit; }
   #answer { margin-top: 12px; }
+  /* 질문: 내 질문 → 캐릭터 안내 + 진행 단계 → 정리된 답 카드 */
+  .qa { margin-bottom: 14px; }
+  .qa .myq { margin: 0 0 6px auto; width: fit-content; max-width: 85%; background: #fff; border: 1px solid var(--line); border-radius: 12px 12px 2px 12px; padding: 5px 10px; font-size: 12.5px; }
+  .qa .steps { list-style: none; padding: 0; margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+  .qa .steps li { margin: 2px 0; } .qa .steps li.done { color: var(--ok); } .qa .steps li.now { color: var(--brown); }
+  .qa .steps .d { color: var(--muted); margin-left: 4px; }
+  .qa .sum { font-family: "Jua", "Malgun Gothic", sans-serif; font-size: 14px; line-height: 1.45; color: var(--brown); margin-bottom: 6px; }
+  .qa .pt { display: flex; gap: 7px; align-items: flex-start; font-size: 12.5px; margin: 5px 0; }
+  .qa .pt .when { color: var(--muted); font-size: 11px; margin-right: 3px; }
+  .qa .range { font-size: 11px; color: var(--muted); border-top: 1px dashed var(--line); margin-top: 8px; padding-top: 5px; }
   .wx { display: inline-block; font-size: 11px; color: #5b6f86; background: #eef4fb; border: 1px solid #d6e3f2;
     border-radius: 999px; padding: 0 7px; margin-left: 4px; white-space: nowrap; }
   #plan-form { display: flex; gap: 6px; margin-bottom: 10px; }
@@ -147,7 +157,7 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;
 let api, wasRunning = false, alertTimer = null;
 // 캐릭터 이름·화면 문구 (캐릭터 파일 [ui])
 let P = {name: "", ui: {}};
-const u = (k, v = {}) => (P.ui[k] || "").replace("{n}", v.n ?? "").replace("{msg}", v.msg ?? "");
+const u = (k, v = {}) => (P.ui[k] || "").replace("{n}", v.n ?? "").replace("{msg}", v.msg ?? "").replace("{q}", v.q ?? "");
 const ready = new Promise(r => window.addEventListener("pywebviewready", async () => {
   api = window.pywebview.api;
   P = await api.get_persona();
@@ -331,6 +341,43 @@ async function loadCands() {
   });
 }
 
+// --- 질문: 진행 단계와 정리된 답 ---
+let asking = false;
+function drawSteps(box, a) {
+  const ul = box.querySelector(".steps");
+  if (!ul || !a || !a.running) return;  // 답이 이미 그려졌으면 늦게 온 진행 상황은 무시
+  // 검색은 순식간이라 search 단계를 못 볼 수 있다 — info가 누적되므로 지난 단계 내용도 여기 있다
+  const at = ["plan", "search", "write"].indexOf(a.stage), info = a.info || {};
+  const step = (i, label, detail) => `<li class="${i < at ? "done" : i === at ? "now" : ""}">
+    ${i < at ? "✓" : i === at ? "…" : "·"} ${label}${i < at && detail ? `<span class="d">${esc(detail)}</span>` : ""}</li>`;
+  ul.innerHTML = step(0, "검색어 고르기", info.keywords ? searchText(info) : "")
+    + step(1, "기록 찾기", info.counts ? countText(info.counts) : "") + step(2, "답 정리하기", "");
+}
+function searchText(s) {
+  if (!s || !s.keywords || !s.keywords.length) return "최근 자료 위주로";
+  const range = s.since || s.until ? ` (${s.since || "처음"}~${s.until || "지금"})` : "";
+  return s.keywords.join(" · ") + range;
+}
+function countText(c) {
+  if (!c) return "";
+  const parts = [["posts", "글"], ["items", "RSS"], ["briefing", "브리핑"], ["events", "일정"]]
+    .filter(([k]) => c[k]).map(([k, label]) => `${label} ${c[k]}`);
+  return parts.length ? parts.join(" · ") : "전체 기록에선 못 찾음 (최근 자료로 답해요)";
+}
+function answerCard(r) {
+  if (!r || r.error) return `<div class="card"><div class="say">${u("plan_fail", {msg: esc(r ? r.error : "응답 없음")})}</div></div>`;
+  const pts = (r.points || []).map(p => {
+    const st = p.status === "확인됨" ? "ok" : "unk";
+    const links = (p.links || []).map(l => `<a href="${esc(l.url)}">${esc(l.label)}</a>`).join(", ");
+    return `<div class="pt"><span class="mark ${st}">${st === "ok" ? "✓" : "?"}</span>
+      <div>${p.date ? `<span class="when">${esc(p.date.slice(5).replace("-", "/"))}</span>` : ""}${esc(p.text)}${links ? ` → ${links}` : ""}</div></div>`;
+  }).join("");
+  const s = r.search || {};
+  return `<div class="card"><div class="sum">${esc(r.summary)}</div>${pts}
+    <div class="range">찾아본 범위: ${esc(searchText(s))} — ${esc(countText(s.counts))}</div></div>`;
+}
+function openTab(t) { document.querySelector(`nav button[data-tab="${t}"]`)?.click(); }
+
 async function poll() {
   const s = await api.get_state();
   $("#status").textContent = s.status + (s.last_run && !s.running ? ` · ${s.last_run}` : "");
@@ -344,9 +391,19 @@ ready.then(() => {
   $("#run").onclick = () => api.run_now().then(poll);
   $("#ask-form").onsubmit = async e => {
     e.preventDefault();
-    const q = $("#q").value.trim(); if (!q) return;
-    $("#answer").innerHTML = `<p class="muted">생각 중…</p>`;
-    $("#answer").innerHTML = await api.ask(q);
+    const q = $("#q").value.trim(); if (!q || asking) return;
+    asking = true; $("#q").value = "";
+    const btn = $("#ask-form button"); btn.disabled = true; btn.textContent = "생각 중…";
+    const short = q.length > 40 ? q.slice(0, 40) + "…" : q;
+    const box = document.createElement("div"); box.className = "qa";
+    box.innerHTML = `<div class="myq">${esc(q)}</div>
+      <div class="card"><div class="say">${u("ask_thinking", {q: esc(short)})}</div><ul class="steps"></ul></div>`;
+    if (!$("#answer .qa")) $("#answer").innerHTML = "";
+    $("#answer").prepend(box);
+    const timer = setInterval(async () => drawSteps(box, (await api.get_state()).ask), 700);
+    drawSteps(box, {running: true, stage: "plan", info: {}});
+    try { box.querySelector(".card").outerHTML = answerCard(await api.ask(q)); }
+    finally { clearInterval(timer); asking = false; btn.disabled = false; btn.textContent = "묻기"; }
   };
   poll(); setInterval(poll, 2000);
 });

@@ -27,6 +27,7 @@ plan_thinking = "날짜를 확인하는 중이에요…"
 plan_confirm = "이렇게 넣을까요?"
 plan_fail = "잘 모르겠어요: {msg}"
 add_fail = "일정을 못 넣었어요: {msg}"
+ask_thinking = "「{q}」… 생각해볼게요."     # 질문했을 때 ({q} = 질문)
 
 # 일정 장소 날씨 대사의 {advice}
 [weather_advice]
@@ -71,6 +72,9 @@ collected = ["다 모았어요. 브리핑 보실래요?"]
 warn = ["문제가 생겼어요: {msg}"]
 event_added = ["{date} {title} 넣어뒀어요.", "{title} 캘린더에 넣었어요."]
 event_failed = ["일정을 못 넣었어요: {msg}"]
+ask_done = ["답을 찾아왔어요. 질문 탭을 봐주세요."]   # 질문 답이 나왔을 때 (말풍선을 누르면 질문 탭)
+ask_none = ["모아둔 자료에서는 못 찾았어요."]
+ask_failed = ["답을 못 했어요: {msg}"]
 monday = ["월요일이에요. 이번 주도 힘내요."]
 friday = ["금요일이에요! 조금만 더 힘내요."]
 weekend = ["주말이에요. 푹 쉬세요."]

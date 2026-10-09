@@ -73,10 +73,17 @@ __LIST__"""
 
 QA_RULES = """아래 데이터와 오늘 브리핑만 근거로 질문에 답하라.
 "# 질문 관련 기록 검색"은 수집해 둔 전체 기간에서 이 질문의 검색어로 찾은 기록이고, 그 아래는 최근 72시간 자료다.
-지난 일을 말할 땐 날짜를 같이 쓴다. 근거가 데이터에 없으면 "수집한 자료에서는 확인 못 했어"라고 말한다.
-답에는 근거 링크를 단다.
+출력은 JSON 하나만. 코드블록·설명 없이.
+{"found": true, "summary": "...", "points": [{"date": "2026-09-08", "text": "...", "status": "확인됨",
+  "links": [{"label": "원문", "url": "https://..."}]}]}
+- summary: 질문에 대한 답을 한두 문장으로. 평문(마크다운 금지), 반말 메모체.
+- points: 답의 근거가 되는 핵심 2~4개, 중요한 순. 장황하게 늘어놓지 말 것.
+  text는 "누가/무엇이 + 어떻게 됐다" 한 문장(60자 이내). date는 그 글·소식의 날짜(YYYY-MM-DD).
+  status는 공식 출처(RSS 공식 변경내역·공식 계정)로 확인되면 "확인됨", 사람 말뿐이면 "미확인".
+  links는 1~2개, URL은 데이터에 있는 것을 글자 그대로만.
+- 근거가 데이터에 없으면 {"found": false, "summary": "수집한 자료에서는 확인 못 했어", "points": []}.
 
-질문: {question}"""
+질문: __QUESTION__"""
 
 SEARCH_SYSTEM = "너는 검색어를 뽑는 도우미다. 요청한 JSON 하나만 출력한다."
 SEARCH_PLAN = """오늘은 {today}(한국 시간)다. 아래 질문에 답하려고, 수집해 둔 SNS 글·RSS·지난 브리핑·일정 기록에서 찾을 말을 정한다.
@@ -417,16 +424,46 @@ def plan_search(cfg, question):
         return search.fallback_keywords(question), None, None
 
 
-def answer(cfg, db, question):
-    """질문 → 검색어·기간을 뽑아 전체 기록에서 찾고, 최근 72시간 자료·오늘 브리핑과 함께 답한다."""
+def clean_answer(raw, data):
+    """모델 답 검사·정리: 칸 채우기, 핵심 4개까지, 데이터에 없는 링크 버리기 (브리핑 카드와 같은 원칙)."""
+    known = {u.rstrip("/.,)") for u in re.findall(r"https?://[^\s|<>\"]+", data)}
+    points = []
+    for p in (raw.get("points") or [])[:4]:
+        if not isinstance(p, dict) or not str(p.get("text") or "").strip():
+            continue
+        links = [{"label": _short(l.get("label") or "원문", 14), "url": str(l.get("url", "")).rstrip("/.,)")}
+                 for l in (p.get("links") or []) if isinstance(l, dict)
+                 and str(l.get("url", "")).rstrip("/.,)") in known][:2]
+        points.append({"date": p["date"] if isinstance(p.get("date"), str) and DATE_RE.match(p["date"]) else "",
+                       "text": _short(p["text"], 120), "status": "확인됨" if p.get("status") == "확인됨" else "미확인",
+                       "links": links})
+    summary = " ".join(str(raw.get("summary") or "").split()) or "수집한 자료에서는 확인 못 했어"
+    return {"found": bool(raw.get("found", True)) and bool(points or raw.get("summary")),
+            "summary": summary, "points": points}
+
+
+def answer(cfg, db, question, progress=lambda stage, info=None: None):
+    """질문 → 검색어·기간을 뽑아 전체 기록에서 찾고, 최근 72시간 자료·오늘 브리핑과 함께 답한다.
+    progress(stage, info): "plan" → "search"({keywords, since, until}) → "write"({counts}) 순으로 알린다.
+    반환: {"found", "summary", "points": [{"date", "text", "status", "links"}], "search": {...}}"""
     since = (datetime.now(timezone.utc) - timedelta(hours=72)).isoformat()
-    b = db.latest_briefing()
-    data = build_data(cfg, db, since, with_events=True)
+    progress("plan")
     kw, lo, hi = plan_search(cfg, question)
-    found = search.find(db, kw, lo, hi)
-    log.info("질문 검색: %s (%s~%s) → %d자", kw, lo, hi, len(found))
+    progress("search", {"keywords": kw, "since": lo, "until": hi})
+    found, counts = search.find(db, kw, lo, hi)
+    log.info("질문 검색: %s (%s~%s) → %s", kw, lo, hi, counts)
+    progress("write", {"counts": counts})
+    data = build_data(cfg, db, since, with_events=True)
     if found:
         data = f"{found}\n\n{data}"
+    b = db.latest_briefing()
     if b:
         data = f"# 오늘 브리핑\n{b['markdown']}\n\n{data}"
-    return llm.ask(cfg, SYSTEM, QA_RULES.format(question=question) + f"\n<data>\n{data}\n</data>", timeout=300)
+    prompt = QA_RULES.replace("__QUESTION__", question) + f"\n<data>\n{data}\n</data>"
+    text = llm.ask(cfg, SYSTEM, prompt, timeout=300)
+    try:
+        raw = parse_json(text)
+    except ValueError:  # 형식이 깨졌으면 한 번만 다시
+        log.warning("답변 JSON 파싱 실패, 다시 요청")
+        raw = parse_json(llm.ask(cfg, SYSTEM, prompt + "\n\n(주의: 반드시 JSON 하나만 출력)", timeout=300))
+    return {**clean_answer(raw, data), "search": {"keywords": kw, "since": lo, "until": hi, "counts": counts}}

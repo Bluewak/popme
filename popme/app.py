@@ -35,7 +35,8 @@ ASSETS = config.ROOT / "assets"
 UI_STATE = config.DATA_DIR / "ui.json"
 SIZES = {"bubble": (330, 200), "panel": (420, 640)}  # 논리 px. 말풍선 높이는 내용에 맞춰 바뀜
 # 창이 열려 있어도 (옆으로) 말하는 '사건' 대사. 나머지(인사·잡담·잠꼬대)는 창이 닫혀 있을 때만
-EVENT_LINES = {"collecting", "warn", "petted", "return_from_away", "event_added", "event_failed"}
+EVENT_LINES = {"collecting", "warn", "petted", "return_from_away", "event_added", "event_failed",
+               "ask_done", "ask_none", "ask_failed"}
 PET_FILES = {"idle": "pet", "busy": "pet_busy", "happy": "pet_happy", "alert": "pet_alert", "sleepy": "pet_sleepy"}
 
 user32 = ctypes.windll.user32
@@ -123,6 +124,9 @@ class Api:
         self._happy_until = self._alert_until = self._pet_cool_until = 0.0
         self._char = character.Character()
         self._said_today = {}  # 하루 한 번 대사 종류 → 마지막으로 말한 날짜
+        # 질문 처리 상태 (화면이 진행 단계를 그린다). stage: plan → search → write
+        self._ask = {"running": False, "stage": "", "info": {}}
+        self._ask_bubble_until = 0.0  # 이 시각 전에 말풍선을 누르면 질문 탭을 연다 ("답 찾아왔어요")
 
     # --- 모드 전환·배치 ---
     def set_mode(self, mode):
@@ -237,7 +241,7 @@ class Api:
                     next_expr = now + random.uniform(*beh["expression_every_sec"])
                 if now < self._happy_until:
                     mood = "happy"
-                elif st["running"]:
+                elif st["running"] or self._ask["running"]:
                     mood = "busy"
                 elif now < self._alert_until:
                     mood = "alert"
@@ -346,6 +350,11 @@ class Api:
             self._pet.say(text, self._char.beh["chatter_bubble_sec"], side=self._mode != "pet")
 
     def _on_bubble_click(self):
+        if time.time() < self._ask_bubble_until:  # "답 찾아왔어요" 말풍선 → 질문 탭
+            self._ask_bubble_until = 0.0
+            self.set_mode("panel")
+            self._window.evaluate_js("openTab('ask')")
+            return
         if self._mode != "pet":  # 옆 말풍선을 누른 거면 그냥 닫기만
             return
         self._window.evaluate_js("fillBubble()")
@@ -374,7 +383,7 @@ class Api:
 
     # --- 데이터 ---
     def get_state(self):
-        return {**self._jobs.state, "mode": self._mode}
+        return {**self._jobs.state, "mode": self._mode, "ask": self._ask}
 
     def get_briefing(self):
         items, _ = briefing.events_block(self._jobs.db, self._jobs.cfg)
@@ -456,12 +465,25 @@ class Api:
         return self._jobs.run_full(collect=False)
 
     def ask(self, question):
+        """질문 → 정리된 답 (JSON). 진행 단계는 get_state()["ask"]로 화면이 그리고, 끝나면 말풍선으로 알린다."""
+        if self._ask["running"]:
+            return {"error": "이전 질문을 아직 생각하는 중이에요."}
+
+        def progress(stage, info=None):  # info는 누적 (화면이 지난 단계 내용도 보여줄 수 있게)
+            self._ask.update(stage=stage, info={**self._ask["info"], **(info or {})})
+
+        self._ask.update(running=True, stage="plan", info={})
         try:
-            md = briefing.answer(self._jobs.cfg, self._jobs.db, question)
-            return markdown.markdown(md, extensions=["tables", "sane_lists"])
+            res = briefing.answer(self._jobs.cfg, self._jobs.db, question, progress)
+            self._say("ask_done" if res["found"] else "ask_none")
+            self._ask_bubble_until = time.time() + self._char.beh["chatter_bubble_sec"] + 2
+            return res
         except Exception as e:
             log.exception("질문 실패")
-            return f"<p class='err'>실패: {e}</p>"
+            self._say("ask_failed", msg=str(e)[:40])
+            return {"error": str(e)}
+        finally:
+            self._ask.update(running=False, stage="", info={})
 
     def open_url(self, url):
         webbrowser.open(url)

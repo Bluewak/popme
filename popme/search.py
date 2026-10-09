@@ -52,10 +52,11 @@ def _day(iso):
 
 
 def find(db, keywords, since=None, until=None, limits=(60, 30, 20, 10)):
-    """반환: 데이터 블록 텍스트 (찾은 게 없으면 ""). limits = (글, RSS, 브리핑 줄, 일정)."""
+    """반환: (데이터 블록 텍스트, 찾은 개수 {"posts", "items", "briefing", "events"}).
+    찾은 게 없으면 텍스트는 "". limits = (글, RSS, 브리핑 줄, 일정)."""
     keywords = [k.strip() for k in keywords if k and k.strip()]
     if not keywords:
-        return ""
+        return "", {"posts": 0, "items": 0, "briefing": 0, "events": 0}
     lo, hi = _range(since, until)
     n_posts, n_items, n_brief, n_events = limits
     parts = []
@@ -100,7 +101,8 @@ def find(db, keywords, since=None, until=None, limits=(60, 30, 20, 10)):
         parts.append(f"## 일정 ({len(events)}개)")
         parts += [f"- [{_day(e['start_at'])}] {e['title']}{' (지워짐)' if e['deleted'] else ''}" for e in events]
 
+    counts = {"posts": len(rows), "items": len(items), "briefing": min(len(lines), n_brief), "events": len(events)}
     if not parts:
-        return ""
+        return "", counts
     period = f"{since or '처음'} ~ {until or '지금'}"
-    return f"# 질문 관련 기록 검색 (검색어: {', '.join(keywords)} / 기간: {period})\n" + "\n".join(parts)
+    return f"# 질문 관련 기록 검색 (검색어: {', '.join(keywords)} / 기간: {period})\n" + "\n".join(parts), counts

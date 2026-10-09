@@ -20,21 +20,22 @@ def make_db(tmp_path):
 
 
 def test_finds_across_tables_with_korean_particles(tmp_path):
-    out = search.find(make_db(tmp_path), ["MCP"])
+    out, counts = search.find(make_db(tmp_path), ["MCP"])
     assert "simonw" in out and "kodev" in out  # 'MCP를'도 걸림
     assert "점심" not in out
     assert "GeekNews" in out and "[2026-09-21 브리핑] **MCP 표준 바뀜** 본문" in out
+    assert counts == {"posts": 2, "items": 1, "briefing": 1, "events": 0}
 
 
 def test_date_range_is_kst_days(tmp_path):
-    out = search.find(make_db(tmp_path), ["MCP"], "2026-09-01", "2026-09-30")
+    out, _ = search.find(make_db(tmp_path), ["MCP"], "2026-09-01", "2026-09-30")
     assert "simonw" in out and "kodev" not in out  # 10월 글은 빠짐
 
 
 def test_like_wildcards_are_literal(tmp_path):
     db = make_db(tmp_path)
-    assert "GeekNews" in search.find(db, ["MCP_tools"])
-    assert search.find(db, ["50%x"]) == ""  # %가 와일드카드로 쓰이지 않음
+    assert "GeekNews" in search.find(db, ["MCP_tools"])[0]
+    assert search.find(db, ["50%x"])[0] == ""  # %가 와일드카드로 쓰이지 않음
 
 
 def test_fallback_keywords_strip_particles():
