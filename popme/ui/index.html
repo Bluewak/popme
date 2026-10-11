@@ -33,9 +33,12 @@
   #say.urgent { color: var(--err); }
   #bubble ul { margin: 4px 0 10px; padding-left: 16px; }
   #bubble li { margin: 3px 0; }
-  /* 날씨 칸: 말풍선은 오늘 한 줄, 브리핑은 오늘·내일 */
-  .wx { font-size: 12px; color: var(--muted); margin: 4px 0 2px; } .wx:empty { display: none; }
-  .wx .bad, .wx-strip .bad { color: var(--err); }
+  /* 날씨 칸: 말풍선은 오늘 한 줄(칩), 브리핑은 오늘·내일. (.wx는 일정 옆 날씨 표시라 이름을 따로 쓴다) */
+  #bubble-wx { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 6px; }
+  #bubble-wx:empty { display: none; }
+  #bubble-wx .place { font-size: 11.5px; color: var(--muted); margin-right: 2px; }
+  .chip.bad { background: #fbe3dc; color: var(--err); }
+  .wx-strip .bad { color: var(--err); }
   .wx-strip { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 5px 10px; font-size: 12.5px; margin-bottom: 4px; }
   .wx-strip:empty { display: none; } .wx-strip div { margin: 2px 0; } .wx-strip b { color: var(--brown); margin-right: 6px; }
   #bubble .row { display: flex; gap: 6px; justify-content: flex-end; align-items: center; }
@@ -125,7 +128,7 @@
 <div id="bubble">
   <span class="tag"></span>
   <div id="say"></div>
-  <div id="bubble-wx" class="wx"></div>
+  <div id="bubble-wx"></div>
   <ul id="bubble-list"></ul>
   <div class="row"><button class="icon" id="bubble-close">닫기</button><button class="primary" id="bubble-more">자세히</button></div>
 </div>
@@ -204,16 +207,21 @@ window.fillBubble = async (alert) => {
   // 날씨는 위치 확인에 몇 초 걸릴 수 있어 따로 받아 채우고, 창 높이를 다시 맞춘다
   api.get_weather().then(w => {
     const d = w && w.days[0];
-    $("#bubble-wx").innerHTML = d ? `${esc(w.place)} · ${wxText(d, true)}` : "";
+    $("#bubble-wx").innerHTML = d ? `<span class="place">${esc(w.place)}</span>${wxChips(d)}` : "";
     measure("bubble");
   });
 };
 
-// 날씨 한 줄: "🌡 12~25° 일교차 큼 · 강수 40% · 😷 미세먼지 나쁨" (short = 말풍선용, 미세먼지는 나쁠 때만)
-function wxText(d, short) {
+// 말풍선 날씨 칩: [🌡 12~25° 일교차 큼] [☂ 40%] [😷 미세먼지 나쁨] — 미세먼지는 나쁠 때만, 빨간 칩
+function wxChips(d) {
+  const chip = (t, bad) => `<span class="chip${bad ? " bad" : ""}">${t}</span>`;
+  return chip(`${d.icon} ${d.min}~${d.max}° ${esc(d.desc)}`)
+    + (d.rain >= 30 ? chip(`☂ ${d.rain}%`) : "") + (d.air_bad ? chip(`😷 미세먼지 ${esc(d.air)}`, true) : "");
+}
+// 브리핑 날씨 줄: "🌡 12~25° 일교차 큼 · 강수 40% · 😷 미세먼지 나쁨"
+function wxText(d) {
   const rain = d.rain >= 30 ? ` · 강수 ${d.rain}%` : "";
-  const air = d.air && (!short || d.air_bad)
-    ? ` · <span class="${d.air_bad ? "bad" : ""}">${d.air_bad ? "😷 " : ""}미세먼지 ${esc(d.air)}</span>` : "";
+  const air = d.air ? ` · <span class="${d.air_bad ? "bad" : ""}">${d.air_bad ? "😷 " : ""}미세먼지 ${esc(d.air)}</span>` : "";
   return `${d.icon} ${d.min}~${d.max}° ${esc(d.desc)}${rain}${air}`;
 }
 async function fillBriefWeather() {
