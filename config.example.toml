@@ -167,8 +167,10 @@ group = "새 오픈소스·화제"
 max_chars = 200
 
 [llm]
-provider = "claude"   # 브리핑 쓸 AI: "claude"(Claude 구독, claude CLI) | "codex"(ChatGPT 구독, Codex CLI)
+provider = "claude"   # 브리핑 쓸 AI: "claude"(Claude 구독, claude CLI) | "codex"(ChatGPT 구독, Codex CLI) | "gemini"(Gemini CLI)
 claude_path = ""   # 비우면 PATH → VS Code 확장 내장 claude.exe 순으로 자동 탐색
 model = ""         # 비우면 Claude Code 기본 모델
 codex_path = ""    # 비우면 PATH → winget 설치 위치 순으로 자동 탐색 (설치: winget install OpenAI.Codex → codex login)
 codex_model = ""   # 비우면 Codex 기본 모델
+gemini_path = ""   # 비우면 PATH → %APPDATA%\npm 순으로 자동 탐색 (설치: npm install -g @google/gemini-cli → gemini로 Google 로그인)
+gemini_model = ""  # 비우면 Gemini CLI 기본 모델

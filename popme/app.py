@@ -13,6 +13,7 @@ import os
 import random
 import re
 import socket
+import subprocess
 import sys
 import threading
 import time
@@ -577,17 +578,23 @@ class Api:
             time.sleep(30)
 
 
-def _single_instance():
-    s = socket.socket()
-    try:
-        s.bind(("127.0.0.1", 47321))
-    except OSError:
-        sys.exit(0)
-    return s  # 프로세스가 살아 있는 동안 포트를 잡아 둔다
+def _single_instance(wait=0.0):
+    """이미 켜져 있으면 끝낸다. wait초 동안은 앞 프로세스가 꺼지길 기다린다 (설정 저장 후 다시 켤 때)."""
+    deadline = time.time() + wait
+    while True:
+        s = socket.socket()
+        try:
+            s.bind(("127.0.0.1", 47321))
+            return s  # 프로세스가 살아 있는 동안 포트를 잡아 둔다
+        except OSError:
+            s.close()
+            if time.time() >= deadline:
+                sys.exit(0)
+            time.sleep(0.5)
 
 
-def main():
-    _lock = _single_instance()
+def main(restart=False):
+    _lock = _single_instance(wait=20 if restart else 0)
     api = Api()
     jobs = Jobs(notify=lambda kind, msg: threading.Thread(target=api._on_job, args=(kind, msg), daemon=True).start())
     api._jobs = jobs
@@ -608,12 +615,27 @@ def main():
         tray.stop()
         window.destroy()
 
+    settings_open = threading.Lock()
+
+    def open_settings(*_):
+        """설정 창(popme/setup_window.py)을 따로 띄우고, 저장하면 POPME를 다시 켠다."""
+        if not settings_open.acquire(blocking=False):
+            return
+        try:
+            r = subprocess.run([sys.executable, "-m", "popme.setup_window"], cwd=config.ROOT)
+        finally:
+            settings_open.release()
+        if r.returncode == 0:
+            subprocess.Popen([sys.executable, "-m", "popme", "restart"], cwd=config.ROOT)
+            quit_app()
+
     # 캐릭터 우클릭 메뉴
     pet_menu = lambda: [
         ("브리핑 열기", lambda: api.set_mode("panel")),
         ("지금 수집", jobs.run_full),
         None,
         (f"{name} 숨기기 (트레이에서 다시 보이기)", api._hide_all),
+        ("설정 바꾸기", bg(open_settings)),
         ("종료", quit_app),
     ]
     pet = PetWindow(_pet_images(), api._pet_anchor, on_click=bg(api._on_pet_click), on_moved=bg(api._on_pet_moved),
@@ -629,6 +651,7 @@ def main():
         pystray.MenuItem("브리핑만 다시 만들기", lambda i, _: jobs.run_full(collect=False)),
         pystray.MenuItem("전용 Chrome 열기 (로그인)", lambda i, _: api.open_chrome_login()),
         pystray.MenuItem("브리핑 폴더 열기", lambda i, _: api.open_folder()),
+        pystray.MenuItem("설정 바꾸기", lambda i, _: threading.Thread(target=open_settings, daemon=True).start()),
         pystray.MenuItem("종료", quit_app),
     ))
     api._tray = tray

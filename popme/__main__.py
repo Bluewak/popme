@@ -10,4 +10,4 @@ if __name__ == "__main__":
         jobs.run_full(force=True, blocking=True)
         print(jobs.db.latest_briefing()["markdown"] if jobs.db.latest_briefing() else jobs.state)
     else:
-        main()
+        main(restart=sys.argv[1:2] == ["restart"])  # restart: 설정 저장 후 앞 프로세스가 꺼지길 기다렸다 켬

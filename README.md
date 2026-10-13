@@ -17,9 +17,10 @@ Windows 화면 구석에 사는 **데스크톱 브리핑 비서**. 내 PC의 로
 - Windows 11 (둥근 창 테두리·위치 서비스. Windows 10에서도 대부분 동작)
 - Python 3.11+
 - Google Chrome
-- 요약·답변용 AI 구독 하나 (별도 API 키 불필요, `config.toml` `[llm] provider`로 고름)
+- 요약·답변용 AI 구독 하나 (별도 API 키 불필요, 설치할 때 설정 창에서 고름 → `config.toml` `[llm] provider`)
   - **Claude** (`provider = "claude"`, 기본): Claude Code의 `claude -p`. PATH에 없으면 VS Code 확장의 claude.exe를 자동으로 찾음
-  - **ChatGPT** (`provider = "codex"`): Codex CLI의 `codex exec`. `install.ps1`이 설치(`winget install OpenAI.Codex`)와 `codex login`까지 안내
+  - **ChatGPT** (`provider = "codex"`): Codex CLI의 `codex exec`. 설정 창에서 설치(`winget install OpenAI.Codex`)와 `codex login`까지
+  - **Gemini** (`provider = "gemini"`): Gemini CLI의 `gemini -p`. Google AI Pro 구독 또는 무료 한도. 설정 창에서 설치(Node.js + `npm i -g @google/gemini-cli`)와 Google 로그인까지
 
 ## 설치
 ```powershell
@@ -27,12 +28,14 @@ git clone <이 저장소>
 cd POPME
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
-패키지 설치, `config.toml` 생성, 로그인 시 자동 실행, 바탕화면 바로가기까지 만듭니다.
+패키지를 설치하고 **설정 창**을 엽니다: 준비물 확인 → 브리핑 AI(설치·로그인) → 캘린더 → 메일 알림 → 날씨·브리핑 시각. 고른 값은 `config.toml`에 저장되고(주석·다른 설정은 그대로), 로그인 시 자동 실행과 바탕화면 바로가기도 만듭니다. 나중에 바꾸려면 트레이 아이콘(또는 캐릭터) 우클릭 → **설정 바꾸기**. 저장하면 POPME가 다시 켜집니다.
+
+캘린더 주소(ICS)는 설정 창에서 **AI에게 연결 맡기기**를 누르면, 고른 AI가 새 터미널에서 캘린더 앱별로 한 단계씩 안내하고 `python -m popme.setup_window check-ics` / `add-ics` 명령으로 주소를 확인·저장합니다 (그 두 명령만 쓰도록 지시).
 
 ## 처음 한 번
 1. 바탕화면 **POPME** 실행 → 트레이 아이콘 우클릭 → **전용 Chrome 열기 (로그인)**
-2. 열린 Chrome에서 X, Threads(, TimeTree)에 로그인 (평소 Chrome과 별개 프로필). ICS 캘린더는 로그인 대신 `config.toml`에 주소만 넣음
-3. `config.toml`에서 볼 X 계정·Threads 태그·RSS·요금제를 내 관심사로 수정
+2. 열린 Chrome에서 X, Threads(, TimeTree)에 로그인 (평소 Chrome과 별개 프로필). ICS 캘린더는 로그인 대신 설정 창에서 주소만 넣음
+3. (선택) `config.toml`에서 볼 X 계정·Threads 태그·RSS를 내 관심사로 수정
 4. 캐릭터 우클릭 → **지금 수집**
 
 ## 사용
@@ -56,9 +59,9 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 ## 꼭 알아둘 점
 - **계정 위험**: X·Threads·TimeTree를 브라우저 자동화로 읽습니다. 사람 속도로 읽기만 하도록 만들었지만, 각 서비스 약관상 자동화는 제한될 수 있고 계정 제재 가능성이 0은 아닙니다. 본인 책임으로 쓰세요.
 - **잘 깨지는 부분**: 서비스들이 내부 API를 자주 바꿉니다. 수집이 0개가 되면 `%LOCALAPPDATA%\POPME\raw\`의 원본 응답을 보고 `popme/collectors/*.py` 파서를 고치세요 (X는 이름이 아니라 내용으로 트윗을 찾게 해 둠).
-- **보내는 데이터**: 요약·해석은 고른 AI(Claude 또는 ChatGPT, 내 구독)로. 현재 위치·일정 장소는 약 1km로 반올림한 좌표를 OpenStreetMap Nominatim(지명)과 Open-Meteo(날씨)로 보냅니다. 끄려면 `config.toml` `[weather] use_windows_location = false`.
+- **보내는 데이터**: 요약·해석은 고른 AI(Claude·ChatGPT·Gemini, 내 구독)로. 현재 위치·일정 장소는 약 1km로 반올림한 좌표를 OpenStreetMap Nominatim(지명)과 Open-Meteo(날씨)로 보냅니다. 끄려면 `config.toml` `[weather] use_windows_location = false`.
 - **메일** (켰을 때만): 메일은 내 PC가 메일 서버에서 직접 받고, 규칙으로 못 정한 메일의 보낸사람·제목·본문 앞 300자만 고른 AI로 보냅니다 (`[mail] ai = false`면 안 보냄). 앱 비밀번호는 `config.toml`에 평문으로 저장됩니다.
-- **프롬프트 인젝션 대비**: 수집한 글을 요약하는 단계에는 도구 권한이 없고(`claude -p --tools ""` / Codex는 셸·코드 실행·브라우저 등 도구를 전부 끄고 빈 폴더·읽기 전용으로 실행), 일정 추가처럼 쓰기 동작은 사용자가 승인 카드를 눌러야만 실행됩니다.
+- **프롬프트 인젝션 대비**: 수집한 글을 요약하는 단계에는 도구 권한이 없고(`claude -p --tools ""` / Codex는 셸·코드 실행·브라우저 등 도구를 전부 끄고 빈 폴더·읽기 전용으로 실행 / Gemini는 빈 폴더 설정으로 내장 도구·MCP·확장을 전부 끄고 실행), 일정 추가처럼 쓰기 동작은 사용자가 승인 카드를 눌러야만 실행됩니다.
 
 ## 개발
 - 테스트: `python -m pip install pytest` → `python -m pytest -q tests`

@@ -38,7 +38,7 @@ POPME는 기본으로 **TimeTree**를 씁니다. 구글·iCloud 등은 **A(ICS �
 ## 3. 서비스별 방법
 
 ### A. ICS(iCal) 주소로 읽기 — 설정만 하면 됨 (내장), 읽기 전용
-코드가 이미 들어 있습니다 (`popme/collectors/ics.py`). `config.toml`에 주소만 넣으세요.
+코드가 이미 들어 있습니다 (`popme/collectors/ics.py`). 설정 창(설치할 때, 또는 트레이 > 설정 바꾸기)에서 캘린더 앱을 고르고 주소를 넣거나 **AI에게 연결 맡기기**를 누르면 됩니다. 직접 고치려면 `config.toml`에:
 
 ```toml
 [calendar]
