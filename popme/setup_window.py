@@ -4,7 +4,7 @@ install.ps1이 설치할 때 띄우고, 나중엔 트레이(또는 캐릭터 우
 config.toml의 주석·다른 설정은 그대로 두고 고른 값의 줄만 바꾼다 (파일이 없으면 config.example.toml에서 시작).
 
 캘린더 주소(ICS)는 고른 AI에게 맡길 수도 있다: 새 터미널에서 AI CLI를 대화형으로 열고, 캘린더 앱별 안내 프롬프트를 준다.
-AI는 아래 명령만으로 주소를 확인·저장한다 (설정 파일을 직접 고치지 않게).
+AI는 아래 명령만으로 주소를 확인·저장한다 (설정 파일을 직접 고치지 않게). python은 py_command() — 이 POPME를 돌리는 파이썬
   python -m popme.setup_window check-ics '<주소>'          주소가 열리는지, 일정 몇 개인지
   python -m popme.setup_window add-ics '<이름>' '<주소>'   확인 후 config.toml에 추가 (source = "ics")
 """
@@ -95,9 +95,10 @@ CAL_PROMPT = """너는 POPME(윈도우 데스크톱 브리핑 위젯) 설치를 
 할 일
 1. 위 방법대로 주소를 얻도록 화면에서 누를 곳을 하나씩 안내한다. 사용자 화면은 직접 볼 수 없으니 무엇이 보이는지 물어 가며 진행한다.
 2. 사용자가 주소를 붙여 넣으면 이 폴더에서 아래 명령으로 열리는지 확인한다.
-   python -m popme.setup_window check-ics '주소'
+   {py} -m popme.setup_window check-ics '주소'
+   (POPME 파이썬 경로에 공백이 있으면 셸에 맞게 따옴표로 감싼다. PowerShell은 & '경로' -m ...)
 3. 확인되면 캘린더 이름(예: 내 캘린더, 회사)을 물어보고 저장한다. 캘린더가 여러 개면 2~3을 반복한다.
-   python -m popme.setup_window add-ics '이름' '주소'
+   {py} -m popme.setup_window add-ics '이름' '주소'
 4. 다 끝나면 「설정 창으로 돌아가 다음을 누르세요」라고 알려 준다.
 
 지킬 것
@@ -441,10 +442,19 @@ def open_ai_setup(provider):
     _console(AI_SETUP[provider], f"POPME - {AIS[provider]['name']} 설치·로그인")
 
 
+def py_command():
+    """AI 터미널에서 이 POPME의 파이썬 (install.ps1은 LOCALAPPDATA/POPME/venv에 패키지를 깔아서
+    시스템 python에는 icalendar 등이 없다). bash·PowerShell 모두 읽게 / 구분 절대 경로."""
+    exe = Path(sys.executable)
+    if exe.name.lower() == "pythonw.exe":
+        exe = exe.with_name("python.exe")
+    return exe.as_posix()
+
+
 def open_calendar_helper(provider, app):
     from popme import llm
     exe = {"claude": llm.find_claude, "codex": llm.find_codex, "gemini": llm.find_gemini}[provider]({"llm": {}})
-    prompt = CAL_PROMPT.format(app=CALENDAR_APPS[app]["name"], howto=CAL_HOWTO.get(app, ""))
+    prompt = CAL_PROMPT.format(app=CALENDAR_APPS[app]["name"], howto=CAL_HOWTO.get(app, ""), py=py_command())
     fd, ppath = tempfile.mkstemp(prefix="popme-cal-", suffix=".txt", dir=config.DATA_DIR)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(prompt)
