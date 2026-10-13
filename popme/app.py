@@ -166,7 +166,8 @@ class Api:
         user32.SetWindowPos(self._hwnd, HWND_TOPMOST, x, y, w, h, 0x0010)
         self._window.show()
         tail_x = min(max(head_x - int(6 * s), x + int(30 * s)), x + w - int(30 * s))
-        self._pet.set_tail((tail_x, y + h), (255, 246, 222) if self._mode == "bubble" else (255, 251, 241))
+        self._pet.set_tail((tail_x, y + h), (255, 246, 222) if self._mode == "bubble" else (255, 251, 241),
+                           attached=self._hwnd)
 
     def _on_pet_click(self):
         if self._mode == "pet":
