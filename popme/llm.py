@@ -2,11 +2,13 @@
 
 - "claude" (기본): Claude Pro/Max 구독의 claude CLI (claude -p)
 - "codex": ChatGPT Plus/Pro 구독의 Codex CLI (codex exec)
+- "gemini": Google 계정(Google AI Pro 등 구독 또는 무료 한도)의 Gemini CLI (gemini -p)
 
 어느 쪽이든 도구(셸·파일·웹·MCP)를 전부 끄고 요약·답변만 하게 한다.
 수집된 SNS 글이 무엇을 시키든 실행할 수단이 없다.
 """
 import glob
+import json
 import os
 import re
 import shutil
@@ -22,7 +24,7 @@ def provider(cfg) -> str:
 
 
 def provider_name(cfg) -> str:
-    return {"claude": "Claude", "codex": "ChatGPT"}.get(provider(cfg), provider(cfg))
+    return {"claude": "Claude", "codex": "ChatGPT", "gemini": "Gemini"}.get(provider(cfg), provider(cfg))
 
 
 def find_claude(cfg) -> str:
@@ -58,6 +60,18 @@ def find_codex(cfg) -> str:
     if not found:
         raise RuntimeError("Codex CLI를 찾지 못했어요. `winget install OpenAI.Codex` 후 `codex login`을 해 주세요. "
                            "(또는 config.toml의 [llm] codex_path 지정)")
+    return found[0]
+
+
+def find_gemini(cfg) -> str:
+    p = cfg.get("llm", {}).get("gemini_path")
+    if p:
+        return p
+    found = ([w for w in [shutil.which("gemini")] if w]
+             + glob.glob(os.path.expandvars(r"%APPDATA%\npm\gemini.cmd")))  # npm i -g @google/gemini-cli
+    if not found:
+        raise RuntimeError("Gemini CLI를 찾지 못했어요. `npm install -g @google/gemini-cli` 후 `gemini`로 Google 로그인을 해 주세요. "
+                           "(또는 config.toml의 [llm] gemini_path 지정)")
     return found[0]
 
 
@@ -97,9 +111,46 @@ def _ask_codex(cfg, system, prompt, timeout):
             pass
 
 
+# Gemini도 에이전트라 기본 도구(셸·파일·웹)가 있다. 작업 폴더 설정으로 내장 도구를 하나도 허용하지 않고,
+# MCP·확장·스킬도 끈다. 시스템 프롬프트는 GEMINI_SYSTEM_MD로 통째로 바꾼다 (기본 에이전트 지시문 대신)
+GEMINI_SETTINGS = {"tools": {"core": ["none"], "exclude": ["run_shell_command", "write_file", "replace", "web_fetch",
+                                                            "google_web_search", "read_file", "read_many_files",
+                                                            "list_directory", "glob", "search_file_content", "save_memory"]},
+                   "mcp": {"allowed": ["none"]}, "skills": {"enabled": False}}
+
+
+def _ask_gemini(cfg, system, prompt, timeout):
+    work = DATA_DIR / "llm-empty-gemini"
+    (work / ".gemini").mkdir(parents=True, exist_ok=True)
+    (work / ".gemini" / "settings.json").write_text(json.dumps(GEMINI_SETTINGS), encoding="utf-8")
+    sys_md = work / ".gemini" / "system.md"
+    sys_md.write_text(system, encoding="utf-8")
+    cmd = [find_gemini(cfg), "-p", "위 입력에 답하세요.", "-o", "json", "-e", "none",
+           "--allowed-mcp-server-names", "none", "--approval-mode", "default", "--skip-trust"]
+    if cfg.get("llm", {}).get("gemini_model"):
+        cmd += ["-m", cfg["llm"]["gemini_model"]]
+    r = subprocess.run(cmd, input=prompt, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                       timeout=timeout, cwd=work, env={**os.environ, "GEMINI_SYSTEM_MD": str(sys_md)},
+                       creationflags=subprocess.CREATE_NO_WINDOW)
+    out = (r.stdout or "").strip()
+    try:
+        data = json.loads(out[out.index("{"):]) if "{" in out else {}
+    except ValueError:
+        data = {}
+    answer = (data.get("response") or "").strip()
+    if r.returncode != 0 or not answer:
+        err = json.dumps(data.get("error"), ensure_ascii=False) if data.get("error") else (r.stderr or out)
+        if any(k in err.lower() for k in ("login", "auth", "credential")):
+            raise RuntimeError("Gemini 로그인이 필요해요. 터미널에서 `gemini`를 한 번 실행해 Google 로그인을 해 주세요.")
+        raise RuntimeError(f"gemini 호출 실패: {err.strip()[-500:]}")
+    return answer
+
+
 def ask(cfg, system: str, prompt: str, timeout: int = 600) -> str:
     if provider(cfg) == "codex":
         return _ask_codex(cfg, system, prompt, timeout)
+    if provider(cfg) == "gemini":
+        return _ask_gemini(cfg, system, prompt, timeout)
     cmd = [find_claude(cfg), "-p", "--tools", "", "--system-prompt", system,
            "--strict-mcp-config", "--no-session-persistence", "--output-format", "text"]
     if cfg.get("llm", {}).get("model"):
