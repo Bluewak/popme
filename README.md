@@ -23,10 +23,14 @@ Windows 화면 구석에 사는 **데스크톱 브리핑 비서**. 내 PC의 로
   - **Gemini** (`provider = "gemini"`): Gemini CLI의 `gemini -p`. Google AI Pro 구독 또는 무료 한도. 설정 창에서 설치(Node.js + `npm i -g @google/gemini-cli`)와 Google 로그인까지
 
 ## 설치
+[Releases](https://github.com/Bluewak/popme/releases)에서 `POPME-v*.zip`을 받아 풀고 **`install.bat`을 더블클릭**하세요.
+(`install.ps1`을 우클릭 → "PowerShell에서 실행"하면 PC의 스크립트 실행 정책에 막혀 창이 바로 닫힐 수 있습니다. `install.bat`은 이번 실행에만 정책을 풀어 줍니다.)
+
 ```powershell
-git clone <이 저장소>
-cd POPME
-powershell -ExecutionPolicy Bypass -File .\install.ps1
+# 또는 저장소에서
+git clone https://github.com/Bluewak/popme.git
+cd popme
+.\install.bat
 ```
 패키지를 설치하고 **설정 창**을 엽니다: 준비물 확인 → 브리핑 AI(설치·로그인) → 캘린더 → 메일 알림 → 날씨·브리핑 시각. 고른 값은 `config.toml`에 저장되고(주석·다른 설정은 그대로), 로그인 시 자동 실행과 바탕화면 바로가기도 만듭니다. 나중에 바꾸려면 트레이 아이콘(또는 캐릭터) 우클릭 → **설정 바꾸기**. 저장하면 POPME가 다시 켜집니다.
 
