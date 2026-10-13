@@ -20,6 +20,7 @@ WNDPROC = ctypes.WINFUNCTYPE(LRESULT, wintypes.HWND, wintypes.UINT, wintypes.WPA
 u32.DefWindowProcW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
 u32.DefWindowProcW.restype = LRESULT
 u32.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND] + [ctypes.c_int] * 4 + [ctypes.c_uint]
+u32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
 u32.CreateWindowExW.restype = wintypes.HWND
 u32.CreateWindowExW.argtypes = [wintypes.DWORD, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.DWORD,
                                 ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
@@ -81,6 +82,7 @@ class PetWindow:
         self._bubble_rect = None  # 창 기준 말풍선 영역 (클릭 판정)
         self.ready = threading.Event()
         self._tail = None        # 큰 말풍선·패널로 잇는 꼬리의 밑변 중심 (화면 좌표)
+        self._attached = None    # 꼬리로 이어진 창(큰 말풍선·패널) — 끌 때 같이 옮긴다
         self._tail_cache = None
         self._rub = {"x": None, "dir": 0, "flips": []}  # 쓰다듬기(좌우 문지르기) 감지
         self.logical = size
@@ -125,12 +127,14 @@ class PetWindow:
             self._speech = {**sp, "bubble": Bubble(sp["bubble"].text, self.scale, tail="right" if side else "down", name=self.name),
                             "side": side, "moved": True}
 
-    def set_tail(self, base, fill=(255, 246, 222)):
-        """큰 말풍선·패널이 열렸을 때: 그 창 아래 가장자리(base, 화면 좌표)에서 머리까지 꼬리를 그린다."""
+    def set_tail(self, base, fill=(255, 246, 222), attached=None):
+        """큰 말풍선·패널이 열렸을 때: 그 창 아래 가장자리(base, 화면 좌표)에서 머리까지 꼬리를 그린다.
+        attached: 그 창의 hwnd — 캐릭터를 끄는 동안 창도 같이 움직여서 꼬리가 늘어나지 않게 한다."""
         if fill != getattr(self, "_tail_fill", None):
             self._tail_cache = None
         self._tail_fill = fill
         self._tail = base
+        self._attached = attached if base else None
         if base and self.hwnd:  # 꼬리가 패널 테두리를 덮도록 캐릭터 창을 맨 위로
             u32.SetWindowPos(self.hwnd, HWND_TOPMOST, 0, 0, 0, 0, 0x2 | 0x1 | 0x10)
 
@@ -389,7 +393,11 @@ class PetWindow:
                 p = wintypes.POINT()
                 u32.GetCursorPos(ctypes.byref(p))
                 self._drag = {"start": (p.x, p.y), "anchor": self._anchor, "moved": False,
-                              "on_bubble": self._on_bubble(p)}
+                              "on_bubble": self._on_bubble(p), "tail": self._tail, "follow": None}
+                if self._attached and self._tail:  # 열린 창의 시작 위치 (끄는 만큼 같이 옮김)
+                    r = wintypes.RECT()
+                    if u32.GetWindowRect(self._attached, ctypes.byref(r)):
+                        self._drag["follow"] = (r.left, r.top)
                 u32.SetCapture(hwnd)
                 return 0
             if msg == WM_MOUSEMOVE and not self._drag:
@@ -405,6 +413,12 @@ class PetWindow:
                 if self._drag["moved"] or abs(dx) + abs(dy) > 5:
                     self._drag["moved"] = True
                     self._anchor = (self._drag["anchor"][0] + dx, self._drag["anchor"][1] + dy)
+                    f = self._drag["follow"]
+                    if f and self._attached:  # 열린 창·꼬리 밑변도 한 덩어리로 (손을 떼면 app이 화면 안으로 다시 맞춤)
+                        t = self._drag["tail"]
+                        self._tail = (t[0] + dx, t[1] + dy)
+                        # NOSIZE|NOZORDER|NOACTIVATE|ASYNCWINDOWPOS — 창 스레드를 기다리지 않아 끌기가 끊기지 않음
+                        u32.SetWindowPos(self._attached, None, f[0] + dx, f[1] + dy, 0, 0, 0x1 | 0x4 | 0x10 | 0x4000)
                     self._render()
                 return 0
             if msg == WM_LBUTTONUP and self._drag:
