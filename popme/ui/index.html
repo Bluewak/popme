@@ -121,6 +121,11 @@
   .card input, .card select { flex: 1; background: #fff; color: var(--ink); border: 1.5px solid var(--line); border-radius: 8px; padding: 4px 8px; font: inherit; }
   .card .row { display: flex; gap: 6px; justify-content: flex-end; margin-top: 8px; }
   .card .unsure { color: #b5652f; font-size: 12px; }
+  /* 메일: 브리핑 카드(.news)와 같은 모양. 중요한 건 왼쪽 띠 */
+  .news.mail .from { font-size: 11.5px; color: var(--muted); }
+  .news.mail .snip { color: var(--muted); font-size: 12px; margin-top: 3px; }
+  .mail-status { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .mail-status .err { color: var(--err); }
 </style>
 </head>
 <body>
@@ -143,6 +148,7 @@
     <button data-tab="brief" class="on">브리핑</button>
     <button data-tab="events">일정</button>
     <button data-tab="cands">발굴</button>
+    <button data-tab="mail" id="mail-tab" style="display:none">메일</button>
     <button data-tab="ask">질문</button>
   </nav>
   <main>
@@ -154,6 +160,7 @@
       <div id="events-list"></div>
     </section>
     <section id="cands"></section>
+    <section id="mail"></section>
     <section id="ask">
       <form id="ask-form"><input id="q" placeholder="예: Codex 리셋 언제 적용돼?" autocomplete="off"><button>묻기</button></form>
       <div id="answer" class="muted">수집한 자료만 근거로 답해요.</div>
@@ -163,7 +170,7 @@
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-let api, wasRunning = false, alertTimer = null;
+let api, wasRunning = false, alertTimer = null, bubbleTab = null;  // bubbleTab: [자세히]로 열 탭 (메일 알림 → 메일)
 // 캐릭터 이름·화면 문구 (캐릭터 파일 [ui])
 let P = {name: "", ui: {}};
 const u = (k, v = {}) => (P.ui[k] || "").replace("{n}", v.n ?? "").replace("{msg}", v.msg ?? "");
@@ -171,6 +178,7 @@ const ready = new Promise(r => window.addEventListener("pywebviewready", async (
   api = window.pywebview.api;
   P = await api.get_persona();
   if (!P.can_add_event) $("#plan-form").style.display = "none";  // ICS 캘린더는 읽기 전용
+  if (P.mail) $("#mail-tab").style.display = "";  // config [mail]을 켰을 때만
   document.querySelectorAll(".tag").forEach(t => { t.textContent = P.name; t.style.display = P.name ? "" : "none"; });
   $("#panel-title").textContent = P.name ? u("panel_title") : "POPME 브리핑";
   $("#plan-q").placeholder = u("plan_placeholder");
@@ -189,6 +197,7 @@ window.fillBubble = async (alert) => {
   const b = await api.get_briefing();
   const today = b.agenda.filter(e => e.day.startsWith("오늘"));
   const say = $("#say");
+  bubbleTab = alert && alert.kind === "mail" ? "mail" : null;
   if (alert) {
     say.className = alert.kind === "urgent" || alert.kind === "warn" ? "urgent" : "";
     // 머리말은 파이썬이 캐릭터 파일 대사로 정해 보내고(alert.lead), 없으면 기본 문구
@@ -201,7 +210,7 @@ window.fillBubble = async (alert) => {
       ? `${u("today_events", {n: today.length})}<br><span class="muted">${today.slice(0, 3).map(e => esc(e.title)).join(" · ")}</span>`
       : u("no_events");
   }
-  $("#bubble-list").innerHTML = b.headlines.slice(0, 3).map(h => `<li>${h.urgent ? "🔥 " : ""}${h.html}</li>`).join("")
+  $("#bubble-list").innerHTML = alert && alert.items ? alert.items.map(h => `<li>${h}</li>`).join("") : b.headlines.slice(0, 3).map(h => `<li>${h.urgent ? "🔥 " : ""}${h.html}</li>`).join("")
     || `<li class="muted">${u("no_briefing")}</li>`;
   measure("bubble");
   // 날씨는 위치 확인에 몇 초 걸릴 수 있어 따로 받아 채우고, 창 높이를 다시 맞춘다
@@ -246,7 +255,7 @@ window.showAlert = async a => {
   alertTimer = setTimeout(() => { if (document.body.className === "bubble") api.set_mode("pet"); }, 20000);
 };
 
-$("#bubble-more").onclick = () => api.set_mode("panel");
+$("#bubble-more").onclick = () => { const t = bubbleTab; api.set_mode("panel"); if (t) openTab(t); };
 $("#bubble-close").onclick = () => api.set_mode("pet");
 $("#to-pet").onclick = () => api.set_mode("pet");
 $("#bubble").addEventListener("mouseenter", () => clearTimeout(alertTimer));
@@ -258,7 +267,7 @@ document.addEventListener("click", e => {
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
   document.querySelectorAll("nav button, main section").forEach(x => x.classList.remove("on"));
   b.classList.add("on"); $("#" + b.dataset.tab).classList.add("on");
-  ({brief: loadBrief, events: loadEvents, cands: loadCands})[b.dataset.tab]?.();
+  ({brief: loadBrief, events: loadEvents, cands: loadCands, mail: loadMail})[b.dataset.tab]?.();
 });
 
 const CLS = {"새로 생김": "new", "바뀜": "changed", "지워짐": "deleted"};
@@ -315,24 +324,57 @@ async function loadBrief() {
     if (!CATS.includes(briefCat)) briefCat = "전체";
     $("#brief").innerHTML = `<h1 class="title">${esc(b.title)} <span class="muted" style="font-size:12px">· ${b.items.length}개</span></h1>
       <div class="wx-strip" id="brief-wx"></div>
-      <h3>일정</h3><div class="agenda">${agendaHtml(b.agenda)}</div>
+      <h3>일정</h3><div class="agenda">${agendaHtml(b.agenda)}</div>${overnightMail(b.mails)}
       <h3>소식</h3><div class="filters" id="filters"></div><div id="news"></div>`;
     renderNews();
+    if ($("#brief-mail")) openable($("#brief-mail"));
     fillBriefWeather();
     return;
   }
   const heads = b.headlines.map(h => `<li><span class="mark ${h.urgent ? "urgent" : h.status === "확인됨" ? "ok" : "unk"}">${h.urgent ? "!" : h.status === "확인됨" ? "✓" : "?"}</span><span>${h.html}</span></li>`).join("");
   $("#brief").innerHTML = `<h1 class="title">${esc(b.title)}</h1>
     <div class="wx-strip" id="brief-wx"></div>
-    <h3>일정</h3><div class="agenda">${agendaHtml(b.agenda)}</div>
+    <h3>일정</h3><div class="agenda">${agendaHtml(b.agenda)}</div>${overnightMail(b.mails)}
     <h3>헤드라인</h3>${heads ? `<ul class="heads">${heads}</ul>` : `<p class="muted">헤드라인이 없는 예전 형식이에요. 트레이 메뉴 > 브리핑만 다시 만들기</p>`}
     ${b.details ? `<button id="more">자세히 ▾</button><div id="details">${b.details}</div>` : ""}`;
+  if ($("#brief-mail")) openable($("#brief-mail"));
   fillBriefWeather();
   $("#more")?.addEventListener("click", () => {
     const d = $("#details"); d.classList.toggle("on");
     $("#more").textContent = d.classList.contains("on") ? "접기 ▴" : "자세히 ▾";
   });
 }
+// --- 메일: 브리핑의 "밤사이 중요 메일" + 메일 탭 ---
+function mailCard(m) {
+  const chips = [`<span class="chip cat">${esc(m.from_name)}</span>`, `<span class="chip">${esc(m.when)}</span>`];
+  if (m.why) chips.push(`<span class="chip ${m.important ? "do" : "no"}">${esc(m.why)}</span>`);
+  return `<div class="news mail ${m.important ? "todo" : "dim"}">
+    <div class="top"><span class="mark ${m.important ? "urgent" : "unk"}">✉</span>
+      <div style="flex:1"><div class="t">${esc(m.subject)}</div><div class="chips">${chips.join("")}</div></div>
+      <span class="arrow">▼</span></div>
+    <div class="b">${esc(m.summary)}<div class="snip">${esc(m.snippet)}</div>
+      ${m.link ? `<a href="${esc(m.link)}">메일 열기</a>` : ""}<div class="from">${esc(m.from_addr)}</div></div></div>`;
+}
+const openable = el => el.querySelectorAll(".news .top").forEach(t => t.onclick = () => t.parentNode.classList.toggle("open"));
+function overnightMail(mails) {
+  if (!mails) return "";  // 메일 기능 꺼짐
+  return `<h3>밤사이 중요 메일</h3>` + (mails.length ? `<div id="brief-mail">${mails.map(mailCard).join("")}</div>`
+    : `<div class="agenda muted">어제 저녁부터 온 중요한 메일은 없어요.</div>`);
+}
+let mailLow = false;
+async function loadMail() {
+  const d = await api.get_mail();
+  const imp = d.items.filter(m => m.important), rest = d.items.filter(m => !m.important);
+  const status = `<div class="mail-status">${d.error ? `<span class="err">● ${esc(d.status)}</span> · ${esc(d.error)}`
+    : `● ${esc(d.status)}${d.checked ? ` · ${esc(d.checked)} 확인` : ""}`}</div>`;
+  $("#mail").innerHTML = status + `<h3>중요 (최근 3일)</h3>`
+    + (imp.length ? imp.map(mailCard).join("") : `<p class="muted">중요한 메일이 없어요.</p>`)
+    + (rest.length ? (mailLow ? `<h3>거른 메일</h3>` + rest.map(mailCard).join("")
+      : `<button class="fold" id="mail-fold">거른 메일 ${rest.length}개 보기 ▾</button>`) : "");
+  $("#mail-fold")?.addEventListener("click", () => { mailLow = true; loadMail(); });
+  openable($("#mail"));
+}
+
 async function loadEvents() { $("#events-list").innerHTML = agendaHtml(await api.get_events()); }
 
 // 캐릭터에게 일정 부탁 → 승인 카드 → [넣어줘]를 눌러야만 TimeTree에 추가

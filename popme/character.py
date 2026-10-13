@@ -35,6 +35,8 @@ LINE_DEFAULTS = {
     "ask_failed": ["답을 못 했어요: {msg}"],
     "weather_gap": ["오늘 일교차가 {gap}도예요. 아침 {min}도, 낮 {max}도래요. 겉옷 챙기세요."],
     "air_bad": ["오늘 {place} 미세먼지 {grade}이래요. 마스크 챙기세요."],
+    "mail": ["중요한 메일이 왔어요. {who}: {summary}"],
+    "mail_many": ["중요한 메일이 {n}통 왔어요."],
 }
 WEATHER_ADVICE_DEFAULTS = {"snow": "미끄럼 조심하세요.", "rain": "우산 챙기세요.", "hot": "물 챙기세요.",
                            "cold": "따뜻하게 입으세요.", "gap": "겉옷 챙기세요.", "nice": "좋은 날이에요.", "cloudy": ""}
