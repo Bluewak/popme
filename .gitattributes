@@ -1,0 +1,2 @@
+# 배치 파일은 CRLF여야 cmd가 제대로 읽는다 (git archive 릴리스 zip에도 적용)
+*.bat text eol=crlf
