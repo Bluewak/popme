@@ -55,6 +55,16 @@ CREATE TABLE IF NOT EXISTS profile_snapshots (
 CREATE TABLE IF NOT EXISTS sightings (
     id TEXT, via TEXT, seen_at TEXT, PRIMARY KEY (id, via)
 );
+
+-- 받은편지함에서 새로 본 메일 (popme/mail.py). id = 계정:UIDVALIDITY:UID, keep_days 지나면 지움
+-- mail_state: 계정별로 어디까지 읽었나 (서버가 UID를 새로 매기면 uidvalidity가 바뀜)
+CREATE TABLE IF NOT EXISTS mails (
+    id TEXT PRIMARY KEY, account TEXT, from_name TEXT, from_addr TEXT, subject TEXT, snippet TEXT,
+    received_at TEXT, thread TEXT, link TEXT, important INTEGER, why TEXT, summary TEXT,
+    notified INTEGER DEFAULT 0, seen_at TEXT
+);
+CREATE INDEX IF NOT EXISTS mails_received ON mails(received_at);
+CREATE TABLE IF NOT EXISTS mail_state (account TEXT PRIMARY KEY, uidvalidity TEXT, last_uid INTEGER);
 """
 
 # 기존 DB에 나중에 생긴 컬럼 추가
@@ -236,3 +246,36 @@ class DB:
     def set_candidate_status(self, handle, status):
         with self.conn() as c:
             c.execute("UPDATE candidates SET status=? WHERE handle=?", (status, handle))
+
+    # --- 메일 ---
+    def mail_state(self, account):
+        rows = self.q("SELECT * FROM mail_state WHERE account=?", account)
+        return rows[0] if rows else None
+
+    def set_mail_state(self, account, uidvalidity, last_uid):
+        with self.conn() as c:
+            c.execute("INSERT OR REPLACE INTO mail_state VALUES (?,?,?)", (account, uidvalidity, last_uid))
+
+    def save_mails(self, account, uidvalidity, mails):
+        cols = ["from_name", "from_addr", "subject", "snippet", "received_at", "thread", "link", "why", "summary"]
+        with self.conn() as c:
+            for m in mails:
+                c.execute(
+                    f"INSERT OR REPLACE INTO mails (id, account, {','.join(cols)}, important, notified, seen_at) "
+                    f"VALUES (?,?,{','.join('?' * len(cols))},?,?,?)",
+                    [f"{account}:{uidvalidity}:{m['uid']}", account] + [m.get(k) for k in cols]
+                    + [int(bool(m.get("important"))), int(bool(m.get("notify"))), now_iso()],
+                )
+
+    def mails(self, since_iso, important_only=False):
+        return self.q("SELECT * FROM mails WHERE received_at >= ?" + (" AND important=1" if important_only else "")
+                      + " ORDER BY received_at DESC", since_iso)
+
+    def thread_alerted(self, account, thread, since_iso):
+        """같은 스레드를 since 이후에 이미 알렸나 (답장이 이어질 때 매번 알리지 않게)."""
+        return bool(self.q("SELECT 1 FROM mails WHERE account=? AND thread=? AND notified=1 AND seen_at >= ? LIMIT 1",
+                           account, thread, since_iso))
+
+    def prune_mails(self, before_iso):
+        with self.conn() as c:
+            c.execute("DELETE FROM mails WHERE received_at < ?", (before_iso,))

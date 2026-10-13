@@ -96,6 +96,21 @@ name = "서울"
 lat = 37.57
 lon = 126.98
 
+[mail]                             # 중요 메일 알림 (IMAP, 읽기 전용). 설정법: docs/MAIL.md
+enabled = false
+host = "imap.gmail.com"            # 네이버 imap.naver.com · 다음 imap.daum.net
+user = ""                          # 예: you@example.com
+password = ""                      # Gmail은 "앱 비밀번호" 16자리 (일반 비밀번호 아님)
+vip = []                           # 무조건 알릴 보낸사람 (이름·주소 일부). 예: ["boss@example.com", "국세청"]
+keywords = []                      # 제목에 있으면 무조건 알림. 예: ["긴급", "결제 실패"]
+ignore = []                        # 무조건 무시할 보낸사람. 예: ["newsletter@", "noreply@shop"]
+skip_categories = ["promotions", "social"]   # Gmail 탭 중 AI에 보내지도 않고 넘길 것 (updates, forums도 가능)
+ai = true                          # 규칙으로 못 정한 메일은 AI가 판단 (보낸사람·제목·본문 앞 300자만 보냄). false면 Gmail 중요 표시를 따름
+criteria = "업무·결제·보안·마감·일정 변경, 사람이 직접 쓴 답장이 필요한 메일"   # AI에게 주는 중요 기준
+quiet_hours = ""                   # 예: "23:00-07:00" — 이 시간엔 말풍선 없이 배지만
+batch_sec = 60                     # 새 메일 신호 후 이만큼 모았다가 한 번에 판단·알림
+keep_days = 14                     # 메일 목록 보관 기간
+
 # 교차 확인·새 오픈소스 발굴용 (로그인 불필요)
 [[rss]]
 name = "Claude Code 릴리스"

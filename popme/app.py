@@ -24,7 +24,7 @@ import pystray
 import webview
 from PIL import Image, ImageDraw
 
-from popme import agenda, briefing, chrome, config, discovery, event_weather, planner, character, weather
+from popme import agenda, briefing, chrome, config, discovery, event_weather, mail, planner, character, weather
 from popme.collectors import timetree
 from popme.jobs import Jobs, calendar_source
 from popme.pet import PetWindow
@@ -114,6 +114,7 @@ class Api:
 
     def __init__(self):
         self._jobs = None
+        self._mail = None  # mail.Watcher — config [mail]을 켰을 때만
         self._window = None
         self._tray = None
         self._pet = None
@@ -390,9 +391,11 @@ class Api:
     def get_briefing(self):
         items, _ = briefing.events_block(self._jobs.db, self._jobs.cfg)
         agenda_items = [e for e in items if not e["day"].startswith("모레")]
+        # 밤사이(어제 18시부터) 중요 메일 — AI 요약을 거치지 않고 메일 DB에서 바로 보여준다
+        mails = mail.for_ui(self._jobs.db.mails(mail.overnight_since(), important_only=True)) if self._mail else None
         b = self._jobs.db.latest_briefing()
         if not b:
-            return {"title": "아직 브리핑이 없어요", "agenda": agenda_items, "headlines": [], "details": ""}
+            return {"title": "아직 브리핑이 없어요", "agenda": agenda_items, "mails": mails, "headlines": [], "details": ""}
         title, _, body = briefing.strip_schedule(b["markdown"]).partition("\n")
         payload = briefing.load_payload(b)
         if payload:  # 카드 형식: 화면이 카드를 직접 그림
@@ -400,6 +403,7 @@ class Api:
             return {
                 "title": title.lstrip("# ").strip(),
                 "agenda": agenda_items,
+                "mails": mails,
                 "headlines": [{**h, "html": html.escape(h["md"])} for h in heads],
                 "items": payload["items"],
                 "details": "",
@@ -409,6 +413,7 @@ class Api:
         return {
             "title": title.lstrip("# ").strip(),
             "agenda": agenda_items,
+            "mails": mails,
             "headlines": [{**h, "html": _inline_md(h["md"])} for h in heads],
             "details": markdown.markdown(details, extensions=["tables", "sane_lists"]),
         }
@@ -421,7 +426,7 @@ class Api:
         """화면 문구용: 캐릭터 이름·호칭·문구 (캐릭터 파일 [ui])."""
         # can_add_event: TimeTree일 때만 일정 부탁(쓰기) 가능 — ICS는 읽기 전용
         return {"name": self._char.name, "user": self._char.user, "ui": self._char.ui,
-                "can_add_event": calendar_source(self._jobs.cfg) == "timetree"}
+                "can_add_event": calendar_source(self._jobs.cfg) == "timetree", "mail": bool(self._mail)}
 
     def plan_event(self, text):
         """부탁 문장 → 승인 카드용 일정 초안 (아직 TimeTree에 안 씀)."""
@@ -456,6 +461,12 @@ class Api:
         except Exception:
             log.exception("날씨 칸 실패")
             return None
+
+    def get_mail(self):
+        """메일 탭: 연결 상태 + 최근 3일 메일 (중요한 것 먼저, 거른 것도 확인용으로)."""
+        if not self._mail:
+            return {"enabled": False, "items": []}
+        return {"enabled": True, **self._mail.state, "items": mail.for_ui(self._jobs.db.mails(mail.ago(days=3)))}
 
     def get_candidates(self):
         return discovery.candidates(self._jobs.db, limit=15)
@@ -508,16 +519,18 @@ class Api:
         os.startfile(config.BRIEFING_DIR)
 
     # --- 캐릭터가 먼저 말 걸기 ---
-    def _alert(self, kind, text, lead=None):
+    def _alert(self, kind, text, lead=None, items=None):
+        """items: 말풍선 목록 줄(HTML) — 없으면 브리핑 헤드라인."""
         self._happy_until = time.time() + 5
-        if kind == "briefing" or kind == "urgent":
+        if kind in ("briefing", "urgent", "mail"):
             self._unseen = True
         if self._pet and self._pet.hidden:  # 숨겨 둔 동안은 Windows 알림으로만
             if self._tray:
-                self._tray.notify(re.sub(r"<[^>]+>", " ", (lead or "") + text).strip(), "POPME")
+                self._tray.notify(html.unescape(re.sub(r"<[^>]+>", " ", (lead or "") + text)).strip(), "POPME")
             return
         try:
-            self._window.evaluate_js(f"showAlert({json.dumps({'kind': kind, 'text': text, 'lead': lead})})")
+            self._window.evaluate_js(
+                f"showAlert({json.dumps({'kind': kind, 'text': text, 'lead': lead, 'items': items})})")
             if self._mode != "panel":
                 self.set_mode("bubble")
         except Exception:
@@ -535,6 +548,20 @@ class Api:
             self._alert("warn", "", lead=self._char.line("warn", msg=msg) or self._char.ui["warn_lead"] + msg)
             if self._tray:
                 self._tray.notify(msg, "POPME")
+
+    def _on_mail(self, mails):
+        """중요 메일 → 말풍선. 조용히 할 때(quiet_hours·전체 화면·방해 금지)는 배지만 — 메일 탭에 남아 있다."""
+        if mail.in_quiet_hours(mail.settings(self._jobs.cfg)["quiet_hours"]) or character.quiet_now():
+            self._unseen = True
+            return
+        m, esc = mails[0], html.escape
+        if len(mails) == 1:  # 메일 내용은 바깥에서 온 글이라 HTML로 끼우기 전에 이스케이프
+            lead = self._char.line("mail", who=esc(m["from_name"]), subject=esc(m["subject"]), summary=esc(m["summary"]))
+        else:
+            lead = self._char.line("mail_many", n=len(mails), who=esc(m["from_name"]))
+        rows = [f"✉ <b>{esc(x['subject'])}</b> <span class=\"muted\">· {esc(x['from_name'])}"
+                f"{' · ' + esc(x['why']) if x['why'] else ''}</span>" for x in mails[:3]]
+        self._alert("mail", "", lead=(lead or "중요한 메일이 왔어요.") + "<br>", items=rows)
 
     def _alert_loop(self):
         notified = set()
@@ -563,6 +590,8 @@ def main():
     api = Api()
     jobs = Jobs(notify=lambda kind, msg: threading.Thread(target=api._on_job, args=(kind, msg), daemon=True).start())
     api._jobs = jobs
+    if mail.enabled(jobs.cfg):
+        api._mail = mail.Watcher(jobs.cfg, jobs.db, on_new=api._on_mail)
 
     window = webview.create_window(
         "POPME", url=str(UI), js_api=api, width=SIZES["panel"][0], height=SIZES["panel"][1],
@@ -623,7 +652,8 @@ def main():
             except Exception:
                 log.exception("일정 장소 확인 실패")
 
-        for target in (tray.run, jobs.morning_loop, api._alert_loop, api._behavior_loop, warm_up):
+        mail_watch = [api._mail.run] if api._mail else []
+        for target in (tray.run, jobs.morning_loop, api._alert_loop, api._behavior_loop, warm_up, *mail_watch):
             threading.Thread(target=target, daemon=True).start()
 
     webview.start(background)
