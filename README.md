@@ -15,7 +15,7 @@ Windows 화면 구석에 사는 **데스크톱 브리핑 비서**. 내 PC의 로
 
 ## 필요한 것
 - Windows 11 (둥근 창 테두리·위치 서비스. Windows 10에서도 대부분 동작)
-- Python 3.11+
+- Python 3.11~3.13 (없으면 설치 스크립트가 winget으로 3.12를 설치)
 - Google Chrome
 - 요약·답변용 AI 구독 하나 (별도 API 키 불필요, 설치할 때 설정 창에서 고름 → `config.toml` `[llm] provider`)
   - **Claude** (`provider = "claude"`, 기본): Claude Code의 `claude -p`. PATH에 없으면 VS Code 확장의 claude.exe를 자동으로 찾음
@@ -32,9 +32,18 @@ git clone https://github.com/Bluewak/popme.git
 cd popme
 .\install.bat
 ```
-패키지를 설치하고 **설정 창**을 엽니다: 준비물 확인 → 브리핑 AI(설치·로그인) → 캘린더 → 메일 알림 → 날씨·브리핑 시각. 고른 값은 `config.toml`에 저장되고(주석·다른 설정은 그대로), 로그인 시 자동 실행과 바탕화면 바로가기도 만듭니다. 나중에 바꾸려면 트레이 아이콘(또는 캐릭터) 우클릭 → **설정 바꾸기**. 저장하면 POPME가 다시 켜집니다.
+설치 스크립트가 하는 일:
+1. Python 3.11~3.13을 찾고(3.12 우선), 없으면 winget으로 3.12 설치. WebView2가 없으면 설치
+2. 켜져 있는 POPME를 끄고, 패키지를 `%LOCALAPPDATA%\POPME\venv`에 따로 설치 (PC의 다른 Python과 안 섞이고, 깊은 경로 제한에도 안 걸림)
+3. 새 버전을 다른 폴더에 풀어 설치하면 예전 폴더의 `config.toml`·`character.toml`·캐릭터 이미지를 가져옴
+4. **설정 창** → 시작프로그램·바탕화면 바로가기 → POPME 켜기
+5. 과정은 `%LOCALAPPDATA%\POPME\install.log`에 남음 (설치가 멈추면 이 파일 확인)
 
-캘린더 주소(ICS)는 설정 창에서 **AI에게 연결 맡기기**를 누르면, 고른 AI가 새 터미널에서 캘린더 앱별로 한 단계씩 안내하고 `python -m popme.setup_window check-ics` / `add-ics` 명령으로 주소를 확인·저장합니다 (그 두 명령만 쓰도록 지시).
+**지우기**: `uninstall.bat` 더블클릭 → POPME를 끄고 바로가기·패키지 환경을 지움. 데이터(브리핑 기록·전용 Chrome 로그인)는 물어보고 지움. 그다음 폴더를 지우면 끝.
+
+**설정 창** 순서: 준비물 확인 → 브리핑 AI(설치·로그인) → 캘린더 → 메일 알림 → 날씨·브리핑 시각. 고른 값은 `config.toml`에 저장됩니다(주석·다른 설정은 그대로). 나중에 바꾸려면 트레이 아이콘(또는 캐릭터) 우클릭 → **설정 바꾸기**. 저장하면 POPME가 다시 켜집니다.
+
+캘린더 주소(ICS)는 설정 창에서 **AI에게 연결 맡기기**를 누르면, 고른 AI가 새 터미널에서 캘린더 앱별로 한 단계씩 안내하고 POPME 파이썬으로 `-m popme.setup_window check-ics` / `add-ics` 명령을 실행해 주소를 확인·저장합니다 (그 두 명령만 쓰도록 지시).
 
 ## 처음 한 번
 1. 바탕화면 **POPME** 실행 → 트레이 아이콘 우클릭 → **전용 Chrome 열기 (로그인)**
