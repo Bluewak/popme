@@ -4,6 +4,7 @@ WebView2는 GPU로 그려져 컬러키 투명이 안 먹으므로, 캐릭터만 
 투명한 픽셀은 클릭이 아래로 통과하고, 캐릭터를 누르면 클릭/끌기를 구분해 콜백한다.
 """
 import ctypes
+import io
 import logging
 import math
 import threading
@@ -12,7 +13,12 @@ from ctypes import wintypes
 
 from PIL import Image, ImageChops, ImageDraw
 
+from popme import config
+
 log = logging.getLogger(__name__)
+ASSETS = config.ROOT / "assets"
+FILES = {"idle": "pet", "busy": "pet_busy", "happy": "pet_happy", "alert": "pet_alert", "sleepy": "pet_sleepy"}
+ICON_SIZES = [(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
 u32, g32, k32 = ctypes.windll.user32, ctypes.windll.gdi32, ctypes.windll.kernel32
 
 LRESULT = ctypes.c_ssize_t
@@ -44,6 +50,50 @@ u32.GetDC.argtypes = [wintypes.HWND]
 HWND_TOPMOST = wintypes.HWND(-1)
 WM_DESTROY, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEMOVE, WM_TIMER = 0x2, 0x201, 0x202, 0x200, 0x113
 WM_RBUTTONUP = 0x205
+
+
+def load_images():
+    """assets/pet*.{png,webp,gif} → {"idle": PIL.Image, ...}. 평소 이미지가 없으면 주황 방울."""
+    imgs = {}
+    for state, name in FILES.items():
+        for ext in ("png", "webp", "gif"):
+            p = ASSETS / f"{name}.{ext}"
+            if p.exists():
+                imgs[state] = Image.open(p).convert("RGBA")
+                break
+    if "idle" not in imgs:
+        img = Image.new("RGBA", (200, 200), (0, 0, 0, 0))
+        d = ImageDraw.Draw(img)
+        d.ellipse((20, 30, 180, 190), fill=(217, 119, 87, 255), outline=(60, 30, 20, 255), width=6)
+        d.ellipse((65, 90, 85, 115), fill=(40, 25, 20, 255))
+        d.ellipse((115, 90, 135, 115), fill=(40, 25, 20, 255))
+        imgs["idle"] = img
+    return imgs
+
+
+def icon_image(img):
+    """캐릭터 이미지를 가운데 둔 256px 정사각형 (트레이·바로가기 아이콘)."""
+    s = max(img.size)
+    sq = Image.new("RGBA", (s, s))
+    sq.alpha_composite(img, ((s - img.width) // 2, (s - img.height) // 2))
+    return sq.resize((256, 256), Image.LANCZOS)
+
+
+def write_icon(img):
+    """assets/pet.ico를 지금 캐릭터 이미지로. 바로가기가 이 경로를 가리키므로 이미지를 바꾸면 아이콘도 따라 바뀐다.
+    수정 시각이 아니라 내용으로 비교한다 (복사한 파일은 원본의 수정 시각을 그대로 가져와서). 바뀌었으면 True."""
+    buf = io.BytesIO()
+    icon_image(img).save(buf, format="ICO", sizes=ICON_SIZES)
+    ico = ASSETS / "pet.ico"
+    if ico.exists() and ico.read_bytes() == buf.getvalue():
+        return False
+    ico.write_bytes(buf.getvalue())
+    _refresh_shell_icons()
+    return True
+
+
+def _refresh_shell_icons():
+    ctypes.windll.shell32.SHChangeNotify(0x08000000, 0, None, None)  # SHCNE_ASSOCCHANGED: 탐색기 아이콘 캐시 새로 고침
 
 
 class WNDCLASSW(ctypes.Structure):

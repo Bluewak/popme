@@ -61,6 +61,13 @@ cd popme
 
 09:00 이후 앱이 켜져 있고 오늘 브리핑이 없으면 자동으로 수집·브리핑합니다 (`config.toml` `briefing_after`).
 
+## 캐릭터 바꾸기
+1. **이미지**: `assets` 폴더에 `pet.png`를 넣습니다 (상황별 `pet_busy` `pet_happy` `pet_sleepy` `pet_alert`는 선택). 배경이 투명한 정사각형이 가장 예쁩니다
+2. **이름·말투·대사**: `character.example.toml`을 복사해 `character.toml`로 이름을 바꾸고 메모장으로 고칩니다. 예시 파일은 직접 고치지 마세요 (업데이트하면 원래대로 돌아감)
+3. 캐릭터 우클릭 → 종료 → 다시 실행. 말투가 그대로면 트레이 우클릭 → **설정 바꾸기**에서 새 캐릭터를 고르고 저장
+
+바탕화면·트레이 아이콘은 켜질 때 새 이미지로 바뀌고, AI가 만드는 '오늘의 멘트'는 다음 브리핑부터 새 말투를 따릅니다. 흰 배경 따기, 대사 칸 설명 등 자세한 방법은 [docs/CHARACTER.md](docs/CHARACTER.md).
+
 ## 설정 파일
 | 파일 | 내용 | 저장소 |
 |---|---|---|
@@ -84,7 +91,8 @@ cd popme
   - 막는 것: 개인 설정·캐릭터 파일, 이미지·DB·로그·zip, 개인 이메일, 개인 단어(목록은 공개하지 않음 — 로컬 `.private-words.txt` / Secret `PRIVATE_WORDS`)
 - 배포: `git tag v1.1.0` → `git push origin v1.1.0` 하면 Actions `Release`가 검사·테스트 후 zip을 Releases에 올림
 
-## 디버깅- `python -m popme run-once`: 위젯 없이 수집+브리핑 1회
+## 디버깅
+- `python -m popme run-once`: 위젯 없이 수집+브리핑 1회
 - 로그: `%LOCALAPPDATA%\POPME\popme.log`
 
 ## 라이선스·출처

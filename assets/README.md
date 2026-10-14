@@ -12,5 +12,7 @@
 | `pet_alert.png` | 경고 (없으면 평소 이미지가 떨며 땀방울) |
 
 - `.png` `.webp` `.gif` 중 아무거나 됩니다. 배경이 투명한 정사각형(256px 이상)이 가장 예쁩니다.
-- 흰 배경 이미지는 `python assets\prepare.py <원본> pet` 처럼 배경을 따서 넣을 수 있습니다.
+- 흰 배경 이미지는 배경을 따서 넣을 수 있습니다 (POPME 폴더의 PowerShell에서, 설치 때 만든 Python으로):
+  `& "$env:LOCALAPPDATA\POPME\venv\Scripts\python.exe" assets\prepare.py <원본> pet`
+- 바탕화면·트레이 아이콘(`pet.ico`)은 POPME가 켜질 때 `pet.png`로 다시 만듭니다.
 - 이름·말투·대사는 `docs/CHARACTER.md` 참고.

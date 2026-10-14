@@ -77,6 +77,15 @@ def test_mail_off_does_not_add_section(monkeypatch):
     assert "[mail]" not in sw.apply(text, choices(mail=mail))
 
 
+def test_default_character_is_not_pinned(tmp_path, monkeypatch):
+    """기본 캐릭터(예시)를 골라도 config에는 character.toml — 나중에 만들면 바로 쓰이게."""
+    monkeypatch.setattr(sw.config, "ROOT", tmp_path)
+    assert choices(character="character.example.toml")["character"] == "character.toml"
+    (tmp_path / "character.toml").write_text('[persona]\nname = "나만의"\n', encoding="utf-8")
+    assert choices(character="character.example.toml")["character"] == "character.example.toml"  # 있으면 고른 대로
+    assert choices(character="other.toml")["character"] == "other.toml"
+
+
 @pytest.mark.parametrize("kw, msg", [
     ({"provider": "grok"}, "AI"),
     ({"briefing_after": "9시"}, "시각"),

@@ -23,54 +23,23 @@ from datetime import datetime
 import markdown
 import pystray
 import webview
-from PIL import Image, ImageDraw
 
 from popme import agenda, briefing, chrome, config, discovery, event_weather, mail, planner, character, weather
 from popme.collectors import timetree
 from popme.jobs import Jobs, calendar_source
-from popme.pet import PetWindow
+from popme.pet import PetWindow, icon_image, load_images, write_icon
 
 log = logging.getLogger(__name__)
 UI = config.ROOT / "popme" / "ui" / "index.html"
-ASSETS = config.ROOT / "assets"
 UI_STATE = config.DATA_DIR / "ui.json"
 SIZES = {"bubble": (330, 200), "panel": (420, 640)}  # 논리 px. 말풍선 높이는 내용에 맞춰 바뀜
 # 창이 열려 있어도 (옆으로) 말하는 '사건' 대사. 나머지(인사·잡담·잠꼬대)는 창이 닫혀 있을 때만
 EVENT_LINES = {"collecting", "warn", "petted", "return_from_away", "event_added", "event_failed",
                "ask_start", "ask_done", "ask_none", "ask_failed"}
-PET_FILES = {"idle": "pet", "busy": "pet_busy", "happy": "pet_happy", "alert": "pet_alert", "sleepy": "pet_sleepy"}
 
 user32 = ctypes.windll.user32
 user32.SetWindowPos.argtypes = [wt.HWND, wt.HWND] + [ctypes.c_int] * 4 + [ctypes.c_uint]
 HWND_TOPMOST = wt.HWND(-1)
-
-
-def _icon_image():
-    if (ASSETS / "pet.ico").exists():  # 트레이 아이콘 = 캐릭터 얼굴
-        return Image.open(ASSETS / "pet.ico").convert("RGBA").resize((64, 64), Image.LANCZOS)
-    img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    d.ellipse((4, 4, 60, 60), fill=(217, 119, 87))
-    d.text((24, 18), "P", fill="white", font_size=28)
-    return img
-
-
-def _pet_images():
-    imgs = {}
-    for state, name in PET_FILES.items():
-        for ext in ("png", "webp", "gif"):
-            p = ASSETS / f"{name}.{ext}"
-            if p.exists():
-                imgs[state] = Image.open(p).convert("RGBA")
-                break
-    if "idle" not in imgs:  # 캐릭터 이미지가 없으면 주황 방울
-        img = Image.new("RGBA", (200, 200), (0, 0, 0, 0))
-        d = ImageDraw.Draw(img)
-        d.ellipse((20, 30, 180, 190), fill=(217, 119, 87, 255), outline=(60, 30, 20, 255), width=6)
-        d.ellipse((65, 90, 85, 115), fill=(40, 25, 20, 255))
-        d.ellipse((115, 90, 135, 115), fill=(40, 25, 20, 255))
-        imgs["idle"] = img
-    return imgs
 
 
 def _inline_md(text):
@@ -638,12 +607,17 @@ def main(restart=False):
         ("설정 바꾸기", bg(open_settings)),
         ("종료", quit_app),
     ]
-    pet = PetWindow(_pet_images(), api._pet_anchor, on_click=bg(api._on_pet_click), on_moved=bg(api._on_pet_moved),
+    images = load_images()
+    try:
+        write_icon(images["idle"])  # 이미지를 바꿨으면 바로가기 아이콘도
+    except OSError:
+        log.warning("캐릭터 아이콘(assets/pet.ico)을 못 만들었어요", exc_info=True)
+    pet = PetWindow(images, api._pet_anchor, on_click=bg(api._on_pet_click), on_moved=bg(api._on_pet_moved),
                     menu_items=pet_menu, on_petted=bg(api._on_petted), on_bubble_click=bg(api._on_bubble_click))
     pet.name = name  # 말풍선 이름표
     api._pet = pet
 
-    tray = pystray.Icon("POPME", _icon_image(), "POPME", menu=pystray.Menu(
+    tray = pystray.Icon("POPME", icon_image(images["idle"]), "POPME", menu=pystray.Menu(
         pystray.MenuItem(f"{name} 보이기", lambda i, _: api._show_all(), default=True),
         pystray.MenuItem(f"{name} 숨기기", lambda i, _: api._hide_all()),
         pystray.MenuItem("브리핑 열기", lambda i, _: (api._show_all(), api.set_mode("panel"))),
