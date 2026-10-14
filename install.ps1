@@ -179,14 +179,10 @@ function Install-Popme {
         Write-Host "만듦: config.toml (설정 창을 닫아서 기본값으로. 트레이 > 설정 바꾸기에서 다시 고를 수 있어요)"
     }
 
-    # 캐릭터 이미지가 있으면 바로가기·트레이 아이콘(pet.ico) 만들기
-    $png = Join-Path $root "assets\pet.png"; $ico = Join-Path $root "assets\pet.ico"
-    if ((Test-Path $png) -and -not (Test-Path $ico)) {
-        $code = "from PIL import Image; im=Image.open(r'$png').convert('RGBA'); s=max(im.size); sq=Image.new('RGBA',(s,s)); " +
-                "sq.alpha_composite(im,((s-im.width)//2,(s-im.height)//2)); " +
-                "sq.resize((256,256)).save(r'$ico', sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])"
-        Invoke-Native $py @("-c", $code) | Out-Null
-    }
+    # 바로가기 아이콘(pet.ico): 캐릭터 이미지, 없으면 기본 방울. 이미지를 나중에 바꾸면 POPME가 켜질 때 다시 만든다
+    $ico = Join-Path $root "assets\pet.ico"
+    Push-Location $root
+    try { Invoke-Native $py @("-c", "from popme import pet; pet.write_icon(pet.load_images()['idle'])") | Out-Null } finally { Pop-Location }
 
     Step "바로가기 만들기"
     $shell = New-Object -ComObject WScript.Shell

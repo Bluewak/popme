@@ -309,7 +309,11 @@ def validate(ch):
             raise ValueError("방해 금지 시간은 23:00-07:00처럼 넣어 주세요.")
     else:
         mail = None
-    return {**ch, "briefing_after": t, "ics": rows, "mail": mail,
+    char = ch.get("character")
+    if char == "character.example.toml" and not (config.ROOT / "character.toml").exists():
+        # 기본 캐릭터는 이름을 박지 않는다: character.toml을 나중에 만들면 그대로 쓰이고, 없으면 예시로 넘어간다
+        char = "character.toml"
+    return {**ch, "briefing_after": t, "ics": rows, "mail": mail, "character": char,
             "plan": (ch.get("plan") or "").strip(), "tools": (ch.get("tools") or "").strip()}
 
 
