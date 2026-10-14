@@ -125,7 +125,7 @@ function Install-Popme {
             throw "Python 3.12가 필요해요. https://www.python.org/downloads/ 에서 설치할 때 'Add python.exe to PATH'를 체크하고, install.bat을 다시 실행해 주세요."
         }
         Write-Host "Python 3.12를 설치할게요 (몇 분 걸려요)..."
-        Invoke-Native winget @("install", "--id", "Python.Python.3.12", "-e", "--scope", "user",
+        Invoke-Native winget @("install", "--id", "Python.Python.3.12", "-e", "--source", "winget", "--scope", "user",
                                "--accept-package-agreements", "--accept-source-agreements") | Out-Null
         $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
         $base = Find-Python
@@ -136,7 +136,7 @@ function Install-Popme {
     if (-not (Test-WebView2)) {
         Step "WebView2 설치 (말풍선·설정 창을 그리는 데 필요)"
         if (Get-Command winget -ErrorAction SilentlyContinue) {
-            Invoke-Native winget @("install", "--id", "Microsoft.EdgeWebView2Runtime", "-e", "--accept-package-agreements", "--accept-source-agreements") | Out-Null
+            Invoke-Native winget @("install", "--id", "Microsoft.EdgeWebView2Runtime", "-e", "--source", "winget", "--accept-package-agreements", "--accept-source-agreements") | Out-Null
         }
         if (-not (Test-WebView2)) {
             Write-Host "WebView2를 확인하지 못했어요. 설정 창이 안 뜨면 https://go.microsoft.com/fwlink/p/?LinkId=2124703 에서 설치해 주세요." -ForegroundColor Yellow

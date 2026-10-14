@@ -46,7 +46,7 @@ AI_SETUP = {
     "codex": [
         "if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {",
         "  Write-Host 'Codex CLI 설치 중...'",
-        "  winget install --id OpenAI.Codex -e --accept-package-agreements --accept-source-agreements",
+        "  winget install --id OpenAI.Codex -e --source winget --accept-package-agreements --accept-source-agreements",
         "  " + REFRESH_PATH,
         "}",
         "Write-Host ''; Write-Host '브라우저가 열리면 ChatGPT 계정으로 로그인하세요. 끝나면 이 창을 닫으면 돼요.'",
@@ -55,7 +55,7 @@ AI_SETUP = {
     "gemini": [
         "if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {",
         "  Write-Host 'Node.js 설치 중 (Gemini CLI에 필요)...'",
-        "  winget install --id OpenJS.NodeJS.LTS -e --accept-package-agreements --accept-source-agreements",
+        "  winget install --id OpenJS.NodeJS.LTS -e --source winget --accept-package-agreements --accept-source-agreements",
         "  " + REFRESH_PATH,
         "}",
         "if (-not (Get-Command gemini -ErrorAction SilentlyContinue)) {",
