@@ -638,7 +638,8 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.stdout.reconfigure(encoding="utf-8")
+    if sys.stdout:  # 트레이에서 pythonw로 띄우면 콘솔이 없어 None — 여기서 죽으면 설정 창이 아예 안 뜬다
+        sys.stdout.reconfigure(encoding="utf-8")
     args = sys.argv[1:]
     try:
         if args[:1] == ["check-ics"] and len(args) == 2:
