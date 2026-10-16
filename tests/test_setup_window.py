@@ -60,7 +60,7 @@ def test_missing_sections_are_created():
 
 def test_mail_password_kept_when_blank(monkeypatch):
     monkeypatch.setattr(sw, "mail_supported", lambda: True)
-    monkeypatch.setattr(sw, "current", lambda: {"mail": {"has_password": True}})
+    monkeypatch.setattr(sw, "current", lambda: {"mail": {"has_password": True, "user": "me@example.com", "host": "imap.gmail.com"}})
     text = sw.set_value(EXAMPLE, "mail", "password", "oldsecret")
     mail = {"enabled": True, "host": "imap.gmail.com", "user": "me@example.com", "password": "", "quiet_hours": "23:00-07:00"}
     cfg = tomllib.loads(sw.apply(text, choices(mail=mail)))
@@ -236,3 +236,76 @@ def test_first_briefing_flag(tmp_path, monkeypatch):
     monkeypatch.setattr(sw.config, "FIRST_BRIEFING", tmp_path / "first-briefing")
     sw.request_first_briefing()
     assert (tmp_path / "first-briefing").exists()
+
+
+class FakeIMAP:
+    """imaplib.IMAP4_SSL 흉내: login에서 behavior대로 실패하거나 통과."""
+    behavior = None
+    logins = []
+
+    def __init__(self, host, port, timeout=None):
+        if isinstance(FakeIMAP.behavior, OSError):
+            raise FakeIMAP.behavior
+
+    def login(self, user, password):
+        FakeIMAP.logins.append((user, password))
+        if isinstance(FakeIMAP.behavior, str):
+            import imaplib
+            raise imaplib.IMAP4.error(FakeIMAP.behavior)
+
+    def select(self, *a, **k):
+        pass
+
+    def logout(self):
+        pass
+
+
+@pytest.mark.parametrize("host, behavior, msg", [
+    ("imap.gmail.com", "b'[ALERT] Application-specific password required: https://support.google.com (Failure)'", "구글 계정 비밀번호를 넣으셨어요"),
+    ("imap.gmail.com", "b'[AUTHENTICATIONFAILED] Invalid credentials (Failure)'", "구글이 로그인을 거절했어요"),
+    ("imap.naver.com", "b'login failed'", "IMAP 사용"),
+])
+def test_check_mail_login_errors_are_plain(monkeypatch, host, behavior, msg):
+    import imaplib
+    monkeypatch.setattr(imaplib, "IMAP4_SSL", FakeIMAP)
+    monkeypatch.setattr(sw, "base_text", lambda: "")
+    FakeIMAP.behavior = behavior
+    with pytest.raises(ValueError, match=msg) as e:
+        sw.check_mail(host, "me@example.com", "abcd efgh ijkl mnop")
+    assert "AUTHENTICATIONFAILED" not in str(e.value) and "b'" not in str(e.value)  # 원문은 로그에만
+
+
+def test_check_mail_network_errors_are_plain(monkeypatch):
+    import imaplib
+    import socket
+    monkeypatch.setattr(imaplib, "IMAP4_SSL", FakeIMAP)
+    monkeypatch.setattr(sw, "base_text", lambda: "")
+    FakeIMAP.behavior = socket.gaierror(11001, "getaddrinfo failed")
+    with pytest.raises(ValueError, match="메일 서버\(imap.nowhere.kr\)를 찾지 못했어요") as e:
+        sw.check_mail("imap.nowhere.kr", "me@example.com", "pw")
+    assert "Errno" not in str(e.value)
+    FakeIMAP.behavior = TimeoutError()
+    with pytest.raises(ValueError, match="답하지 않아요"):
+        sw.check_mail("imap.gmail.com", "me@example.com", "pw")
+
+
+def test_check_mail_uses_saved_password_only_for_same_account(monkeypatch):
+    import imaplib
+    monkeypatch.setattr(imaplib, "IMAP4_SSL", FakeIMAP)
+    monkeypatch.setattr(sw, "base_text", lambda: '[mail]\nhost = "imap.gmail.com"\nuser = "Me@Example.com"\npassword = "savedpw"\n')
+    FakeIMAP.behavior, FakeIMAP.logins = None, []
+    assert sw.check_mail("imap.gmail.com", "me@example.com", "") is True
+    assert FakeIMAP.logins == [("me@example.com", "savedpw")]
+    with pytest.raises(ValueError, match="메일 주소가 바뀌었어요"):  # 다른 계정이면 예전 비밀번호를 쓰지 않는다
+        sw.check_mail("imap.gmail.com", "other@example.com", "")
+    with pytest.raises(ValueError, match="메일 주소를 먼저"):
+        sw.check_mail("imap.gmail.com", "", "pw")
+
+
+def test_save_refuses_old_password_for_new_account(monkeypatch):
+    monkeypatch.setattr(sw, "mail_supported", lambda: True)
+    monkeypatch.setattr(sw, "current", lambda: {"mail": {"has_password": True, "user": "me@example.com", "host": "imap.gmail.com"}})
+    mail = {"enabled": True, "host": "imap.gmail.com", "user": "other@example.com", "password": "", "quiet_hours": ""}
+    with pytest.raises(ValueError, match="메일 주소가 바뀌었어요"):
+        choices(mail=mail)
+    assert choices(mail={**mail, "user": "ME@example.com"})["mail"]["password"] == ""  # 같은 계정이면 저장된 것 그대로
