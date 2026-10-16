@@ -655,8 +655,17 @@ def main(restart=False):
             except Exception:
                 log.exception("일정 장소 확인 실패")
 
+        def first_briefing():  # 설정 창에서 「첫 브리핑 받아 보기」를 눌렀으면 켜지자마자 수집·브리핑
+            if not config.FIRST_BRIEFING.exists():
+                return
+            config.FIRST_BRIEFING.unlink(missing_ok=True)
+            time.sleep(3)  # 캐릭터가 화면에 뜬 뒤에
+            api._show_chat("첫 브리핑을 모으는 중이에요… 몇 분 걸려요!")
+            jobs.run_full()
+
         mail_watch = [api._mail.run] if api._mail else []
-        for target in (tray.run, jobs.morning_loop, api._alert_loop, api._behavior_loop, warm_up, *mail_watch):
+        for target in (tray.run, jobs.morning_loop, api._alert_loop, api._behavior_loop, warm_up, first_briefing,
+                       *mail_watch):
             threading.Thread(target=target, daemon=True).start()
 
     webview.start(background)

@@ -166,17 +166,73 @@ def test_caldav_rejects(monkeypatch, dav, msg):
         choices(source="caldav", caldav=dav)
 
 
-def test_take_app_password_only_returns_app_password():
-    """클립보드에서 앱 암호 모양만 꺼내고, 꺼낸 뒤엔 클립보드를 비운다. 다른 내용은 돌려주지 않는다."""
-    board = {"text": " abcd-efgh-ijkl-mnop\n"}
+def test_take_clipboard_only_returns_wanted_shape():
+    """클립보드에서 그 모양(앱 암호·캘린더 주소)만 꺼내고, 꺼낸 뒤엔 클립보드를 비운다. 다른 내용은 돌려주지 않는다."""
+    board = {}
 
     def read(clear=False):
         if clear:
             board["text"] = ""
         return board["text"]
-    assert sw.take_app_password(read) == "abcd-efgh-ijkl-mnop"
-    assert board["text"] == ""
-    for other in ["내 비밀 메모", "abcd-efgh-ijkl-mnop 그리고 더", "ABCD-EFGH-IJKL-MNOP1", "abcdefghijklmnop"]:
+    for kind, text, want in [
+        ("apple", " abcd-efgh-ijkl-mnop\n", "abcd-efgh-ijkl-mnop"),
+        ("google", "abcd efgh ijkl mnop", "abcdefghijklmnop"),  # 구글은 띄어 써서 보여 준다
+        ("ics", "https://calendar.google.com/calendar/ical/me%40gmail.com/private-0123abcd/basic.ics",
+         "https://calendar.google.com/calendar/ical/me%40gmail.com/private-0123abcd/basic.ics"),
+        ("ics", "webcal://p42-caldav.icloud.com/published/2/MTIz", "webcal://p42-caldav.icloud.com/published/2/MTIz"),
+    ]:
+        board["text"] = text
+        assert sw.take_clipboard(kind, read) == want
+        assert board["text"] == ""
+    for kind, other in [("apple", "내 비밀 메모"), ("apple", "abcd-efgh-ijkl-mnop 그리고 더"), ("apple", "abcdefghijklmnop"),
+                        ("google", "abcd-efgh-ijkl-mnop"), ("ics", "https://example.com/page"), ("ics", "내 메모 https://a.ics")]:
         board["text"] = other
-        assert sw.take_app_password(read) == ""
-        assert board["text"] == other  # 앱 암호가 아니면 건드리지 않는다
+        assert sw.take_clipboard(kind, read) == ""
+        assert board["text"] == other  # 그 모양이 아니면 건드리지 않는다
+
+
+def test_help_data_is_complete():
+    """화면이 쓰는 안내 키가 다 있고, 열기 버튼은 (이름, https 주소), 자주 묻는 질문은 [질문, 답]."""
+    for key in ["google", "icloud", "icloud_ics", "naver", "outlook", "minical", "gmail", "mail_other", "login"]:
+        h = sw.HELP[key]
+        assert h["steps"] and all(isinstance(t, str) for t in h["steps"])
+        assert all(len(f) == 2 and f[0] and f[1] for f in h.get("faq", []))
+        if "open" in h:
+            assert h["open"][1].startswith("https://")
+
+
+def test_ask_help_stays_in_scope(monkeypatch):
+    """「막혔어요?」 AI는 그 단계 안내·자주 묻는 질문만 받고, 범위 밖이면 답하지 말라는 지시를 받는다."""
+    from popme import llm
+    seen = {}
+
+    def fake(cfg, system, prompt, timeout=600):
+        seen.update(system=system, prompt=prompt, provider=cfg["llm"]["provider"])
+        return " 왼쪽 「내 캘린더의 설정」에서 캘린더 이름을 눌러요. "
+    monkeypatch.setattr(llm, "ask", fake)
+    monkeypatch.setattr(sw, "base_text", lambda: "")
+    assert sw.ask_help("codex", "google", "어디서 주소를 찾아요?") == "왼쪽 「내 캘린더의 설정」에서 캘린더 이름을 눌러요."
+    assert seen["provider"] == "codex" and "도와드릴 수 없어요" in seen["system"]
+    assert "iCal 형식의 비공개 주소" in seen["prompt"] and "<b>" not in seen["prompt"]  # HTML은 빼고 넘긴다
+    assert "앱 암호" not in seen["prompt"]  # 다른 단계(iCloud) 안내는 섞지 않는다
+
+    def boom(*a, **k):
+        raise RuntimeError("login")
+    monkeypatch.setattr(llm, "ask", boom)
+    with pytest.raises(ValueError, match="AI를 부르지 못했어요"):
+        sw.ask_help("claude", "google", "?")
+
+
+def test_login_status_without_chrome(monkeypatch):
+    from popme import chrome
+    monkeypatch.setattr(sw, "base_text", lambda: "[chrome]\nport = 9555\n")
+    ports = []
+    monkeypatch.setattr(chrome, "is_running", lambda port: ports.append(port) or False)
+    assert sw.login_status(["x", "timetree"]) == {"chrome": False, "x": None, "timetree": None}
+    assert ports == [9555]  # 설정의 전용 Chrome 포트를 본다
+
+
+def test_first_briefing_flag(tmp_path, monkeypatch):
+    monkeypatch.setattr(sw.config, "FIRST_BRIEFING", tmp_path / "first-briefing")
+    sw.request_first_briefing()
+    assert (tmp_path / "first-briefing").exists()
