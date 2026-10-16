@@ -146,15 +146,18 @@ HELP = {
         "faq": [["둘 다 써요", "지금은 한 곳만 연결할 수 있어요. 일정을 주로 넣는 쪽을 고르고, 나중에 설정에서 바꿀 수 있어요."]]},
     "gmail": {
         "open": ("앱 비밀번호 만들기", "https://myaccount.google.com/apppasswords"),
-        "steps": ["아래 <b>「앱 비밀번호 만들기」</b> → 평소 브라우저에서 구글에 로그인해요",
+        "steps": ["아래 <b>「앱 비밀번호 만들기」</b> → 평소 브라우저에서 ① 메일 주소의 구글 계정으로 로그인해요",
                   "앱 이름에 <b>POPME</b> → 만들기",
-                  "나온 16자리를 복사하면 위 비밀번호 칸에 저절로 들어와요 (한 번만 보여 줘요)"],
+                  "나온 16자리를 마우스로 끌어 <b>모두</b> 선택하고 <b>Ctrl+C</b> → 아래 ③ 칸에 저절로 들어와요 (한 번만 보여 줘요)"],
         "faq": [
             ["「사용할 수 없는 설정」이라고 나와요", "구글 계정에 2단계 인증이 켜져 있어야 앱 비밀번호를 만들 수 있어요. "
                                               "<a data-url='https://myaccount.google.com/signinoptions/twosv'>2단계 인증 켜기</a> 뒤 다시 해요. "
                                               "회사·학교 계정은 관리자가 막아 두었을 수 있어요."],
             ["「로그인하지 못했어요」가 나와요", "구글 비밀번호가 아니라 앱 비밀번호 16자리를 넣어야 해요. 구글 비밀번호를 바꾸면 앱 비밀번호도 새로 만들어야 해요."],
-            ["복사했는데 안 들어와요", "「앱 비밀번호 만들기」를 누른 뒤 15분 안에 복사한 것만 저절로 들어와요. 비밀번호 칸에 직접 붙여 넣어도 돼요."],
+            ["복사했는데 안 들어와요", "「앱 비밀번호 만들기」를 누른 뒤 15분 안에 복사한 것만 저절로 들어와요. "
+                                   "16자리를 모두 선택했는지 보고, 안 되면 ③ 칸을 누르고 Ctrl+V로 붙여 넣어도 돼요."],
+            ["다른 구글 계정으로 열려요", "브라우저 오른쪽 위 프로필 사진을 눌러 ① 메일 주소와 같은 계정으로 바꾼 뒤 다시 만들어요."],
+            ["16자리 창을 닫아 버렸어요", "다시 볼 수는 없어요. 같은 페이지에서 POPME를 지우고 새로 만들면 돼요."],
         ]},
     "mail_other": {
         "steps": ["메일 서비스 설정에서 <b>IMAP 사용</b>을 켜요", "2단계 인증을 쓰면 <b>앱 비밀번호</b>를 만들어 넣어요"],
@@ -408,8 +411,12 @@ def validate(ch):
             raise ValueError("메일 서버 주소를 확인해 주세요 (예: imap.gmail.com).")
         if mail["enabled"] and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", mail["user"]):
             raise ValueError("메일 주소를 확인해 주세요.")
-        if mail["enabled"] and not mail["password"] and not current()["mail"]["has_password"]:
-            raise ValueError("메일 앱 비밀번호를 넣어 주세요.")
+        saved = current()["mail"]
+        if mail["enabled"] and not mail["password"]:
+            if not saved["has_password"]:
+                raise ValueError("메일 앱 비밀번호를 넣어 주세요.")
+            if saved["user"].lower() != mail["user"].lower() or saved["host"] != mail["host"]:
+                raise ValueError("메일 주소가 바뀌었어요. 새 계정의 비밀번호를 넣어 주세요.")
         hm = r"([01]\d|2[0-3]):[0-5]\d"
         if mail["quiet_hours"] and not re.fullmatch(f"{hm}-{hm}", mail["quiet_hours"]):
             raise ValueError("방해 금지 시간은 23:00-07:00처럼 넣어 주세요.")
@@ -498,12 +505,39 @@ def guess_mail_host(domain):
     return host_from_mx(domain, mxs)
 
 
+def saved_mail_password(host, user):
+    """저장된 메일 비밀번호 — 저장된 것과 같은 계정(서버·주소)일 때만. 계정을 바꿨으면 "" (예전 계정 비밀번호를 쓰지 않게)."""
+    m = tomllib.loads(base_text()).get("mail", {})
+    same = (m.get("user") or "").strip().lower() == (user or "").strip().lower() and m.get("host") == (host or "").strip()
+    return m.get("password", "") if same else ""
+
+
+def _mail_login_error(host, raw):
+    low = raw.lower()
+    if "application-specific password required" in low:  # 2단계 인증 켠 구글 계정에 구글 비밀번호를 넣은 경우
+        return "구글 계정 비밀번호를 넣으셨어요. 구글 비밀번호 말고 「앱 비밀번호」 16자리를 넣어 주세요."
+    if host == "imap.gmail.com":
+        return ("구글이 로그인을 거절했어요. 구글 비밀번호 말고 「앱 비밀번호」 16자리를 넣었는지, "
+                "위 메일 주소와 같은 구글 계정에서 만들었는지 봐 주세요.")
+    return "로그인하지 못했어요. 메일 설정에서 「IMAP 사용」을 켰는지, 2단계 인증을 쓰면 앱 비밀번호를 넣었는지 봐 주세요."
+
+
 def check_mail(host, user, password):
-    """IMAP 로그인 → 받은편지함을 읽기 전용으로 열어 보기만 한다. 실패하면 ValueError."""
+    """IMAP 로그인 → 받은편지함을 읽기 전용으로 열어 보기만 한다. 실패하면 ValueError(사람이 읽는 문장, 원문은 로그에)."""
     import imaplib
+    import socket
+    host, user = (host or "").strip(), (user or "").strip()
+    gmail = host == "imap.gmail.com"
+    if "@" not in user:
+        raise ValueError("메일 주소를 먼저 넣어 주세요.")
     password = (password or "").replace(" ", "")
-    if not password:  # 비밀번호 칸을 비웠으면 저장된 것으로 확인
-        password = tomllib.loads(base_text()).get("mail", {}).get("password", "")
+    if not password:  # 비밀번호 칸을 비웠으면 저장된 것으로 — 같은 계정일 때만
+        password = saved_mail_password(host, user)
+        if not password and tomllib.loads(base_text()).get("mail", {}).get("password"):
+            raise ValueError(f"메일 주소가 바뀌었어요. 새 계정의 {'앱 비밀번호' if gmail else '비밀번호'}를 넣어 주세요.")
+        if not password:
+            raise ValueError("앱 비밀번호 칸이 비어 있어요. ②의 「앱 비밀번호 만들기」를 눌러 주세요." if gmail
+                             else "비밀번호 칸이 비어 있어요.")
     try:
         M = imaplib.IMAP4_SSL(host, 993, timeout=20)
         try:
@@ -515,11 +549,16 @@ def check_mail(host, user, password):
             except Exception:
                 pass
     except imaplib.IMAP4.error as e:
-        hint = (" Gmail은 일반 비밀번호가 아니라 「앱 비밀번호」 16자리를 넣어야 해요." if "gmail" in host else
-                " 메일 설정에서 IMAP 사용을 켰는지도 확인해 주세요.")
-        raise ValueError(f"로그인하지 못했어요.{hint} ({str(e)[:100]})")
+        log.warning("메일 로그인 실패 (%s): %s", host, e)
+        raise ValueError(_mail_login_error(host, str(e))) from None
+    except socket.gaierror as e:
+        log.warning("메일 서버 이름 실패 (%s): %s", host, e)
+        raise ValueError(f"메일 서버({host})를 찾지 못했어요. 인터넷이 연결돼 있는지, @ 뒤 주소가 맞는지 봐 주세요.") from None
+    except TimeoutError:
+        raise ValueError("메일 서버가 답하지 않아요. 잠시 뒤 다시 눌러 주세요.") from None
     except OSError as e:
-        raise ValueError(f"메일 서버에 연결하지 못했어요: {e}")
+        log.warning("메일 서버 연결 실패 (%s): %s", host, e)
+        raise ValueError("메일 서버에 연결하지 못했어요. 인터넷 연결을 확인하고 다시 눌러 주세요.") from None
     return True
 
 

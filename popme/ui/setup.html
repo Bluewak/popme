@@ -82,6 +82,18 @@
   .help .a small { display: block; color: var(--muted); font-size: 11px; }
   .help .lead2 { display: block; color: var(--muted); font-size: 12px; margin: 1px 0 2px; }
   .check .grow { flex: 1; }
+  /* 메일: ① 주소 → ② 만들기(접을 수 있음) → ③ 비밀번호·연결 확인 */
+  #mail-form h2.first { margin-top: 2px; }
+  details.step > summary { list-style: none; cursor: pointer; }
+  details.step > summary::-webkit-details-marker { display: none; }
+  details.step > summary h2 { display: inline-block; }
+  details.step:not([open]) > summary::after { content: " ▸ 펼치기"; font-size: 12px; color: var(--muted); }
+  .saved { background: #e5f3ea; color: #2f7a52; border-radius: 8px; padding: 6px 10px; margin-bottom: 6px;
+    display: flex; gap: 8px; align-items: center; }
+  .saved span { flex: 1; }
+  details.quiet { margin-top: 10px; }
+  details.quiet input[type=time] { width: 140px; }
+  #mail-host-note:empty { display: none; }
 </style>
 </head>
 <body>
@@ -179,11 +191,12 @@
     <h1>중요한 메일을 알려 드릴까요?</h1>
     <p class="lead">새 메일 중 중요한 것만 골라 말풍선으로 알려 줘요. 메일은 읽기만 해요.</p>
     <div class="cards two">
-      <label class="card"><input type="radio" name="mail-on" value="1"><b>알려 줘</b><small>메일 계정을 연결해요</small></label>
+      <label class="card"><input type="radio" name="mail-on" value="1"><b>알려 주세요</b><small>메일 계정을 연결해요</small></label>
       <label class="card"><input type="radio" name="mail-on" value="0"><b>안 씀</b><small>나중에 설정에서 켤 수 있어요</small></label>
     </div>
     <div id="mail-form" class="box hidden" style="margin-top:10px">
-      <b>메일 주소</b>
+      <div id="mail-saved" class="saved hidden"><span id="mail-saved-text"></span><button id="mail-recheck">연결 다시 확인</button></div>
+      <h2 class="first">① 메일 주소</h2>
       <div class="row">
         <input type="text" id="mail-id" placeholder="아이디" autocomplete="off">
         <span class="at">@</span>
@@ -195,16 +208,25 @@
         <div class="row"><input type="text" id="mail-host" placeholder="imap.example.com" autocomplete="off"></div>
       </details>
       <div id="mail-host-note" class="msg warn-t"></div>
-      <b>비밀번호</b>
-      <div class="row"><input type="password" id="mail-pw" autocomplete="off"><button id="mail-eye">보기</button></div>
-      <div class="howto" id="mail-howto"></div>
-      <div class="row hidden" id="mail-open-row"><button id="mail-open" class="primary"></button></div>
-      <b>방해 금지 시간</b>
-      <div class="row"><input type="text" id="mail-quiet" placeholder="예: 23:00-07:00 (비워 두면 언제든 알려 줘요)"></div>
-      <div class="row"><button id="mail-check">연결 확인</button></div>
+      <details id="mail-make" class="step" open>
+        <summary><h2 id="mail-make-title"></h2></summary>
+        <small class="hint" id="mail-make-hint"></small>
+        <div class="howto" id="mail-howto"></div>
+        <div class="row hidden" id="mail-open-row"><button id="mail-open" class="primary"></button></div>
+      </details>
+      <h2 id="mail-pw-title"></h2>
+      <div class="row">
+        <input type="password" id="mail-pw" autocomplete="off"><button id="mail-eye">보기</button><button id="mail-check">연결 확인</button>
+      </div>
       <div id="mail-msg" class="msg"></div>
+      <div class="secret" id="mail-secret"></div>
       <div id="mail-helpbox"></div>
-      <div class="secret">비밀번호는 이 PC의 config.toml에만 저장돼요. 그래서 일반 비밀번호가 아니라 언제든 지울 수 있는 앱 비밀번호를 써요.</div>
+      <details class="quiet" id="mail-quiet-box">
+        <summary id="mail-quiet-sum"></summary>
+        <label class="inline"><input type="checkbox" id="quiet-on"> 이 시간에는 말풍선 없이 캐릭터에 표시만 하기</label>
+        <div class="row"><input type="time" id="quiet-from"> 부터 <input type="time" id="quiet-to"> 까지</div>
+        <small class="hint">전체 화면이거나 Windows 방해 금지 모드일 때도 표시만 해요. 놓친 메일은 메일 탭에 남아 있어요.</small>
+      </details>
     </div>
   </section>
 
@@ -284,7 +306,7 @@ function init() {
     item("opt", "AI 유료 구독 하나", "Claude Pro·ChatGPT Plus·Google AI Pro 중 하나 (Gemini는 무료 한도로도 가능)"),
     item("opt", "쓰는 캘린더 앱", "미니캘 같은 앱이면 구글·iCloud 중 어디와 연결됐는지 알아 두면 좋아요"),
     item("opt", "X·Threads 계정 (있으면)", "소식 모으기에 써요. 없으면 공식 블로그 소식만 모여요"),
-    ...(D.mail.supported ? [item("opt", "메일 알림을 쓰려면", "Gmail이면 2단계 인증 + 앱 비밀번호 (다음 단계에서 안내해요)")] : []),
+    ...(D.mail.supported ? [item("opt", "메일 알림을 쓰려면", "Gmail이면 2단계 인증 + 앱 비밀번호 (메일 단계에서 안내해요)")] : []),
   );
   $("#prereq-ok").onchange = nav;
 
@@ -353,7 +375,20 @@ function init() {
     $("#mail-id").value = id;
     $("#mail-domain").value = domains.find(d => d === dom || (!dom && D.mail_domains[d] === D.mail.host)) || (dom ? "" : "gmail.com");
     if (dom && !(dom in D.mail_domains)) { $("#mail-domain-custom").value = dom; $("#mail-host").value = D.mail.host; hostTouched = true; }
-    $("#mail-quiet").value = D.mail.quiet_hours;
+    // 조용한 시간: "23:00-07:00" ↔ 체크 + 시간 칸 두 개
+    const [qf, qt] = (D.mail.quiet_hours || "").split("-");
+    $("#quiet-on").checked = !!(qf && qt);
+    $("#quiet-from").value = qf || "23:00";
+    $("#quiet-to").value = qt || "07:00";
+    ["quiet-on", "quiet-from", "quiet-to"].forEach(id => $("#" + id).onchange = quietView);
+    quietView();
+    // 다시 설정하러 왔으면 「연결돼 있어요」를 보여 주고 ② 만드는 법은 접어 둔다
+    $("#mail-make").open = !(D.mail.enabled && D.mail.has_password);
+    $("#mail-recheck").onclick = () => mailCheck();
+    // 칸을 바꾸면 「연결됐어요」는 지운다 — 바뀐 값으로 다시 확인해야 넘어갈 수 있다
+    const edited = () => { if (mailOk && mailOk !== mailSig()) { mailOk = ""; say($("#mail-msg"), ""); } mailView(); nav(); };
+    ["mail-id", "mail-domain-custom", "mail-host", "mail-pw"].forEach(id => $("#" + id).addEventListener("input", edited));
+    $("#mail-domain").addEventListener("change", edited);
     setRadio("mail-on", D.mail.enabled ? "1" : "0");
     document.querySelectorAll("input[name=mail-on]").forEach(r => r.onchange = mailView);
     // 아이디@도메인을 통째로 넣으면 나눠 담는다. 한 글자씩 칠 때 나누면 「me@」에서 @가 사라지고 뒤 글자가
@@ -683,26 +718,73 @@ function guessHost() {
   }, 600);
 }
 
+const MAIL_SECRET = {
+  gmail: "🔒 이 PC에만 저장되고 다른 곳으로 보내지 않아요. 구글 계정 → 앱 비밀번호에서 POPME를 지우면 바로 끊겨요.",
+  other: "🔒 이 PC에만 저장되고 다른 곳으로 보내지 않아요. 2단계 인증을 켜고 앱 비밀번호를 쓰면 더 안전해요 — 언제든 지울 수 있거든요.",
+};
+// 저장된 것과 같은 계정이고 비밀번호 칸을 비워 뒀으면 저장된 비밀번호를 쓴다 (계정을 바꾸면 안 쓴다 — setup_window.saved_mail_password)
+const savedSame = () => D.mail.has_password && !$("#mail-pw").value.trim()
+  && mailUser().toLowerCase() === (D.mail.user || "").toLowerCase() && mailHost() === D.mail.host;
+// 연결이 확인된 (서버|주소|비밀번호). 칸을 바꾸면 달라져서 다시 확인해야 「다음」으로 간다
+let mailOk = "";
+const mailSig = () => [mailHost(), mailUser().toLowerCase(), $("#mail-pw").value.replace(/\s/g, "")].join("|");
+const mailReady = () => radio("mail-on") !== "1" || mailOk === mailSig() || (savedSame() && D.mail.enabled);
+
 function mailView() {
   $("#mail-form").classList.toggle("hidden", radio("mail-on") !== "1");
-  const custom = !$("#mail-domain").value, host = mailHost();
+  const custom = !$("#mail-domain").value, host = mailHost(), gmail = host === "imap.gmail.com";
   $("#mail-domain-custom").classList.toggle("hidden", !custom);
   $("#mail-adv").classList.toggle("hidden", !custom || !mailDomain());
   $("#mail-adv summary").textContent = `메일 서버: ${host || "찾는 중…"} (보통은 그대로 두면 돼요)`;
   $("#mail-host-note").textContent = custom ? hostNote : "";
-  const gmail = host === "imap.gmail.com";
-  $("#mail-howto").innerHTML = ol(gmail ? D.help.gmail.steps : MAIL_HOWTO[host] || (custom && host ? D.help.mail_other.steps : []));
+  // ② 만들기 / 설정 확인
+  const steps2 = gmail ? D.help.gmail.steps : MAIL_HOWTO[host] || (custom && host ? D.help.mail_other.steps : []);
+  $("#mail-make").classList.toggle("hidden", !steps2.length);
+  $("#mail-make-title").textContent = gmail ? "② 앱 비밀번호 만들기" : "② 메일 설정 확인";
+  $("#mail-make-hint").innerHTML = gmail ? "구글 계정에 2단계 인증이 켜져 있어야 해요 · "
+    + "<a data-url='https://myaccount.google.com/signinoptions/twosv'>2단계 인증 켜기</a>" : "";
+  $("#mail-howto").innerHTML = ol(steps2);
   $("#mail-open-row").classList.toggle("hidden", !gmail);
+  // ③ 비밀번호
+  const n = steps2.length ? "③" : "②";
+  $("#mail-pw-title").textContent = gmail ? `${n} 앱 비밀번호 (구글 비밀번호 아님)` : `${n} 비밀번호`;
+  $("#mail-pw").placeholder = savedSame() ? "저장된 비밀번호 사용 (바꿀 때만 입력)"
+    : D.mail.has_password && !$("#mail-pw").value ? `새 계정의 ${gmail ? "앱 비밀번호" : "비밀번호"}를 넣어 주세요`
+    : gmail ? "16자리 — 위에서 만들어 복사하면 저절로 들어와요" : "비밀번호";
+  $("#mail-secret").textContent = MAIL_SECRET[gmail ? "gmail" : "other"];
+  // 다시 설정하러 왔을 때: 저장된 계정 그대로면 「연결돼 있어요」
+  const saved = D.mail.enabled && savedSame() && mailOk !== mailSig();
+  $("#mail-saved").classList.toggle("hidden", !saved);
+  if (saved) $("#mail-saved-text").textContent = `✓ ${D.mail.user} 연결돼 있어요. 바꿀 것만 고치면 돼요.`;
   if (helps.mail) helps.mail.refresh();
-  $("#mail-pw").placeholder = D.mail.has_password ? "저장된 비밀번호 사용 (바꿀 때만 입력)"
-    : host === "imap.gmail.com" ? "앱 비밀번호 16자리" : "비밀번호 (2단계 인증을 쓰면 앱 비밀번호)";
 }
 
-async function mailCheck(first) {
+function quietView() {
+  const on = $("#quiet-on").checked;
+  $("#quiet-from").disabled = $("#quiet-to").disabled = !on;
+  $("#mail-quiet-sum").textContent = on ? `조용한 시간: ${$("#quiet-from").value}~${$("#quiet-to").value}` : "조용한 시간 (선택)";
+}
+const quietHours = () => $("#quiet-on").checked && $("#quiet-from").value && $("#quiet-to").value
+  ? `${$("#quiet-from").value}-${$("#quiet-to").value}` : "";
+
+async function mailCheck(first) {  // 반환: 연결됐나
   splitId();
-  say($("#mail-msg"), typeof first === "string" ? first : "확인 중…");
-  const r = await api().check_mail(mailHost(), mailUser(), $("#mail-pw").value);
-  say($("#mail-msg"), r.ok ? "연결됐어요! 받은편지함을 읽을 수 있어요." : r.error, r.ok ? "ok-t" : "err-t");
+  const btn = $("#mail-check");
+  btn.disabled = true;
+  say($("#mail-msg"), typeof first === "string" ? first : "메일 서버에 연결해 보는 중…");
+  const sig = mailSig(), r = await api().check_mail(mailHost(), mailUser(), $("#mail-pw").value);
+  btn.disabled = false;
+  if (r.ok) {
+    mailOk = sig;
+    $("#mail-make").open = false;  // 만드는 법은 이제 필요 없다
+    say($("#mail-msg"), "연결됐어요! 받은편지함을 읽을 수 있어요. 「다음」을 눌러 주세요.", "ok-t");
+  } else {
+    mailOk = "";
+    say($("#mail-msg"), r.error, "err-t");
+  }
+  mailView();
+  nav();
+  return r.ok;
 }
 
 // 로그인: 사이트별 「로그인 열기」 → 전용 Chrome에서 사용자가 직접 로그인 → 3초마다 확인해 ✓ (setup_window.login_status)
@@ -765,7 +847,7 @@ function nav() {
   const name = steps[step].dataset.step, nx = $("#next");
   const later = (name === "브리핑 AI" && radio("ai") && !aiReady()) || (name === "로그인" && !loginReady());
   nx.textContent = name === "마무리" ? "저장" : name === "끝" ? (D.exists ? "지금 한 번 모아 보기" : "첫 브리핑 받아 보기")
-                 : later ? "나중에 하기" : "다음";
+                 : later ? "나중에 하기" : name === "메일" && D.mail.supported && !mailReady() ? "연결 확인하고 다음" : "다음";
   nx.className = later ? "later" : "primary";  // 아직 안 됐어도 넘어갈 수는 있지만 덜 눈에 띄게
   nx.disabled = !canNext();
   $("#prev").textContent = name === "끝" ? "닫기" : "이전";
@@ -797,9 +879,21 @@ async function next() {
     return say($("#msg"), "주소를 넣어 주세요. 위 버튼으로 설정 페이지를 열고 복사하면 저절로 들어와요. 나중에 하려면 「안 씀」을 골라요.", "err-t");
   if (name === "메일" && radio("mail-on") === "1") {
     splitId();
-    if (!$("#mail-id").value.trim() || !mailDomain()) return say($("#msg"), "메일 아이디와 @ 뒤 주소를 넣어 주세요.", "err-t");
+    const gmail = mailHost() === "imap.gmail.com";
+    const stop = (field, text) => { $(field).focus(); return say($("#msg"), text, "err-t"); };
+    if (!$("#mail-id").value.trim()) return stop("#mail-id", "메일 아이디를 넣어 주세요.");
+    if (!mailDomain()) return stop("#mail-domain-custom", "@ 뒤 주소를 넣어 주세요 (예: company.co.kr).");
     if (!mailHost()) return say($("#msg"), "메일 서버를 찾는 중이에요. 잠깐 뒤 다시 눌러 주세요.", "err-t");
-    if (!$("#mail-pw").value.trim() && !D.mail.has_password) return say($("#msg"), "비밀번호를 넣어 주세요.", "err-t");
+    if (!$("#mail-pw").value.trim() && !savedSame())
+      return stop("#mail-pw", D.mail.has_password ? `메일 주소가 바뀌었어요. 새 계정의 ${gmail ? "앱 비밀번호" : "비밀번호"}를 넣어 주세요.`
+        : gmail ? "앱 비밀번호를 넣어 주세요. ②의 「앱 비밀번호 만들기」를 누르면 저절로 들어와요. 나중에 하려면 「안 씀」을 골라요."
+        : "비밀번호를 넣어 주세요. 나중에 하려면 「안 씀」을 골라요.");
+    if (!mailReady()) {
+      say($("#msg"), "메일 연결을 확인하는 중…");
+      if (!await mailCheck())
+        return say($("#msg"), "연결이 아직 안 됐어요. 위 빨간 안내대로 고치거나 「안 씀」을 골라요.", "err-t");
+      say($("#msg"), "");
+    }
   }
   if (name !== "마무리") return go(step + 1);
   say($("#msg"), "저장 중…");
@@ -809,7 +903,7 @@ async function next() {
     source: calMode(), ics: icsRows(), holidays: $("#holidays").checked,
     caldav: { user: $("#dav-user").value, password: $("#dav-pw").value, calendars: davChosen() },
     mail: D.mail.supported ? { enabled: radio("mail-on") === "1", host: mailHost(), user: mailUser(),
-                               password: $("#mail-pw").value, quiet_hours: $("#mail-quiet").value } : null,
+                               password: $("#mail-pw").value, quiet_hours: quietHours() } : null,
     character: radio("char") || D.character, briefing_after: $("#time").value,
     use_windows_location: $("#winloc").checked, place: $("#place").value,
   });
