@@ -309,3 +309,19 @@ def test_save_refuses_old_password_for_new_account(monkeypatch):
     with pytest.raises(ValueError, match="메일 주소가 바뀌었어요"):
         choices(mail=mail)
     assert choices(mail={**mail, "user": "ME@example.com"})["mail"]["password"] == ""  # 같은 계정이면 저장된 것 그대로
+
+
+def test_ask_help_sends_recent_conversation(monkeypatch):
+    """이어 묻기: 앞 대화(최근 HELP_TURNS개, HTML 뺌)를 함께 보내 「그래도 안 돼요」에도 맥락이 있다."""
+    from popme import llm
+    seen = {}
+    monkeypatch.setattr(llm, "ask", lambda cfg, system, prompt, timeout=600: seen.update(prompt=prompt) or "답")
+    monkeypatch.setattr(sw, "base_text", lambda: "")
+    history = [{"q": f"질문{i}", "a": f"<b>답{i}</b>"} for i in range(6)]
+    sw.ask_help("claude", "google", "그래도 안 돼요", history)
+    p = seen["prompt"]
+    assert "[지금까지 대화]" in p and "사용자: 질문5" in p and "도우미: 답5" in p and "<b>" not in p
+    assert "질문1" not in p  # 오래된 대화는 뺀다
+    assert p.index("[지금까지 대화]") < p.index("그래도 안 돼요")
+    sw.ask_help("claude", "google", "처음 질문")
+    assert "[지금까지 대화]" not in seen["prompt"]
