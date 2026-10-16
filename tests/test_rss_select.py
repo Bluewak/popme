@@ -97,3 +97,14 @@ def test_rss_items_skips_saved_prereleases(tmp_path):
     cfg = {"rss": [{"name": "Codex 릴리스", "skip": "alpha|beta|-rc"}]}
     since = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
     assert [r["title"] for r in briefing.rss_items(cfg, db, since)] == ["0.163.0"]
+
+
+def test_rss_items_future_dated_post_only_once(tmp_path):
+    """앞날짜로 찍힌 글(Databricks 변경내역 등)은 처음 본 날 한 번만 — 날짜가 될 때까지 매일 다시 들어가지 않는다."""
+    db = DB(tmp_path / "t.db")
+    now = datetime.now(timezone.utc)
+    db.upsert_items([{"url": "https://dbx/1", "source": "Databricks", "grp": "공식 발표", "title": "앞날짜 글",
+                      "summary": "", "published": (now + timedelta(days=4)).isoformat()}])
+    seen_in = [d for d in range(4)
+               if briefing.rss_items({"rss": []}, db, (now + timedelta(days=d) - timedelta(hours=18)).isoformat())]
+    assert seen_in == [0]

@@ -236,8 +236,11 @@ def rss_items(cfg, db, since_iso):
                 "ORDER BY COALESCE(published, collected_at) DESC", early)
     groups = {}
     for r in rows:
-        new = datetime.fromisoformat(r["collected_at"]) >= since
-        if (r["published"] or r["collected_at"]) < since_iso and not new:
+        seen = datetime.fromisoformat(r["collected_at"])
+        new = seen >= since
+        # 앞날짜로 찍힌 글(예: 미리 써 둔 변경내역)은 처음 본 시각으로 — 날짜가 될 때까지 매일 다시 들어가지 않게
+        posted = min(datetime.fromisoformat(r["published"]), seen) if r["published"] else seen
+        if posted < since and not new:
             continue
         if topic.get(r["source"]) == "ai" and not rss.is_ai(r):
             continue
