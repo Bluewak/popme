@@ -97,6 +97,49 @@ def test_validate_rejects(kw, msg):
         choices(**kw)
 
 
+def test_mail_custom_host(monkeypatch):
+    """직접 입력한 도메인은 서버 이름만 모양을 본다 (목록에 없어도 됨)."""
+    monkeypatch.setattr(sw, "mail_supported", lambda: True)
+    mail = {"enabled": True, "host": " IMAP.Example.co.kr ", "user": "me@example.com", "password": "pw", "quiet_hours": ""}
+    assert choices(mail=mail)["mail"]["host"] == "imap.example.co.kr"
+    with pytest.raises(ValueError, match="메일 서버"):
+        choices(mail={**mail, "host": "imap example"})
+    assert choices(mail={**mail, "enabled": False, "host": ""})["mail"]["host"] == ""  # 끈 상태면 비어도 됨
+
+
+@pytest.mark.parametrize("mx, host, note", [
+    (["aspmx.l.google.com."], "imap.gmail.com", False),          # 회사 도메인 + Google Workspace
+    (["mx1.worksmobile.com"], "imap.worksmobile.com", False),    # 네이버웍스
+    (["corp-com.mail.protection.outlook.com"], "outlook.office365.com", True),
+    (["mx.example.co.kr"], "imap.example.co.kr", False),
+    ([], "imap.example.co.kr", False),
+])
+def test_host_from_mx(mx, host, note):
+    g = sw.host_from_mx("example.co.kr", mx)
+    assert g["host"] == host and bool(g["note"]) is note
+
+
+def test_guess_mail_host_known_domain_needs_no_lookup(monkeypatch):
+    monkeypatch.setattr(sw.subprocess, "run", lambda *a, **k: pytest.fail("nslookup 안 해야 함"))
+    assert sw.guess_mail_host("Hanmail.net")["host"] == "imap.daum.net"
+    assert sw.guess_mail_host("not a domain")["host"] == ""
+
+
+@pytest.mark.parametrize("err, msg", [
+    ("claude 호출 실패: Invalid API key · Please run /login", "로그인"),
+    ("claude 호출 실패: 5-hour limit reached", "한도"),
+    ("claude 호출 실패: 무언가 이상함", "불러 보지 못했어요"),
+])
+def test_ai_test_errors_are_friendly(monkeypatch, err, msg):
+    from popme import llm
+
+    def boom(*a, **k):
+        raise RuntimeError(err)
+    monkeypatch.setattr(llm, "ask", boom)
+    with pytest.raises(ValueError, match=msg):
+        sw.ai_test("claude")
+
+
 def test_caldav_saved(monkeypatch):
     monkeypatch.setattr(sw, "current", lambda: {"caldav": {"has_password": False}})
     cals = [{"name": "집", "url": "https://p1-caldav.icloud.com/1/calendars/home/"}]
