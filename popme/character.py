@@ -37,6 +37,9 @@ LINE_DEFAULTS = {
     "air_bad": ["오늘 {place} 미세먼지 {grade}이래요. 마스크 챙기세요."],
     "mail": ["중요한 메일이 왔어요. {who}: {summary}"],
     "mail_many": ["중요한 메일이 {n}통 왔어요."],
+    "collecting_hint": ["전용 Chrome 창으로 소식을 모으는 중이에요. 끝나면 저절로 멈추니 창은 닫지 말아 주세요."],
+    "collect_busy": ["지금 모으는 중이에요. {status}"],
+    "chrome_closed": ["Chrome 창이 닫혀서 이번엔 일부만 모았어요. 다시 모을까요?"],
 }
 WEATHER_ADVICE_DEFAULTS = {"snow": "미끄럼 조심하세요.", "rain": "우산 챙기세요.", "hot": "물 챙기세요.",
                            "cold": "따뜻하게 입으세요.", "gap": "겉옷 챙기세요.", "nice": "좋은 날이에요.", "cloudy": ""}

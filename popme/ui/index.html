@@ -170,7 +170,7 @@
   <div id="say"></div>
   <div id="bubble-wx"></div>
   <ul id="bubble-list"></ul>
-  <div class="row"><button class="icon" id="bubble-close">닫기</button><button class="primary" id="bubble-more">자세히</button></div>
+  <div class="row"><button class="icon" id="bubble-close">닫기</button><button id="bubble-act" style="display:none"></button><button class="primary" id="bubble-more">자세히</button></div>
 </div>
 <div id="panel">
   <header>
@@ -245,6 +245,13 @@ window.fillBubble = async (alert) => {
     say.innerHTML = today.length
       ? `${u("today_events", {n: today.length})}<br><span class="muted">${today.slice(0, 3).map(e => esc(e.title)).join(" · ")}</span>`
       : u("no_events");
+  }
+  // 말풍선 버튼 (예: Chrome이 닫혀 수집이 끊겼을 때 「다시 모으기」)
+  const act = $("#bubble-act"), action = alert && alert.action;
+  act.style.display = action ? "" : "none";
+  if (action) {
+    act.textContent = action.label;
+    act.onclick = () => { api.set_mode("pet"); api[action.call](); };
   }
   $("#bubble-list").innerHTML = alert && alert.items ? alert.items.map(h => `<li>${h}</li>`).join("") : b.headlines.slice(0, 3).map(h => `<li>${h.urgent ? "🔥 " : ""}${h.html}</li>`).join("")
     || `<li class="muted">${u("no_briefing")}</li>`;
