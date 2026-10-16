@@ -591,9 +591,14 @@ def main(restart=False):
         if not settings_open.acquire(blocking=False):
             return
         try:
-            r = subprocess.run([sys.executable, "-m", "popme.setup_window"], cwd=config.ROOT)
+            r = subprocess.run([sys.executable, "-m", "popme.setup_window"], cwd=config.ROOT,
+                               stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
         finally:
             settings_open.release()
+        if "Traceback" in (r.stderr or ""):  # 창이 뜨기도 전에 죽으면 아무 표시가 없어서 기록하고 알려 준다
+            log.error("설정 창 오류:\n%s", r.stderr[-2000:])
+            api._show_chat("설정 창을 못 열었어요… popme.log에 이유를 적어 뒀어요.")
+            return
         if r.returncode == 0:
             subprocess.Popen([sys.executable, "-m", "popme", "restart"], cwd=config.ROOT)
             quit_app()
