@@ -98,7 +98,7 @@ lon = 126.98
 
 [mail]                             # 중요 메일 알림 (IMAP, 읽기 전용). 설정법: docs/MAIL.md
 enabled = false
-host = "imap.gmail.com"            # 네이버 imap.naver.com · 다음 imap.daum.net
+host = "imap.gmail.com"            # 네이버 imap.naver.com · 다음 imap.daum.net · 카카오 imap.kakao.com
 user = ""                          # 예: you@example.com
 password = ""                      # Gmail은 "앱 비밀번호" 16자리 (일반 비밀번호 아님)
 vip = []                           # 무조건 알릴 보낸사람 (이름·주소 일부). 예: ["boss@example.com", "국세청"]
