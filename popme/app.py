@@ -440,11 +440,14 @@ class Api:
         return {"enabled": True, **self._mail.state, "items": mail.for_ui(self._jobs.db.mails(mail.ago(days=3)))}
 
     def get_candidates(self):
-        return discovery.candidates(self._jobs.db, limit=15)
+        if not getattr(self, "_verdicts_filled", False):  # 이 기능 전에 쓴 브리핑의 발굴 판단도 보이게
+            self._verdicts_filled = True
+            discovery.backfill_verdicts(self._jobs.db)
+        return [discovery.for_view(c) for c in discovery.candidates(self._jobs.db, limit=15)]
 
     def get_review(self):
         """정리 추천: 꾸준함 기준에 4주 넘게 못 미친 승인 계정."""
-        return discovery.to_review(self._jobs.db, self._jobs.cfg)
+        return [discovery.for_view(c) for c in discovery.to_review(self._jobs.db, self._jobs.cfg)]
 
     def set_candidate(self, handle, status):
         self._jobs.db.set_candidate_status(handle, status)

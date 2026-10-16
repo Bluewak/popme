@@ -96,6 +96,11 @@
   .badge.new { background: var(--ok); } .badge.changed { background: var(--warn); color: #000; } .badge.deleted { background: var(--err); }
   .cand { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; border-bottom: 1px solid var(--line); }
   .cand .row { display: flex; gap: 6px; align-items: center; } .cand .row b { flex: 1; }
+  .cand .chips { margin-top: 0; } .chip.ok { background: #e5f3ea; color: #2f7a52; }
+  .cand .why { font-size: 13px; } .cand .why .chip { font-size: 11px; margin-right: 4px; vertical-align: 1px; }
+  .cand .why-body { font-size: 12.5px; line-height: 1.55; }
+  .cand .quote { font-size: 12px; color: var(--muted); border-left: 3px solid var(--line); padding-left: 7px; }
+  .cand .src { font-size: 11px; color: var(--muted); }
   #ask-form { display: flex; gap: 6px; }
   #q { flex: 1; background: #fff; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font: inherit; }
   #answer { margin-top: 12px; }
@@ -405,16 +410,26 @@ async function loadCands() {
   const link = c => c.platform === "threads"
     ? `<span class="badge changed">Threads</span> <a href="https://www.threads.com/@${esc(c.handle.split("/")[1])}">@${esc(c.handle.split("/")[1])}</a>`
     : `<span class="badge new">X</span> <a href="https://x.com/${esc(c.handle)}">@${esc(c.handle)}</a>`;
-  // 후보: 팔로워·꾸준함 단계를 통과한 것만 온다. check_note = 단계 판정 요약
+  // 후보: 팔로워·꾸준함 단계를 통과한 것만 온다. 기준은 태그로(c.tags), 아래에 브리핑 때 AI가 대표글을 보고 쓴
+  // 추천 이유(c.ai: 추천|비추천|보류 + 한 줄 + 설명). 아직 없으면 발굴 근거(대표글)만
+  const tagsOf = c => `<div class="chips">${c.tags.map(t =>
+    `<span class="chip ${t.tone}" ${t.tip ? `title="${esc(t.tip)}"` : ""}>${esc(t.text)}</span>`).join("")}</div>`;
+  const VCLS = { "추천": "me", "비추천": "bad", "보류": "do" };
+  const why = c => c.ai ? `
+      <div class="why"><span class="chip ${VCLS[c.ai.verdict] || ""}">${esc(c.ai.verdict)}</span><b>${esc(c.ai.title)}</b></div>
+      ${c.ai.body ? `<div class="why-body">${esc(c.ai.body)}</div>` : ""}
+      <div class="src">${esc(c.ai.date.slice(5).replace("-", "/"))} 브리핑에서 AI가 대표글을 보고 판단${c.ai.link ? ` · <a href="${esc(c.ai.link)}">근거 글</a>` : ""}</div>`
+    : `${c.quote ? `<div class="quote">${esc(c.quote)}</div>` : ""}
+      <div class="src">추천 이유는 다음 브리핑 때 AI가 대표글을 보고 적어 줘요.</div>`;
   $("#cands").innerHTML = (rows.length ? rows.map(c => `
     <div class="cand"><div class="row"><b>${link(c)} ${esc(c.name || "")}</b>
       <button data-h="${esc(c.handle)}" data-s="added">추가</button><button data-h="${esc(c.handle)}" data-s="dismissed">무시</button></div>
-      <div class="muted">${esc(c.check_note || "")}</div><div class="muted">${esc(c.reason)}</div></div>`).join("")
+      ${tagsOf(c)}${why(c)}</div>`).join("")
     : `<p class="muted">아직 기준을 통과한 후보가 없어요.</p>`)
     + (review.length ? `<h2>정리 추천</h2>` + review.map(c => `
     <div class="cand"><div class="row"><b>${link(c)} ${esc(c.name || "")}</b>
       <button data-h="${esc(c.handle)}" data-s="dismissed">빼기</button></div>
-      <div class="muted">${esc(c.check_note || "")}</div></div>`).join("") : "");
+      ${tagsOf(c)}</div>`).join("") : "");
   $("#cands").querySelectorAll("button[data-h]").forEach(b => b.onclick = async () => {
     await api.set_candidate(b.dataset.h, b.dataset.s); loadCands();
   });

@@ -142,3 +142,55 @@ def test_dropped_then_requalified(tmp_path):
     assert stage(db, "dev")["stage"] == "gone"
     discovery.update(db, ["simonw", "swyx"])
     assert stage(db, "dev")["stage"] == "pool"
+
+
+def test_briefing_verdicts_show_on_candidates(tmp_path):
+    """브리핑 발굴 카드의 판단(추천·비추천·보류)이 후보에 붙어 발굴 탭에 같은 이유로 보인다."""
+    db = DB(tmp_path / "t.db")
+    db.upsert_candidate("charliermarsh", "Charlie", "서로 다른 회사 2곳의 핵심 계정(@a, @b)이 리포스트·인용·답글", 10, "x", "global")
+    db.upsert_candidate("pequityresearch", "P", "", 9, "x", "global")
+    db.upsert_candidate("threads/fofr.ai", "F", "", 8, "threads", "threads")
+    items = [
+        {"cat": "발굴", "title": "@charliermarsh — Python 도구 ty 소식 볼 만함", "body": "개발 도구를 만드는 쪽",
+         "links": [{"label": "X 글", "url": "https://x.com/zeeg/status/1"}]},
+        {"cat": "발굴", "title": "@pequityresearch — 비추천: 주식 리서치 위주", "body": "투자 정보 위주"},
+        {"cat": "발굴", "title": "@fofr.ai — 보류: 대표글이 없어 판단 불가", "body": ""},
+        {"cat": "발굴", "title": "@nobody — 모르는 사람", "body": "후보에 없으면 무시"},
+        {"cat": "업데이트", "title": "@charliermarsh — 발굴 카드가 아니면 무시", "body": ""},
+    ]
+    discovery.remember_verdicts(db, items, "2026-10-16")
+    rows = {c["handle"]: discovery.for_view(c) for c in db.q("SELECT * FROM candidates")}
+    assert rows["charliermarsh"]["ai"] == {"verdict": "추천", "title": "Python 도구 ty 소식 볼 만함", "body": "개발 도구를 만드는 쪽",
+                                           "date": "2026-10-16", "link": "https://x.com/zeeg/status/1"}
+    assert (rows["pequityresearch"]["ai"]["verdict"], rows["pequityresearch"]["ai"]["title"]) == ("비추천", "주식 리서치 위주")
+    assert (rows["threads/fofr.ai"]["ai"]["verdict"], rows["threads/fofr.ai"]["ai"]["title"]) == ("보류", "대표글이 없어 판단 불가")
+
+
+def test_backfill_uses_latest_briefing(tmp_path):
+    import json
+    db = DB(tmp_path / "t.db")
+    db.upsert_candidate("someone", "S", "", 1, "x", "global")
+    for date, title in [("2026-10-14", "@someone — 비추천: 옛 판단"), ("2026-10-16", "@someone — 새 판단")]:
+        db.save_briefing(date, "", json.dumps({"items": [{"cat": "발굴", "title": title, "body": ""}]}, ensure_ascii=False))
+    discovery.backfill_verdicts(db)
+    c = discovery.for_view(db.q("SELECT * FROM candidates")[0])
+    assert (c["ai"]["verdict"], c["ai"]["title"], c["ai"]["date"]) == ("추천", "새 판단", "2026-10-16")
+
+
+def test_tags_shorten_criteria():
+    texts = lambda c: [t["text"] for t in discovery.tags(c)[0]]
+    assert texts({"check_note": "세계 개인 팔로워 62,177명 · 꾸준함 검사 면제",
+                  "reason": "서로 다른 회사 2곳의 핵심 계정(@USAnt_IDEA, @elonmusk)이 리포스트·인용·답글"}) == \
+        ["세계 개인", "팔로워 6.2만", "꾸준함 면제", "회사 2곳이 언급"]
+    assert texts({"check_note": "국내 X 팔로워 8,100명 · 꾸준함 통과: 30일 글 12개 · 4주 활동 · AI·개발 글 80%",
+                  "reason": "한국어 글 3개, 반응 합계 ♥1,234"}) == \
+        ["국내 X", "팔로워 8,100", "꾸준함 ✓", "30일 글 12개", "4주 활동", "AI·개발 글 80%", "한국어 글 3개 ♥1,234"]
+    assert texts({"check_note": "세계 기업 팔로워 120,000명 · 꾸준함 검사 면제",
+                  "reason": "서로 다른 회사 3곳의 핵심 계정(@a, @b, @c)이 4주에 걸쳐 7번 리포스트·인용 · 떠오르는 중(30일 팔로워 +15%)"}) == \
+        ["세계 기업", "팔로워 12만", "꾸준함 면제", "회사 3곳이 4주간 7번 언급", "떠오르는 중 +15%"]
+    t, quote = discovery.tags({"check_note": "꾸준함 미달: 30일 글 2개, 최근 4주 중 1주 활동",
+                               "reason": "Threads 검색·태그 3곳 등장(MCP, 바이브코딩, AI), 글 5개, ♥1,234 · 대표글: 클로드 코드 팁 모음"})
+    assert [(x["text"], x["tone"]) for x in t] == [("꾸준함 미달", "bad"), ("30일 글 2개", "bad"), ("최근 4주 중 1주 활동", "bad"),
+                                                  ("검색·태그 3곳 등장", ""), ("글 5개 ♥1,234", "")]
+    assert t[3]["tip"] == "MCP, 바이브코딩, AI" and quote == "클로드 코드 팁 모음"
+    assert texts({"check_note": "처음 보는 모양의 아주 긴 판정 문장이 여기에 들어가면 잘린다", "reason": ""})[0].endswith("…")

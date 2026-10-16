@@ -11,6 +11,7 @@
 두 단계를 통과한 후보(stage='pass')만 화면·브리핑에 보인다.
 승인한 국내 X·Threads 계정도 같은 꾸준함 기준으로 점검해, 4주 넘게 못 미치면 정리 추천으로 보여준다.
 """
+import json
 import math
 import re
 from collections import defaultdict
@@ -307,6 +308,95 @@ def to_review(db, cfg=None):
 def added(db, platform):
     return [c for c in db.q("SELECT * FROM candidates WHERE status='added' ORDER BY score DESC")
             if (c.get("platform") or "x") == platform]
+
+
+# ---------------- 화면용: 기준은 태그로, 추천 이유는 브리핑의 AI 판단으로 ----------------
+CARD_TITLE = re.compile(r"^@([\w.]+)\s*[—–-]+\s*(.+)$")
+VERDICTS = ("비추천", "보류", "추천")
+
+
+def remember_verdicts(db, items, date):
+    """브리핑 발굴 카드("@handle — 볼 만한 이유" / "— 비추천: 이유" / "— 보류: 이유")를 후보에 붙여 둔다.
+    발굴 탭이 브리핑과 같은 판단을 보여 주게 — AI를 다시 부르지 않는다."""
+    known = defaultdict(list)
+    for c in db.q("SELECT handle FROM candidates"):
+        known[c["handle"].split("/")[-1].lower()].append(c["handle"])
+    for it in items:
+        m = CARD_TITLE.match((it.get("title") or "").strip()) if it.get("cat") == "발굴" else None
+        if not m:
+            continue
+        head = m.group(2).strip()
+        verdict = next((v for v in VERDICTS if head.startswith(v)), "추천")
+        head = re.sub(rf"^({'|'.join(VERDICTS)})\s*[:：]?\s*", "", head) or head
+        links = [l.get("url") for l in it.get("links") or [] if l.get("url")]
+        note = json.dumps({"title": head, "body": (it.get("body") or "").strip(), "date": date,
+                           "link": links[0] if links else ""}, ensure_ascii=False)
+        for handle in known.get(m.group(1).lower(), []):
+            db.set_candidate_ai(handle, verdict, note)
+
+
+def backfill_verdicts(db, n=14):
+    """최근 브리핑 n개의 발굴 카드로 AI 판단을 채운다 (오래된 것부터 → 최신 판단이 남는다). 업데이트 직후 한 번."""
+    for b in reversed(db.q("SELECT date, items FROM briefings WHERE items IS NOT NULL ORDER BY date DESC LIMIT ?", n)):
+        try:
+            payload = json.loads(b["items"])
+        except ValueError:
+            continue
+        items = payload.get("items", []) if isinstance(payload, dict) else payload
+        remember_verdicts(db, [it for it in items if isinstance(it, dict)], b["date"])
+
+
+def _count(n):
+    n = int(n.replace(",", ""))
+    return f"{n / 10000:.1f}만".replace(".0만", "만") if n >= 10000 else f"{n:,}"
+
+
+def tags(c):
+    """기준 판정(check_note)·발굴 근거(reason) 문장 → 짧은 태그 [{text, tone, tip}] 와 대표글.
+    tone: ok(통과) | bad(미달) | "" . 모르는 모양은 문장 그대로 태그로 (잘리면 tip에 전체)."""
+    out, quote = [], ""
+
+    def add(text, tone="", tip=""):
+        out.append({"text": text if len(text) <= 28 else text[:27] + "…", "tone": tone,
+                    "tip": tip or (text if len(text) > 28 else "")})
+    for part in [p.strip() for p in (c.get("check_note") or "").split(" · ") if p.strip()]:
+        if m := re.fullmatch(r"(.+?) 팔로워 ([\d,]+)명", part):
+            add(m.group(1)), add(f"팔로워 {_count(m.group(2))}")
+        elif part == "꾸준함 검사 면제":
+            add("꾸준함 면제", "ok", "세계 기업·개인 계정은 꾸준함 검사를 하지 않아요")
+        elif m := re.fullmatch(r"꾸준함 통과: (.+)", part):
+            add("꾸준함 ✓", "ok"), add(m.group(1))
+        elif m := re.fullmatch(r"꾸준함 미달: (.+)", part):
+            add("꾸준함 미달", "bad")
+            for why in m.group(1).split(", "):
+                add(why, "bad")
+        else:
+            add(part)
+    for part in [p.strip() for p in (c.get("reason") or "").split(" · ") if p.strip()]:
+        if m := re.match(r"서로 다른 회사 (\d+)곳의 핵심 계정\((.+?)\)이 (?:(\d+)주에 걸쳐 (\d+)번 )?", part):
+            text = f"회사 {m.group(1)}곳이 " + (f"{m.group(3)}주간 {m.group(4)}번 " if m.group(3) else "") + "언급"
+            add(text, "", f"{m.group(2)}이 리포스트·인용·답글")
+        elif m := re.fullmatch(r"떠오르는 중\(30일 팔로워 (\+\d+%)\)", part):
+            add(f"떠오르는 중 {m.group(1)}", "ok")
+        elif m := re.fullmatch(r"한국어 글 (\d+)개, 반응 합계 (♥[\d,]+)", part):
+            add(f"한국어 글 {m.group(1)}개 {m.group(2)}")
+        elif m := re.fullmatch(r"Threads 검색·태그 (\d+)곳 등장\((.*?)\), 글 (\d+)개, (♥[\d,]+)", part):
+            add(f"검색·태그 {m.group(1)}곳 등장", "", m.group(2)), add(f"글 {m.group(3)}개 {m.group(4)}")
+        elif part.startswith("대표글: "):
+            quote = part[len("대표글: "):]
+        else:
+            add(part)
+    return out, quote
+
+
+def for_view(c):
+    """발굴 탭 카드: 원래 칸 + tags·quote + ai({verdict, title, body, date, link} 또는 None)."""
+    t, quote = tags(c)
+    try:
+        ai = {"verdict": c["ai_verdict"], **json.loads(c["ai_note"])} if c.get("ai_note") else None
+    except ValueError:
+        ai = None
+    return {**c, "tags": t, "quote": quote, "ai": ai}
 
 
 def candidates(db, limit=10):
