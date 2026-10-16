@@ -89,8 +89,8 @@ def discover(user, password, server=ICLOUD):
             raise ValueError("캘린더 목록 위치를 찾지 못했어요.")
         base, root = _request("PROPFIND", home, user, password, LIST, 1)
     except AuthError:
-        raise ValueError("로그인하지 못했어요. 이메일과 앱 암호를 확인해 주세요. "
-                         "(Apple 계정 비밀번호가 아니라 「앱 암호」 xxxx-xxxx-xxxx-xxxx를 넣어야 해요)") from None
+        raise ValueError("로그인하지 못했어요. 이메일이 앱 암호를 만든 그 Apple 계정 이메일인지 확인해 주세요 "
+                         "(평소 메일과 다를 수 있어요). 앱 암호는 Apple 계정 비밀번호가 아니라 xxxx-xxxx-xxxx-xxxx예요.") from None
     except (urllib.error.URLError, OSError, ET.ParseError) as e:
         raise ValueError(f"캘린더 서버에 연결하지 못했어요: {e}") from None
     out = []

@@ -121,3 +121,19 @@ def test_caldav_rejects(monkeypatch, dav, msg):
     monkeypatch.setattr(sw, "current", lambda: {"caldav": {"has_password": False}})
     with pytest.raises(ValueError, match=msg):
         choices(source="caldav", caldav=dav)
+
+
+def test_take_app_password_only_returns_app_password():
+    """클립보드에서 앱 암호 모양만 꺼내고, 꺼낸 뒤엔 클립보드를 비운다. 다른 내용은 돌려주지 않는다."""
+    board = {"text": " abcd-efgh-ijkl-mnop\n"}
+
+    def read(clear=False):
+        if clear:
+            board["text"] = ""
+        return board["text"]
+    assert sw.take_app_password(read) == "abcd-efgh-ijkl-mnop"
+    assert board["text"] == ""
+    for other in ["내 비밀 메모", "abcd-efgh-ijkl-mnop 그리고 더", "ABCD-EFGH-IJKL-MNOP1", "abcdefghijklmnop"]:
+        board["text"] = other
+        assert sw.take_app_password(read) == ""
+        assert board["text"] == other  # 앱 암호가 아니면 건드리지 않는다

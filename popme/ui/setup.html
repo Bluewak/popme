@@ -117,10 +117,15 @@
     <div id="cal-caldav" class="hidden" style="margin-top:10px">
       <div class="box">
         <b>Apple 계정으로 연결</b>
-        <small class="hint">아이폰 캘린더를 바로 읽어요. 두 가지만 넣어 주세요.</small>
-        <div class="row"><input type="text" id="dav-user" placeholder="Apple 계정 이메일" autocomplete="off"></div>
-        <div class="row"><input type="password" id="dav-pw" placeholder="앱 암호 xxxx-xxxx-xxxx-xxxx" autocomplete="off"><button id="dav-eye">보기</button></div>
+        <small class="hint">아이폰 캘린더를 바로 읽어요. Apple이 다른 앱에 허락하는 방법(앱 암호)을 써요.</small>
+        <h2>① Apple 계정 이메일</h2>
+        <div class="row"><input type="text" id="dav-user" placeholder="Apple 계정 이메일 (예: ○○○@icloud.com)" autocomplete="off"></div>
+        <small class="hint">평소 쓰는 메일과 다를 수 있어요. 아이폰 <b>설정</b> 맨 위 내 이름을 누르면 보이는 이메일, 곧 ② Apple 페이지에 로그인할 때 쓰는 이메일이에요.</small>
+        <h2>② 앱 암호 만들기</h2>
         <div class="howto" id="dav-howto"></div>
+        <div class="row"><button id="dav-open" class="primary">Apple 페이지 열기</button></div>
+        <h2>③ 앱 암호</h2>
+        <div class="row"><input type="password" id="dav-pw" placeholder="복사하면 저절로 들어와요" autocomplete="off"><button id="dav-eye">보기</button></div>
         <div class="row"><button id="dav-check">연결 확인</button></div>
         <div id="dav-msg" class="msg"></div>
         <div id="dav-cals" class="cals"></div>
@@ -211,10 +216,11 @@ const CAL_HOWTO = {
   naver: ["네이버 캘린더 → <b>환경설정</b> → <b>캘린더 관리</b>", "내보내기/공유의 <b>ICS(iCal) 주소</b>를 복사해 붙여 넣어요"],
   outlook: ["outlook.com → <b>설정</b> → <b>캘린더</b> → <b>공유 캘린더</b>", "<b>캘린더 게시</b>에서 <b>ICS 링크</b>를 복사해 붙여 넣어요"],
 };
+const APPLE_ACCOUNT = "https://account.apple.com/account/manage";
 const DAV_HOWTO = [
-  "<a data-url='https://account.apple.com/account/manage'>Apple 계정 페이지</a>에 로그인해요 (아이폰과 같은 계정)",
+  "아래 <b>「Apple 페이지 열기」</b> → 평소 브라우저에서 아이폰과 같은 계정으로 로그인해요",
   "<b>로그인 및 보안</b> → <b>앱 암호</b> → <b>+</b> → 이름 <b>POPME</b> → 만들기",
-  "나온 <b>xxxx-xxxx-xxxx-xxxx</b>를 위 칸에 붙여 넣어요 (한 번만 보여 줘요)",
+  "나온 <b>xxxx-xxxx-xxxx-xxxx</b>를 복사만 하면 여기에 저절로 들어와요 (한 번만 보여 주니 창을 닫기 전에 복사해요)",
 ];
 const VIA_HELP = [
   "미니캘은 아이폰에 등록된 캘린더를 그대로 보여 줘요",
@@ -294,6 +300,7 @@ function init() {
     $("#dav-eye").textContent = show ? "숨기기" : "보기";
   };
   $("#dav-check").onclick = davCheck;
+  $("#dav-open").onclick = () => { api().open_url(APPLE_ACCOUNT); watchClipboard(); };
   $("#dav-fallback").onclick = () => { davFallback = true; calView(); };
   $("#dav-back").onclick = () => { davFallback = false; calView(); };
   D.ics.forEach(addRow); if (!D.ics.length) addRow();
@@ -422,8 +429,29 @@ function davList(cals) {  // [{name, url, color, on}] → 체크 목록
 }
 const davChosen = () => [...document.querySelectorAll("#dav-cals input:checked")].map(c => ({ name: c.dataset.name, url: c.dataset.url }));
 
-async function davCheck() {
-  say($("#dav-msg"), "Apple에 로그인해 보는 중…");
+// 「Apple 페이지 열기」 뒤 15분 동안 클립보드를 본다. 앱 암호 모양(xxxx-xxxx-xxxx-xxxx)일 때만 꺼내 오고
+// 다른 내용은 파이썬 쪽에서 아예 돌려주지 않는다. 꺼낸 암호는 클립보드에서 지운다 (popme/setup_window.py take_app_password)
+let clipPoll = null;
+function stopClip() { clearInterval(clipPoll); clipPoll = null; }
+function watchClipboard() {
+  stopClip();
+  const started = Date.now();
+  say($("#dav-msg"), "Apple 페이지에서 앱 암호를 만들어 복사하면 여기에 저절로 들어와요…");
+  clipPoll = setInterval(async () => {
+    if (steps[step].dataset.step !== "캘린더" || calMode() !== "caldav" || Date.now() - started > 15 * 60e3) return stopClip();
+    const pw = await api().take_app_password();
+    if (!pw || !clipPoll) return;
+    stopClip();
+    $("#dav-pw").value = pw;
+    if ($("#dav-user").value.trim()) return davCheck("복사한 앱 암호를 넣었어요. Apple에 로그인해 보는 중…");
+    say($("#dav-msg"), "복사한 앱 암호를 넣었어요! ① 칸에 방금 Apple 페이지에 로그인한 이메일을 넣고 「연결 확인」을 눌러 주세요.", "ok-t");
+    $("#dav-user").focus();
+  }, 1500);
+}
+
+async function davCheck(first) {
+  stopClip();
+  say($("#dav-msg"), typeof first === "string" ? first : "Apple에 로그인해 보는 중…");
   $("#dav-check").disabled = true;
   const r = await api().check_caldav($("#dav-user").value, $("#dav-pw").value);
   $("#dav-check").disabled = false;
