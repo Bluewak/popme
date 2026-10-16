@@ -126,6 +126,11 @@ class Jobs:
                     ctx.add_init_script(BANNER_JS)
                 except Exception:
                     log.warning("수집 중 안내 띠를 못 붙였어요", exc_info=True)
+                if self is not None and self.cfg.get("chrome", {}).get("minimize_while_collecting", True):
+                    # 수집기는 사이트마다 새 탭을 여는데, 새 탭이 열리면 Chrome이 창을 다시 띄운다
+                    # → 붙어 있는 동안 새 탭마다 다시 최소화 (X·Threads가 따로 붙으니 양쪽 다)
+                    ctx.on("page", lambda page: chrome.set_minimized(page, True))
+                    chrome.set_minimized(ctx.pages[0] if ctx.pages else ctx.new_page(), True)
                 fn(ctx)
             finally:
                 # connect_over_cdp로 붙은 브라우저는 close()해도 Chrome 자체는 계속 떠 있다.
@@ -136,9 +141,6 @@ class Jobs:
                     log.info("전용 Chrome 연결 정리 실패 (이미 닫힘)", exc_info=True)
 
     def _collect_calendar_x(self, ctx, warnings, progress):
-        first = ctx.pages[0] if ctx.pages else ctx.new_page()
-        if self.cfg.get("chrome", {}).get("minimize_while_collecting", True):
-            chrome.set_minimized(first, True)
         source = calendar_source(self.cfg)
         try:
             if source == "ics":
