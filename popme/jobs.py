@@ -159,6 +159,7 @@ class Jobs:
                 if warnings:
                     md += "\n\n---\n수집 경고\n" + "\n".join(f"- {w}" for w in warnings)
                 self.db.save_briefing(date, md, json.dumps(payload, ensure_ascii=False))
+                discovery.remember_verdicts(self.db, payload["items"], date)  # 발굴 탭에도 같은 추천 이유
                 (config.BRIEFING_DIR / f"{date}.md").write_text(md, encoding="utf-8")
                 self.notify("briefing", "브리핑이 준비됐어요")
             self._progress("완료" + (f" (경고 {len(warnings)}개)" if warnings else ""))

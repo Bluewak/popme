@@ -82,6 +82,9 @@ MIGRATIONS = [
     "ALTER TABLE candidates ADD COLUMN check_note TEXT",
     "ALTER TABLE candidates ADD COLUMN checked_at TEXT",
     "ALTER TABLE candidates ADD COLUMN fail_since TEXT",  # 승인 계정이 꾸준함 기준에 처음 못 미친 때
+    # 브리핑 발굴 카드의 AI 판단 (discovery.remember_verdicts): 추천|비추천|보류, {title, body, date, link} JSON
+    "ALTER TABLE candidates ADD COLUMN ai_verdict TEXT",
+    "ALTER TABLE candidates ADD COLUMN ai_note TEXT",
     "ALTER TABLE event_places ADD COLUMN loc TEXT",  # 일정 장소 칸 (바뀌면 장소를 다시 뽑는다)
     "ALTER TABLE profiles ADD COLUMN org TEXT",
     "ALTER TABLE profiles ADD COLUMN lang TEXT",
@@ -242,6 +245,10 @@ class DB:
     def set_fail_since(self, handle, fail_since, note):
         with self.conn() as c:
             c.execute("UPDATE candidates SET fail_since=?, check_note=? WHERE handle=?", (fail_since, note, handle))
+
+    def set_candidate_ai(self, handle, verdict, note):
+        with self.conn() as c:
+            c.execute("UPDATE candidates SET ai_verdict=?, ai_note=? WHERE handle=?", (verdict, note, handle))
 
     def set_candidate_status(self, handle, status):
         with self.conn() as c:
