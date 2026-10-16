@@ -223,7 +223,7 @@ RSS_CAP_OTHER = 15
 
 
 def rss_items(cfg, db, since_iso):
-    """브리핑에 넘길 RSS 글. topic = "ai"인 피드(일반 개발 커뮤니티)는 AI 관련 글만 — 수집은 전부 해 두고
+    """브리핑에 넘길 RSS 글. topic이 있는 피드(일반 개발 커뮤니티)는 그 주제 글만("ai", "data", "ml", "ai+data") — 수집은 전부 해 두고
     여기서 고른다 (관심사가 바뀌어도 같은 자료를 다른 기준으로 고를 수 있게)."""
     topic = {f.get("name"): f.get("topic") for f in cfg.get("rss", [])}
     skip = {f.get("name"): re.compile(f["skip"], re.I) for f in cfg.get("rss", []) if f.get("skip")}  # 이미 저장된 시험판도
@@ -242,7 +242,7 @@ def rss_items(cfg, db, since_iso):
         posted = min(datetime.fromisoformat(r["published"]), seen) if r["published"] else seen
         if posted < since and not new:
             continue
-        if topic.get(r["source"]) == "ai" and not rss.is_ai(r):
+        if not rss.matches(r, topic.get(r["source"])):
             continue
         if r["source"] in skip and skip[r["source"]].search(r["title"] or ""):
             continue
