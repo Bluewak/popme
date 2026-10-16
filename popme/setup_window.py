@@ -7,6 +7,7 @@ config.toml의 주석·다른 설정은 그대로 두고 고른 값의 줄만 �
 AI는 아래 명령만으로 주소를 확인·저장한다 (설정 파일을 직접 고치지 않게). python은 py_command() — 이 POPME를 돌리는 파이썬
   python -m popme.setup_window check-ics '<주소>'          주소가 열리는지, 일정 몇 개인지
   python -m popme.setup_window add-ics '<이름>' '<주소>'   확인 후 config.toml에 추가 (source = "ics")
+  python -m popme.setup_window check-caldav '<Apple 계정 이메일>'   앱 암호를 물어 iCloud 캘린더·일정 수만 보여 줌 (저장 안 함)
 """
 import json
 import logging
@@ -20,6 +21,7 @@ import tomllib
 from pathlib import Path
 
 from popme import config
+from popme.collectors import caldav
 
 log = logging.getLogger(__name__)
 UI = config.ROOT / "popme" / "ui" / "setup.html"
@@ -29,7 +31,7 @@ AIS = {
     "codex": {"name": "ChatGPT", "plans": ["ChatGPT Plus", "ChatGPT Pro"], "tools": "ChatGPT, Codex"},
     "gemini": {"name": "Gemini", "plans": ["Google AI Pro", "Google AI Ultra", "무료"], "tools": "Gemini"},
 }
-SOURCES = ("timetree", "ics", "none")
+SOURCES = ("timetree", "ics", "caldav", "none")
 # 메일 주소 도메인 → IMAP 서버. 목록에 없는 도메인은 guess_mail_host()가 MX 레코드로 추측한다
 MAIL_DOMAINS = {"gmail.com": "imap.gmail.com", "naver.com": "imap.naver.com", "daum.net": "imap.daum.net",
                 "hanmail.net": "imap.daum.net", "kakao.com": "imap.kakao.com"}
@@ -75,12 +77,13 @@ AI_SETUP = {
     ],
 }
 
-# 캘린더 앱 → 읽는 방법. ics면 원본 캘린더의 비공개 주소가 필요하다 (안내는 setup.html)
+# 캘린더 앱 → 읽는 방법. ics면 원본 캘린더의 비공개 주소, caldav면 계정 + 앱 암호 (안내는 setup.html)
+# 미니캘은 "어느 캘린더와 연결됐나"를 물어서 iCloud면 caldav, 구글이면 ics로 간다 (source "ask")
 CALENDAR_APPS = {
     "timetree": {"name": "TimeTree", "source": "timetree"},
     "google": {"name": "구글 캘린더", "source": "ics"},
-    "icloud": {"name": "아이폰 기본 캘린더 (iCloud)", "source": "ics"},
-    "minical": {"name": "미니캘 같은 아이폰 캘린더 앱", "source": "ics"},
+    "icloud": {"name": "아이폰 기본 캘린더 (iCloud)", "source": "caldav"},
+    "minical": {"name": "미니캘 같은 아이폰 캘린더 앱", "source": "ask"},
     "naver": {"name": "네이버 캘린더", "source": "ics"},
     "outlook": {"name": "Outlook", "source": "ics"},
     "none": {"name": "안 씀", "source": "none"},
@@ -252,6 +255,7 @@ def mail_supported():
 def current():
     cfg = tomllib.loads(base_text())
     cal, w, llm_, mail = cfg.get("calendar", {}), cfg.get("weather", {}), cfg.get("llm", {}), cfg.get("mail", {})
+    dav = cfg.get("caldav", {})
     chars = characters()
     char = cfg.get("character", {}).get("file", "character.toml")
     if char not in {c["file"] for c in chars}:
@@ -265,6 +269,8 @@ def current():
         "source": cal.get("source", "timetree"),
         "ics": [{"name": c.get("name", ""), "url": c.get("url", "")} for c in cal.get("ics", [])],
         "holidays": cal.get("holidays", True),
+        "caldav": {"user": dav.get("user", ""), "has_password": bool(dav.get("password")),
+                   "calendars": [{"name": c.get("name", ""), "url": c.get("url", "")} for c in dav.get("calendars", [])]},
         "use_windows_location": w.get("use_windows_location", True),
         "place": w.get("name", ""),
         "mail": {"supported": mail_supported(), "enabled": mail.get("enabled", False),
@@ -301,6 +307,18 @@ def validate(ch):
             rows.append({"name": (r.get("name") or "").strip() or f"캘린더 {len(rows) + 1}", "url": _check_url(url)})
     if ch["source"] == "ics" and not rows:
         raise ValueError("캘린더 주소를 하나 이상 넣어 주세요. 나중에 넣으려면 「안 씀」으로 두고 설정을 다시 열면 돼요.")
+    dav = None
+    if ch["source"] == "caldav":
+        d = ch.get("caldav") or {}
+        dav = {"user": (d.get("user") or "").strip(), "password": (d.get("password") or "").strip(),
+               "calendars": [{"name": (c.get("name") or "").strip() or "캘린더", "url": c["url"].strip()}
+                             for c in d.get("calendars") or [] if re.match(r"^https?://\S+$", (c.get("url") or "").strip())]}
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", dav["user"]):
+            raise ValueError("Apple 계정 이메일을 확인해 주세요.")
+        if not dav["password"] and not current()["caldav"]["has_password"]:
+            raise ValueError("앱 암호를 넣어 주세요.")
+        if not dav["calendars"]:
+            raise ValueError("「연결 확인」을 눌러 읽을 캘린더를 하나 이상 골라 주세요.")
     mail = ch.get("mail")
     if mail and mail_supported():
         mail = {**mail, "enabled": bool(mail.get("enabled")), "user": (mail.get("user") or "").strip(),
@@ -322,7 +340,7 @@ def validate(ch):
     if char == "character.example.toml" and not (config.ROOT / "character.toml").exists():
         # 기본 캐릭터는 이름을 박지 않는다: character.toml을 나중에 만들면 그대로 쓰이고, 없으면 예시로 넘어간다
         char = "character.toml"
-    return {**ch, "briefing_after": t, "ics": rows, "mail": mail, "character": char,
+    return {**ch, "briefing_after": t, "ics": rows, "caldav": dav, "mail": mail, "character": char,
             "plan": (ch.get("plan") or "").strip(), "tools": (ch.get("tools") or "").strip()}
 
 
@@ -337,7 +355,15 @@ def apply(text, ch):
     text = set_value(text, "calendar", "source", ch["source"], before=("timetree", "weather"))
     if ch["source"] == "ics":
         text = set_value(text, "calendar", "ics", ch["ics"])
+    if ch["source"] in ("ics", "caldav"):
         text = set_value(text, "calendar", "holidays", bool(ch.get("holidays", True)))
+    if ch["source"] == "caldav":
+        d = ch["caldav"]
+        text = set_value(text, "caldav", "server", caldav.ICLOUD, before=("timetree", "weather"))
+        text = set_value(text, "caldav", "user", d["user"])
+        if d["password"]:  # 비워 두면 저장된 앱 암호를 그대로 둔다
+            text = set_value(text, "caldav", "password", d["password"])
+        text = set_value(text, "caldav", "calendars", d["calendars"])
     if "use_windows_location" in ch:
         text = set_value(text, "weather", "use_windows_location", bool(ch["use_windows_location"]))
     if ch.get("mail"):
@@ -428,6 +454,58 @@ def check_ics(url):
     except Exception as e:
         raise ValueError(f"주소를 열지 못했어요 ({type(e).__name__}: {str(e)[:120]}). 주소 전체를 다시 복사해 주세요.")
     return {"events": len(cal.walk("VEVENT")), "name": str(cal.get("X-WR-CALNAME", "") or "")}
+
+
+APP_PASSWORD = re.compile(r"[a-z]{4}-[a-z]{4}-[a-z]{4}-[a-z]{4}")  # Apple 앱 암호 모양
+
+
+def _clipboard(clear=False):
+    """Windows 클립보드 글자 (clear=True면 비우기만). 못 열면 ""."""
+    import ctypes
+    from ctypes import wintypes
+    u32, k32 = ctypes.windll.user32, ctypes.windll.kernel32
+    u32.GetClipboardData.restype = wintypes.HANDLE
+    k32.GlobalLock.argtypes = k32.GlobalUnlock.argtypes = [wintypes.HGLOBAL]
+    k32.GlobalLock.restype = ctypes.c_void_p
+    if not u32.OpenClipboard(None):
+        return ""
+    try:
+        if clear:
+            u32.EmptyClipboard()
+            return ""
+        h = u32.GetClipboardData(13)  # CF_UNICODETEXT
+        p = k32.GlobalLock(h) if h else None
+        if not p:
+            return ""
+        try:
+            return ctypes.wstring_at(p)
+        finally:
+            k32.GlobalUnlock(h)
+    finally:
+        u32.CloseClipboard()
+
+
+def take_app_password(read=_clipboard):
+    """클립보드가 Apple 앱 암호 하나뿐이면 꺼내고 클립보드를 비운다. 아니면 "" — 다른 내용은 화면에 넘기지 않는다."""
+    text = read().strip()
+    if not APP_PASSWORD.fullmatch(text):
+        return ""
+    if read().strip() == text:  # 그 사이 다른 걸 복사했으면 건드리지 않는다
+        read(clear=True)
+    return text
+
+
+def check_caldav(user, password):
+    """Apple 계정 + 앱 암호로 로그인해 일정 캘린더 목록. 앱 암호를 비우면 저장된 것으로. 실패하면 ValueError."""
+    password = (password or "").strip()
+    if not password:
+        password = tomllib.loads(base_text()).get("caldav", {}).get("password", "")
+    if not (user or "").strip() or not password:
+        raise ValueError("Apple 계정 이메일과 앱 암호를 넣어 주세요.")
+    cals = caldav.discover(user, password)
+    if not cals:
+        raise ValueError("로그인은 됐는데 일정 캘린더가 없어요. 아이폰 설정에서 iCloud 캘린더가 켜져 있는지 봐 주세요.")
+    return cals
 
 
 def add_ics(name, url):
@@ -593,6 +671,19 @@ class Api:
         except ValueError as e:
             return {"ok": False, "error": str(e)}
 
+    def check_caldav(self, user, password):
+        try:
+            return {"ok": True, "calendars": check_caldav(user, password)}
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
+
+    def take_app_password(self):
+        try:
+            return take_app_password()
+        except Exception:
+            log.exception("클립보드 읽기 실패")
+            return ""
+
     def check_mail(self, host, user, password):
         try:
             return {"ok": check_mail(host, user, password)}
@@ -634,6 +725,12 @@ if __name__ == "__main__":
         if args[:1] == ["check-ics"] and len(args) == 2:
             info = check_ics(args[1])
             print(f"확인됨: 일정 {info['events']}개" + (f", 캘린더 이름 「{info['name']}」" if info["name"] else ""))
+        elif args[:1] == ["check-caldav"] and len(args) == 2:  # 설정은 그대로 두고 iCloud 연결만 시험
+            import getpass
+            pw = getpass.getpass("앱 암호 (입력해도 화면에 안 보여요): ")
+            for c in check_caldav(args[1], pw):
+                n = len(caldav.fetch_events(c, args[1], pw))
+                print(f"  {c['name']}: 일정 {n}개")
         elif args[:1] == ["add-ics"] and len(args) == 3:
             info = add_ics(args[1], args[2])
             print(f"저장됨: 「{args[1]}」 (일정 {info['events']}개). 설정 창으로 돌아가세요.")

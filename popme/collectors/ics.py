@@ -106,6 +106,20 @@ def parse(data, calendar_id, id_prefix):
     return events
 
 
+def holiday_events(cfg):
+    """[calendar] holidays = true면 대한민국 공휴일 (ics·caldav 공통). 실패해도 빈 목록."""
+    if not cfg.get("calendar", {}).get("holidays", True):
+        return []
+    try:
+        hol = parse(fetch(HOLIDAY_URL), "holiday:공휴일", "holiday:")
+    except Exception as e:  # 공휴일은 없어도 됨
+        log.warning("공휴일 캘린더 읽기 실패: %s", e)
+        return []
+    for h in hol:
+        h["all_day"] = 1
+    return hol
+
+
 def collect(cfg, progress=lambda s: None, warnings=None):
     """반환: (일정 리스트, 전체를 다시 읽은 calendar_id 목록) — timetree.collect와 같은 모양.
     한 캘린더가 실패해도 나머지는 읽는다. 실패한 캘린더는 synced에서 빠지므로 기존 일정이 '지워짐'이 되지 않는다."""
@@ -124,13 +138,6 @@ def collect(cfg, progress=lambda s: None, warnings=None):
             log.warning("캘린더 %s 읽기 실패: %s", name, e)
             if warnings is not None:
                 warnings.append(f"'{name}' 캘린더를 못 읽었어요 ({e})")
-    if cfg.get("calendar", {}).get("holidays", True):
-        try:
-            hol = parse(fetch(HOLIDAY_URL), "holiday:공휴일", "holiday:")
-            for h in hol:
-                h["all_day"] = 1
-            events += hol
-        except Exception as e:  # 공휴일은 없어도 됨
-            log.warning("공휴일 캘린더 읽기 실패: %s", e)
+    events += holiday_events(cfg)
     log.info("ICS: 캘린더 %d개, 일정 %d개", len(synced), len(events))
     return events, synced
