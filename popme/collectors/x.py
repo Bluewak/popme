@@ -178,9 +178,10 @@ def check_profiles(ctx, handles, progress=lambda s: None, users=None):
     return out
 
 
-def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None):
+def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None, on_batch=None):
     """accounts: 핵심 계정 handle 목록. since(UTC ISO): 계정 페이지는 이 시각 이전 글까지만 스크롤.
-    users(dict): 응답에 실린 계정 규모(팔로워 등)를 모아 둘 곳. 반환: 파싱된 트윗 리스트."""
+    users(dict): 응답에 실린 계정 규모(팔로워 등)를 모아 둘 곳. 반환: 파싱된 트윗 리스트.
+    on_batch(새 트윗들): 페이지 하나를 볼 때마다 — 중간에 끊겨도 모은 데까지 저장되게."""
     xcfg = cfg.get("x", {})
     scrolls = int(xcfg.get("scrolls_per_page", 3))
     if not any(c["name"] == "auth_token" for c in ctx.cookies("https://x.com")):
@@ -201,7 +202,10 @@ def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None)
         for i, (url, via) in enumerate(targets):
             progress(f"X 수집 중 {i + 1}/{len(targets)}")
             owner = via[5:] if via.startswith("user:") else None  # 검색 결과는 시간순이 아니라 멈추지 않음
+            before = len(out)
             got = _visit(page, url, via, scrolls, out, ops_seen, owner, since, users)
+            if on_batch and len(out) > before:
+                on_batch(out[before:])
             empty_streak = empty_streak + 1 if got == 0 else 0
             if empty_streak >= 3:
                 # 로그인은 됐는데 계속 비면 X 응답 구조가 바뀐 것. 더 두드리지 않고 단서를 남긴다

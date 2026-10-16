@@ -85,5 +85,6 @@ def set_minimized(page, minimized: bool):
             "windowId": win["windowId"],
             "bounds": {"windowState": "minimized" if minimized else "normal"},
         })
+        cdp.detach()  # 새 탭마다 부르니 세션을 남기지 않는다
     except Exception as e:  # 최소화는 편의 기능이라 실패해도 진행
         log.warning("창 상태 변경 실패: %s", e)

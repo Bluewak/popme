@@ -116,9 +116,10 @@ def check_profiles(ctx, usernames, progress=lambda s: None, users=None):
     return out
 
 
-def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None):
+def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None, on_batch=None):
     """since(UTC ISO): 계정 페이지는 이 시각 이전 글까지만 스크롤. 검색·태그는 시간순이 아니라 그대로.
-    users(dict): 페이지에 실린 팔로워 수를 모아 둘 곳 (계정 페이지를 열 때 같이 온다)."""
+    users(dict): 페이지에 실린 팔로워 수를 모아 둘 곳 (계정 페이지를 열 때 같이 온다).
+    on_batch(새 게시물들): 페이지 하나를 볼 때마다 — 중간에 끊겨도 모은 데까지 저장되게."""
     tcfg = cfg.get("threads", {})
     if not any(c["name"] == "sessionid" for c in ctx.cookies(["https://www.threads.com"])):
         raise NeedLogin("Threads 로그인이 필요해요. 트레이 메뉴 > 전용 Chrome 열기에서 로그인해 주세요.")
@@ -134,7 +135,10 @@ def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None)
         for i, (url, via) in enumerate(targets):
             progress(f"Threads 수집 중 {i + 1}/{len(targets)}")
             owner = via[8:] if via.startswith("th-user:") else None
+            before = len(out)
             empty = empty + 1 if _visit(page, url, via, scrolls, out, owner, since, users) == 0 else 0
+            if on_batch and len(out) > before:
+                on_batch(out[before:])
             if empty >= 3:
                 raise RuntimeError("Threads에서 연속으로 게시물을 못 찾았어요. 페이지 구조가 바뀐 것 같아요.")
             page.wait_for_timeout(random.uniform(4000, 8000))
