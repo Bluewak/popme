@@ -129,6 +129,7 @@ name = "Codex 릴리스"
 url = "https://github.com/openai/codex/releases.atom"
 group = "공식 변경내역"
 max_chars = 1500
+skip = "alpha|beta|-rc"            # 시험판(alpha·beta·rc)은 뺀다
 
 [[rss]]
 name = "pi 릴리스"
@@ -141,6 +142,7 @@ name = "OpenClaw 릴리스"
 url = "https://github.com/openclaw/openclaw/releases.atom"
 group = "공식 변경내역"
 max_chars = 1000
+skip = "release-publish|beta"      # 내부 배포 태그·beta는 뺀다
 
 [[rss]]
 name = "Deep Agents 릴리스"
@@ -149,8 +151,65 @@ group = "공식 변경내역"
 max_chars = 1000
 
 [[rss]]
+name = "Gemini CLI 릴리스"
+url = "https://github.com/google-gemini/gemini-cli/releases.atom"
+group = "공식 변경내역"
+max_chars = 1000
+skip = "nightly|preview"          # 제목에 이 말이 있으면 뺀다 (매일 나오는 시험판)
+
+[[rss]]
 name = "OpenAI 뉴스"
 url = "https://openai.com/news/rss.xml"
+group = "공식 발표"
+max_chars = 400
+
+[[rss]]
+name = "OpenAI 개발자 블로그"
+url = "https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_openai_developer.xml"
+group = "공식 발표"
+max_chars = 400
+
+# Anthropic은 공식 RSS가 없어 공개 미러(github.com/Olshansk/rss-feeds, 사이트를 읽어 RSS로 만들어 줌)를 쓴다.
+# 글 링크는 anthropic.com·claude.com 원문이다. 미러가 멈추면 이 세 개만 비게 된다
+[[rss]]
+name = "Anthropic 뉴스"
+url = "https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_news.xml"
+group = "공식 발표"
+max_chars = 400
+
+[[rss]]
+name = "Claude 블로그"              # 제품·요금 공지 (예: Code Review 정식 출시) — 릴리스 노트엔 없는 소식
+url = "https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_claude.xml"
+group = "공식 발표"
+max_chars = 400
+
+[[rss]]
+name = "Anthropic 엔지니어링"
+url = "https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_engineering.xml"
+group = "실사용 검증"
+max_chars = 400
+
+[[rss]]
+name = "Google AI 블로그"
+url = "https://blog.google/technology/ai/rss/"
+group = "공식 발표"
+max_chars = 400
+
+[[rss]]
+name = "xAI 뉴스"                  # Grok — 공식 RSS가 없어 같은 미러
+url = "https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_xainews.xml"
+group = "공식 발표"
+max_chars = 400
+
+[[rss]]
+name = "Meta AI 블로그"             # Llama·Muse — 같은 미러. 2026-10 확인 때 마지막 글이 7월이라 멈췄을 수 있음 (HN AI가 받쳐 줌)
+url = "https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_meta_ai.xml"
+group = "공식 발표"
+max_chars = 400
+
+[[rss]]
+name = "Mistral 뉴스"
+url = "https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_mistral.xml"
 group = "공식 발표"
 max_chars = 400
 
@@ -165,10 +224,25 @@ name = "GeekNews"
 url = "https://news.hada.io/rss/news"
 group = "한국 커뮤니티"
 max_chars = 300
+topic = "ai"                       # 일반 개발 커뮤니티 — 브리핑엔 AI 관련 글만 넘긴다 (수집은 전부)
 
 [[rss]]
 name = "Hacker News 인기"
 url = "https://hnrss.org/frontpage?points=300"
+group = "새 오픈소스·화제"
+max_chars = 200
+topic = "ai"
+
+# 300점까진 못 가도 100점 넘은 AI 글. hnrss는 검색어가 길면 502를 내서 둘로 나눔 (같은 글은 한 번만 저장됨)
+[[rss]]
+name = "Hacker News AI 회사"
+url = "https://hnrss.org/newest?q=Claude+OR+OpenAI+OR+Anthropic+OR+Codex&points=100"
+group = "새 오픈소스·화제"
+max_chars = 200
+
+[[rss]]
+name = "Hacker News AI 모델"
+url = "https://hnrss.org/newest?q=LLM+OR+Gemini+OR+Grok+OR+xAI+OR+Llama+OR+%22Meta+AI%22&points=100"
 group = "새 오픈소스·화제"
 max_chars = 200
 

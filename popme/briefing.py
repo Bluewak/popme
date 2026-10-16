@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 from popme import agenda, clock, discovery, event_weather, llm, search
 from popme.character import Character
+from popme.collectors import rss
 
 log = logging.getLogger(__name__)
 
@@ -202,11 +203,10 @@ def build_data(cfg, db, since_iso, with_events=False):
         parts.append("# 한국어 Threads 반응 큰 글 (검색·태그)")
         parts += [f"- @{t['author']}: " + _tweet_line(t)[2:] for t in th]
 
-    items = db.q("SELECT * FROM items WHERE COALESCE(published, collected_at) >= ? ORDER BY grp, published",
-                 since_iso)
+    items = rss_items(cfg, db, since_iso)
     if items:
-        parts.append("# RSS (공식 변경내역·블로그·커뮤니티)")
-        parts += [f"- [{i['grp']} / {i['source']}] {i['title']} — {i['summary']} | {i['url']}" for i in items[:120]]
+        parts.append("# RSS (공식 변경내역·공식 발표·실사용·화제·커뮤니티 — 커뮤니티는 AI 관련 글만)")
+        parts += [f"- [{i['grp']} / {i['source']}] {i['title']} — {i['summary']} | {i['url']}" for i in items]
 
     cands = discovery.candidates(db, limit=5)
     if cands:
@@ -214,6 +214,38 @@ def build_data(cfg, db, since_iso, with_events=False):
         parts += [f"- [{c.get('platform') or 'x'}] @{c['handle'].split('/')[-1]} ({c['name'] or ''}): {c['reason']}"
                   f" / {c['check_note'] or ''}" for c in cands]
     return "\n".join(parts)
+
+
+# RSS를 브리핑에 넘길 때 묶음(group)마다 최신순 상한. 예전엔 묶음 이름순 정렬 뒤 앞 120개라
+# 가나다순으로 뒤인 묶음(한국 커뮤니티)이 내용과 상관없이 잘렸다. 공식 출처를 먼저, 넉넉히
+RSS_CAPS = {"공식 변경내역": 40, "공식 발표": 30, "실사용 검증": 15, "새 오픈소스·화제": 20, "한국 커뮤니티": 20}
+RSS_CAP_OTHER = 15
+
+
+def rss_items(cfg, db, since_iso):
+    """브리핑에 넘길 RSS 글. topic = "ai"인 피드(일반 개발 커뮤니티)는 AI 관련 글만 — 수집은 전부 해 두고
+    여기서 고른다 (관심사가 바뀌어도 같은 자료를 다른 기준으로 고를 수 있게)."""
+    topic = {f.get("name"): f.get("topic") for f in cfg.get("rss", [])}
+    skip = {f.get("name"): re.compile(f["skip"], re.I) for f in cfg.get("rss", []) if f.get("skip")}  # 이미 저장된 시험판도
+    # 넣을 글: 올라온 시각이 구간 안이거나, 이번에 처음 본 글이면서 이틀 안에 올라온 글.
+    # 미러 피드(Anthropic·Claude)는 시각 없이 날짜만 줘서 0시로 찍히는데, 그러면 낮에 올라온 글이 구간 밖으로 밀린다.
+    # 처음 본 시각(collected_at)은 바뀌지 않으니 다음 날 브리핑에 또 들어가지 않는다
+    since = datetime.fromisoformat(since_iso)
+    early = (since - timedelta(days=2)).isoformat()
+    rows = db.q("SELECT * FROM items WHERE COALESCE(published, collected_at) >= ? "
+                "ORDER BY COALESCE(published, collected_at) DESC", early)
+    groups = {}
+    for r in rows:
+        new = datetime.fromisoformat(r["collected_at"]) >= since
+        if (r["published"] or r["collected_at"]) < since_iso and not new:
+            continue
+        if topic.get(r["source"]) == "ai" and not rss.is_ai(r):
+            continue
+        if r["source"] in skip and skip[r["source"]].search(r["title"] or ""):
+            continue
+        groups.setdefault(r["grp"], []).append(r)
+    order = list(RSS_CAPS) + sorted(g for g in groups if g not in RSS_CAPS)
+    return [r for g in order for r in groups.get(g, [])[:RSS_CAPS.get(g, RSS_CAP_OTHER)]]
 
 
 def _fill(template, **kw):
