@@ -129,7 +129,7 @@ name = "Codex 릴리스"
 url = "https://github.com/openai/codex/releases.atom"
 group = "공식 변경내역"
 max_chars = 1500
-skip = "alpha|beta|-rc"            # 시험판(alpha·beta·rc)은 뺀다
+skip = 'alpha|beta|-rc'            # 시험판(alpha·beta·rc)은 뺀다. skip은 정규식 — 작은따옴표로 (큰따옴표 안 \d는 오류)
 
 [[rss]]
 name = "pi 릴리스"
@@ -142,7 +142,7 @@ name = "OpenClaw 릴리스"
 url = "https://github.com/openclaw/openclaw/releases.atom"
 group = "공식 변경내역"
 max_chars = 1000
-skip = "release-publish|beta"      # 내부 배포 태그·beta는 뺀다
+skip = 'release-publish|beta'      # 내부 배포 태그·beta는 뺀다
 
 [[rss]]
 name = "Deep Agents 릴리스"
@@ -155,7 +155,7 @@ name = "Gemini CLI 릴리스"
 url = "https://github.com/google-gemini/gemini-cli/releases.atom"
 group = "공식 변경내역"
 max_chars = 1000
-skip = "nightly|preview"          # 제목에 이 말이 있으면 뺀다 (매일 나오는 시험판)
+skip = 'nightly|preview'          # 제목에 이 말이 있으면 뺀다 (매일 나오는 시험판)
 
 [[rss]]
 name = "OpenAI 뉴스"
@@ -202,8 +202,8 @@ group = "공식 발표"
 max_chars = 400
 
 [[rss]]
-name = "Meta AI 블로그"             # Llama·Muse — 같은 미러. 2026-10 확인 때 마지막 글이 7월이라 멈췄을 수 있음 (HN AI가 받쳐 줌)
-url = "https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_meta_ai.xml"
+name = "Hugging Face 블로그"        # 오픈 웨이트 모델 공개(Meta Llama·Muse, Qwen 등)가 실림. Meta AI 미러는 7월에 멈춰서 대신 씀
+url = "https://huggingface.co/blog/feed.xml"
 group = "공식 발표"
 max_chars = 400
 
@@ -233,7 +233,8 @@ group = "새 오픈소스·화제"
 max_chars = 200
 topic = "ai"
 
-# 300점까진 못 가도 100점 넘은 AI 글. hnrss는 검색어가 길면 502를 내서 둘로 나눔 (같은 글은 한 번만 저장됨)
+# 300점까진 못 가도 100점 넘은 AI 글. hnrss는 검색어가 길면 502를 내서 둘로 나눔 (같은 글은 한 번만 저장됨).
+# 검색어엔 단어 OR만 — 따옴표 구문("…")이나 점(.)을 넣으면 502가 나거나 엉뚱한 글이 섞인다
 [[rss]]
 name = "Hacker News AI 회사"
 url = "https://hnrss.org/newest?q=Claude+OR+OpenAI+OR+Anthropic+OR+Codex&points=100"
@@ -242,7 +243,7 @@ max_chars = 200
 
 [[rss]]
 name = "Hacker News AI 모델"
-url = "https://hnrss.org/newest?q=LLM+OR+Gemini+OR+Grok+OR+xAI+OR+Llama+OR+%22Meta+AI%22&points=100"
+url = "https://hnrss.org/newest?q=LLM+OR+Gemini+OR+Grok+OR+xAI+OR+Llama&points=100"
 group = "새 오픈소스·화제"
 max_chars = 200
 

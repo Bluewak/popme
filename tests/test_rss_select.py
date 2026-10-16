@@ -108,3 +108,21 @@ def test_rss_items_future_dated_post_only_once(tmp_path):
     seen_in = [d for d in range(4)
                if briefing.rss_items({"rss": []}, db, (now + timedelta(days=d) - timedelta(hours=18)).isoformat())]
     assert seen_in == [0]
+
+
+def test_fetch_reads_gzip_body(monkeypatch):
+    """묻지 않아도 gzip으로 주는 피드(Google DeepMind 블로그 등)도 읽는다."""
+    import gzip
+    body = gzip.compress(b'<rss><channel><item><title>Gemma 4</title><link>https://g/1</link></item></channel></rss>')
+
+    class R:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+        def read(self):
+            return body
+    monkeypatch.setattr(rss.urllib.request, "urlopen", lambda req, timeout=20: R())
+    assert [i["title"] for i in rss.fetch({"name": "DeepMind", "url": "https://example.com/rss.xml"})] == ["Gemma 4"]

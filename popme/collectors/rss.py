@@ -1,4 +1,5 @@
 """RSS/Atom 수집 — 로그인 없이 공식 변경내역·블로그·커뮤니티 새 글을 가져온다."""
+import gzip
 import html
 import logging
 import re
@@ -50,7 +51,10 @@ def _date(s):
 def fetch(feed):
     req = urllib.request.Request(feed["url"], headers={"User-Agent": UA})
     with urllib.request.urlopen(req, timeout=20) as r:
-        root = ET.fromstring(r.read())
+        data = r.read()
+    if data[:2] == b"\x1f\x8b":  # 묻지 않아도 gzip으로 주는 곳이 있다 (Google DeepMind 블로그 등) — urllib은 안 풀어 줌
+        data = gzip.decompress(data)
+    root = ET.fromstring(data)
     limit = int(feed.get("max_chars", 500))
     base = {"source": feed["name"], "grp": feed.get("group", "")}
     skip = re.compile(feed["skip"], re.I) if feed.get("skip") else None  # 예: 매일 나오는 nightly 릴리스
