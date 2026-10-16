@@ -31,9 +31,20 @@
   .check .st { flex: none; width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center;
     justify-content: center; color: #fff; font-size: 12px; background: var(--muted); margin-top: 1px; }
   .st.ok { background: var(--ok); } .st.no { background: var(--err); } .st.opt { background: var(--warn); }
+  .st.idle { background: var(--line); } .st.wait { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .45; } }
   .check small, .card small, .hint { display: block; color: var(--muted); font-size: 12px; }
   .cards { display: grid; gap: 7px; }
   .cards.two { grid-template-columns: 1fr 1fr; }
+  .cards.three { grid-template-columns: repeat(3, 1fr); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { border: 2px solid var(--line); background: #fff; border-radius: 999px; padding: 1px 14px; cursor: pointer; }
+  .chip input { display: none; }
+  .chip:has(input:checked) { border-color: var(--accent); background: #fff4ec; color: var(--brown); }
+  .at { color: var(--muted); font-size: 15px; }
+  select.domain { flex: 0 0 auto; }
+  input.domain { flex: 1 1 0; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 12.5px; margin-top: 8px; }
   .card { display: block; background: #fff; border: 2px solid var(--line); border-radius: 12px; padding: 8px 12px; cursor: pointer; }
   .card input { display: none; }
   .card b { font-size: 15px; color: var(--brown); }
@@ -49,6 +60,7 @@
   button:hover { background: #fff; }
   button:disabled { opacity: .45; cursor: default; }
   button.primary { background: var(--accent); color: #fff; padding: 4px 22px; font-size: 15px; }
+  button.later { padding: 4px 18px; font-size: 15px; }
   button.x { border: none; background: transparent; color: var(--muted); padding: 0 4px; }
   .msg { font-size: 12.5px; margin-top: 4px; min-height: 1em; }
   .ok-t { color: var(--ok); } .err-t { color: var(--err); } .warn-t { color: #a8730f; }
@@ -75,18 +87,22 @@
   <section data-step="브리핑 AI">
     <h1>어떤 AI를 구독하고 있나요?</h1>
     <p class="lead">아침 브리핑과 질문 답변을 그 AI가 써요. 구독 요금 말고 추가 요금은 없어요.</p>
-    <div class="cards" id="ai-cards"></div>
-    <h2>요금제</h2>
-    <div class="row"><input type="text" id="plan" list="plans"><datalist id="plans"></datalist></div>
-    <small class="hint">혜택·크레딧 소식이 나한테 해당되는지 판단할 때 써요.</small>
-    <h2>설치·로그인</h2>
-    <div class="box">
-      <div id="ai-status" class="msg">확인 중…</div>
-      <div class="row">
-        <button id="ai-setup">설치·로그인 하기</button>
-        <button id="ai-recheck">다시 확인</button>
+    <div class="cards three" id="ai-cards"></div>
+    <div id="ai-more" class="hidden">
+      <h2>요금제</h2>
+      <div class="chips" id="plan-chips"></div>
+      <small class="hint">혜택·크레딧 소식이 나한테 해당되는지 판단할 때 써요.</small>
+      <h2>준비 상태</h2>
+      <div class="box">
+        <div class="check" id="ai-s-install"></div>
+        <div class="check" id="ai-s-login"></div>
+        <div class="check" id="ai-s-test"></div>
+        <div class="row">
+          <button id="ai-setup">설치·로그인 시작</button>
+          <button id="ai-test" class="hidden">다시 불러 보기</button>
+        </div>
+        <small class="hint" id="ai-hint"></small>
       </div>
-      <small class="hint">새 창이 열려요. 거기서 로그인을 마치고 「다시 확인」을 눌러 주세요.</small>
     </div>
   </section>
 
@@ -126,11 +142,23 @@
       <label class="card"><input type="radio" name="mail-on" value="0"><b>안 씀</b><small>나중에 설정에서 켤 수 있어요</small></label>
     </div>
     <div id="mail-form" class="box hidden" style="margin-top:10px">
-      <div class="row"><select id="mail-host"></select></div>
-      <div class="row"><input type="text" id="mail-user" placeholder="메일 주소 (예: you@example.com)"></div>
-      <div class="row"><input type="password" id="mail-pw" placeholder="앱 비밀번호 16자리"></div>
+      <b>메일 주소</b>
+      <div class="row">
+        <input type="text" id="mail-id" placeholder="아이디" autocomplete="off">
+        <span class="at">@</span>
+        <input type="text" id="mail-domain-custom" class="domain hidden" placeholder="example.com" autocomplete="off">
+        <select id="mail-domain" class="domain"></select>
+      </div>
+      <details id="mail-adv" class="hidden">
+        <summary>메일 서버 (보통은 그대로 두면 돼요)</summary>
+        <div class="row"><input type="text" id="mail-host" placeholder="imap.example.com" autocomplete="off"></div>
+      </details>
+      <div id="mail-host-note" class="msg warn-t"></div>
+      <b>비밀번호</b>
+      <div class="row"><input type="password" id="mail-pw" autocomplete="off"><button id="mail-eye">보기</button></div>
       <div class="howto" id="mail-howto"></div>
-      <div class="row"><input type="text" id="mail-quiet" placeholder="방해 금지 시간 (예: 23:00-07:00, 비워도 돼요)"></div>
+      <b>방해 금지 시간</b>
+      <div class="row"><input type="text" id="mail-quiet" placeholder="예: 23:00-07:00 (비워 두면 언제든 알려 줘요)"></div>
       <div class="row"><button id="mail-check">연결 확인</button></div>
       <div id="mail-msg" class="msg"></div>
       <div class="secret">비밀번호는 이 PC의 config.toml에만 저장돼요. 그래서 일반 비밀번호가 아니라 언제든 지울 수 있는 앱 비밀번호를 써요.</div>
@@ -187,7 +215,10 @@ const MAIL_HOWTO = {
                      "나온 16자리를 위 칸에 붙여 넣어요 (한 번만 보여 줘요)"],
   "imap.naver.com": ["네이버 메일 → 환경설정 → <b>POP3/IMAP 설정</b>에서 IMAP 사용", "2단계 인증을 쓰면 <b>애플리케이션 비밀번호</b>를 만들어 넣어요"],
   "imap.daum.net": ["다음 메일 → 설정 → <b>IMAP/POP3</b>에서 IMAP 사용", "카카오 계정 비밀번호 또는 앱 비밀번호를 넣어요"],
+  "imap.kakao.com": ["카카오메일 → 설정 → <b>IMAP/SMTP</b>에서 IMAP 사용", "카카오 계정 비밀번호 또는 앱 비밀번호를 넣어요"],
 };
+const MAIL_HOWTO_OTHER = ["메일 서비스 설정에서 <b>IMAP 사용</b>을 켜요", "2단계 인증을 쓰면 <b>앱 비밀번호</b>를 만들어 넣어요",
+                          "회사·학교 메일은 관리자가 막아 두었을 수 있어요"];
 const ol = items => "<ol>" + items.map(i => `<li>${i}</li>`).join("") + "</ol>";
 document.addEventListener("click", e => { const a = e.target.closest("a[data-url]"); if (a) api().open_url(a.dataset.url); });
 
@@ -222,18 +253,14 @@ function init() {
 
   // AI
   $("#ai-cards").append(...Object.entries(D.ais).map(([k, a]) => el("label", { className: "card", innerHTML:
-    `<input type="radio" name="ai" value="${k}"><b>${a.name}</b><small>${a.plans.filter(p => p !== "무료").join(" · ")}${k === "gemini" ? " · 무료 한도" : ""}</small>` })));
+    `<input type="radio" name="ai" value="${k}"><b>${a.name}</b><small>${k === "gemini" ? "무료로도 돼요" : a.plans.map(p => p.split(" ").pop()).join(" · ")}</small>` })));
   setRadio("ai", D.provider);
-  $("#plan").value = D.plan;
   document.querySelectorAll("input[name=ai]").forEach(r => r.onchange = () => {
-    const a = D.ais[radio("ai")];
-    if (radio("ai") !== D.provider || !$("#plan").value) $("#plan").value = a.plans[0];
-    else $("#plan").value = D.plan || a.plans[0];
-    aiPlans(); aiStatus(); nav();
+    planTouched = false; stopPoll(); aiPlans(); aiRender(); aiRefresh();
   });
   aiPlans();
-  $("#ai-setup").onclick = () => api().ai_setup(radio("ai"));
-  $("#ai-recheck").onclick = aiStatus;
+  $("#ai-setup").onclick = aiSetup;
+  $("#ai-test").onclick = () => { const p = radio("ai"); if (p) { AI[p] = { ...AI[p], test: null }; aiRefresh(); } };
 
   // 캘린더
   $("#cal-cards").append(...Object.entries(D.calendar_apps).map(([k, c]) => el("label", { className: "card", innerHTML:
@@ -248,17 +275,36 @@ function init() {
 
   // 메일
   if (D.mail.supported) {
-    $("#mail-host").append(...Object.entries(D.mail_hosts).map(([h, n]) => el("option", { value: h, textContent: n })));
-    $("#mail-host").value = D.mail.host;
-    $("#mail-user").value = D.mail.user;
+    const domains = Object.keys(D.mail_domains);
+    $("#mail-domain").append(...domains.map(d => el("option", { value: d, textContent: d })), el("option", { value: "", textContent: "직접 입력" }));
+    const [id, dom] = splitMail(D.mail.user);
+    $("#mail-id").value = id;
+    $("#mail-domain").value = domains.find(d => d === dom || (!dom && D.mail_domains[d] === D.mail.host)) || (dom ? "" : "gmail.com");
+    if (dom && !(dom in D.mail_domains)) { $("#mail-domain-custom").value = dom; $("#mail-host").value = D.mail.host; hostTouched = true; }
     $("#mail-quiet").value = D.mail.quiet_hours;
-    if (D.mail.has_password) $("#mail-pw").placeholder = "저장된 비밀번호 사용 (바꿀 때만 입력)";
     setRadio("mail-on", D.mail.enabled ? "1" : "0");
     document.querySelectorAll("input[name=mail-on]").forEach(r => r.onchange = mailView);
-    $("#mail-host").onchange = mailView;
+    $("#mail-id").oninput = () => {  // 아이디@도메인을 통째로 붙여 넣으면 나눠 담는다
+      const v = $("#mail-id").value;
+      if (!v.includes("@")) return;
+      const [i, d] = splitMail(v);
+      $("#mail-id").value = i;
+      if (d) setDomain(d);
+    };
+    $("#mail-domain").onchange = () => {
+      if (!$("#mail-domain").value) { hostTouched = false; hostNote = ""; guessHost(); setTimeout(() => $("#mail-domain-custom").focus()); }
+      mailView();
+    };
+    $("#mail-domain-custom").oninput = () => { if (!hostTouched) $("#mail-host").value = ""; hostNote = ""; mailView(); guessHost(); };
+    $("#mail-host").oninput = () => { hostTouched = true; mailView(); };
+    $("#mail-eye").onclick = () => {
+      const pw = $("#mail-pw"), show = pw.type === "password";
+      pw.type = show ? "text" : "password";
+      $("#mail-eye").textContent = show ? "숨기기" : "보기";
+    };
     $("#mail-check").onclick = async () => {
       say($("#mail-msg"), "확인 중…");
-      const r = await api().check_mail($("#mail-host").value, $("#mail-user").value, $("#mail-pw").value);
+      const r = await api().check_mail(mailHost(), mailUser(), $("#mail-pw").value);
       say($("#mail-msg"), r.ok ? "연결됐어요! 받은편지함을 읽을 수 있어요." : r.error, r.ok ? "ok-t" : "err-t");
     };
     mailView();
@@ -280,24 +326,93 @@ function init() {
   go(0);
 }
 
-function aiPlans() {
-  const a = D.ais[radio("ai")];
-  $("#plans").replaceChildren(...(a ? a.plans : []).map(p => el("option", { value: p })));
+let planTouched = false;
+function aiPlans(detected) {  // 고른 AI의 요금제 칩. 고르는 순서: 이번에 직접 고른 것 > CLI가 알려 준 것 > 저장된 것 > 첫째
+  const p = radio("ai"), a = D.ais[p];
+  $("#ai-more").classList.toggle("hidden", !a);
+  if (!a) return;
+  const plans = [...a.plans], cur = radio("plan");
+  if (p === D.provider && D.plan && !plans.includes(D.plan)) plans.push(D.plan);
+  const saved = p === D.provider && D.plan;
+  if (detected && saved && saved.startsWith(detected)) detected = saved;  // 「Claude Pro 연간」처럼 더 자세히 적어 둔 건 그대로
+  const pick = [planTouched && cur, detected, saved].find(v => v && plans.includes(v)) || plans[0];
+  $("#plan-chips").replaceChildren(...plans.map(v => el("label", { className: "chip" },
+    el("input", { type: "radio", name: "plan", value: v, checked: v === pick, onchange: () => planTouched = true }), v)));
 }
 
-let aiState = null;
-async function aiStatus() {
+// AI 준비 상태: ① 설치 → ② 로그인 → ③ 시험 호출. 「설치·로그인 시작」 뒤엔 4초마다 저절로 다시 확인한다
+const AI = {};  // provider → {st: ai_status 결과, test: null | "run" | {ok, answer | error}, busy}
+let aiPoll = null;
+const aiReady = () => { const t = (AI[radio("ai")] || {}).test; return !!(t && t.ok); };
+function stopPoll() { clearInterval(aiPoll); aiPoll = null; }
+
+function aiRow(id, st, title, sub) {
+  $(id).replaceChildren(el("span", { className: "st " + st, textContent: { ok: "✓", no: "!", opt: "?", wait: "…", idle: "" }[st] }),
+    el("div", {}, el("b", { textContent: title }), el("small", { textContent: sub })));
+}
+
+function aiRender() {
   const p = radio("ai");
-  if (!p) return say($("#ai-status"), "위에서 AI를 골라 주세요.");
-  say($("#ai-status"), "확인 중…");
-  aiState = await api().ai_status(p);
-  if (radio("ai") !== p) return;
-  const name = D.ais[p].name;
-  if (!aiState.installed) say($("#ai-status"), `${name} 도구가 아직 없어요. 「설치·로그인 하기」를 눌러 주세요.`, "warn-t");
-  else if (aiState.logged_in === false) say($("#ai-status"), `${name} 로그인이 필요해요. 「설치·로그인 하기」를 눌러 주세요.`, "warn-t");
-  else if (aiState.logged_in === null) say($("#ai-status"), `${name} 도구가 있어요. 로그인했는지는 확인할 수 없어서, 안 했다면 「설치·로그인 하기」를 눌러 주세요.`, "ok-t");
-  else say($("#ai-status"), `${name} 준비됐어요!`, "ok-t");
-  $("#ai-setup").textContent = aiState.installed ? "로그인 하기" : "설치·로그인 하기";
+  if (!p) return nav();
+  const name = D.ais[p].name, { st: s, test: t } = AI[p] || {};
+  const waitLogin = "브라우저에서 로그인해 주세요… (저절로 확인 중)";
+  if (!s) aiRow("#ai-s-install", "wait", "프로그램 설치", "확인 중…");
+  else if (!s.installed) aiRow("#ai-s-install", aiPoll ? "wait" : "no", "프로그램 설치",
+                               aiPoll ? "새 창에서 설치하는 중… (몇 분 걸릴 수 있어요)" : `${name} 도구가 아직 없어요`);
+  else aiRow("#ai-s-install", "ok", "프로그램 설치", "설치돼 있어요");
+
+  const loginOk = s && s.installed && s.logged_in !== false;
+  if (!s || !s.installed) aiRow("#ai-s-login", "idle", "로그인", "설치가 끝나면 해요");
+  else if (s.logged_in === false) aiRow("#ai-s-login", aiPoll ? "wait" : "no", "로그인", aiPoll ? waitLogin : "로그인이 필요해요");
+  else if (s.logged_in || (t && t.ok)) aiRow("#ai-s-login", "ok", "로그인", "로그인돼 있어요" + (s.plan ? ` (${s.plan})` : ""));
+  else if (aiPoll) aiRow("#ai-s-login", "wait", "로그인", waitLogin);
+  else if (t && t !== "run") aiRow("#ai-s-login", "no", "로그인", "로그인이 안 된 것 같아요");
+  else aiRow("#ai-s-login", "opt", "로그인", "불러 보면 알 수 있어요");
+
+  if (!loginOk || (aiPoll && !t)) aiRow("#ai-s-test", "idle", "시험 삼아 불러 보기", "로그인이 끝나면 저절로 해요");
+  else if (!t || t === "run") aiRow("#ai-s-test", "wait", "시험 삼아 불러 보기", "불러 보는 중… (10~30초)");
+  else if (t.ok) aiRow("#ai-s-test", "ok", "시험 삼아 불러 보기", `답했어요: 「${t.answer}」`);
+  else aiRow("#ai-s-test", "no", "시험 삼아 불러 보기", t.error);
+
+  const ready = aiReady(), installed = s && s.installed;
+  $("#ai-setup").classList.toggle("hidden", ready || t === "run");
+  $("#ai-setup").textContent = aiPoll ? "창 다시 열기" : installed ? "로그인 하기" : "설치·로그인 시작";
+  $("#ai-test").classList.toggle("hidden", !(t && t !== "run" && !t.ok));
+  $("#ai-hint").textContent = ready ? `${name} 준비됐어요! 「다음」을 눌러 주세요.`
+    : t === "run" ? ""
+    : aiPoll ? "새 창에서 설치·로그인을 마치면 여기서 저절로 알아채요. 창을 닫아 버렸으면 「창 다시 열기」를 눌러요."
+    : installed ? "누르면 검은 PowerShell 창과 브라우저가 열려요. 브라우저에서 로그인만 하면 여기서 저절로 알아채요."
+    : "누르면 검은 PowerShell 창이 열리고 설치 글자가 지나가요 (정상이에요). 브라우저가 열리면 로그인만 하면 여기서 저절로 알아채요.";
+  nav();
+}
+
+async function aiRefresh() {
+  const p = radio("ai");
+  if (!p || (AI[p] || {}).busy) return;
+  const a = AI[p] = { ...AI[p], busy: true };
+  try {
+    a.st = await api().ai_status(p);
+    if (a.st.plan && radio("ai") === p) aiPlans(a.st.plan);
+    if (aiPoll && a.st.installed && a.st.logged_in === true) { stopPoll(); a.test = null; }
+    if (!aiPoll && a.st.installed && a.st.logged_in !== false && !a.test) {
+      a.test = "run";
+      if (radio("ai") === p) aiRender();
+      a.test = await api().ai_test(p);
+    }
+  } finally { a.busy = false; }
+  if (radio("ai") === p) aiRender();
+}
+
+function aiSetup() {
+  const p = radio("ai"), started = Date.now();
+  api().ai_setup(p);
+  AI[p] = { ...AI[p], test: null };
+  stopPoll();
+  aiPoll = setInterval(() => {  // 다른 AI를 고르거나 단계를 떠나거나 15분이 지나면 그만 (그 뒤엔 「다시 불러 보기」)
+    if (radio("ai") !== p || steps[step].dataset.step !== "브리핑 AI" || Date.now() - started > 15 * 60e3) stopPoll();
+    aiRefresh();
+  }, 4000);
+  aiRender();
 }
 
 function guessCal() {
@@ -354,9 +469,42 @@ async function calAi() {
   }, 3000);
 }
 
+// 메일 주소 = 아이디 @ 도메인. 아는 도메인이면 서버가 정해지고, 「직접 입력」이면 MX로 서버를 추측한다 (바꿀 수 있음)
+let hostTouched = false, hostNote = "", guessT = null;
+const splitMail = v => { v = (v || "").trim(); const i = v.lastIndexOf("@"); return i < 0 ? [v, ""] : [v.slice(0, i), v.slice(i + 1).toLowerCase()]; };
+const mailDomain = () => $("#mail-domain").value || $("#mail-domain-custom").value.trim().toLowerCase().replace(/^@/, "");
+const mailHost = () => $("#mail-domain").value ? D.mail_domains[$("#mail-domain").value] : $("#mail-host").value.trim();
+const mailUser = () => { const id = $("#mail-id").value.trim(), d = mailDomain(); return id && d ? `${id}@${d}` : id; };
+
+function setDomain(d) {
+  if (d in D.mail_domains) $("#mail-domain").value = d;
+  else { $("#mail-domain").value = ""; $("#mail-domain-custom").value = d; hostTouched = false; hostNote = ""; guessHost(); }
+  mailView();
+}
+
+function guessHost() {
+  clearTimeout(guessT);
+  guessT = setTimeout(async () => {
+    const d = mailDomain();
+    if (!d || $("#mail-domain").value) return;
+    const g = await api().guess_mail_host(d);
+    if (d !== mailDomain()) return;
+    if (!hostTouched) $("#mail-host").value = g.host;
+    hostNote = g.note;
+    mailView();
+  }, 600);
+}
+
 function mailView() {
   $("#mail-form").classList.toggle("hidden", radio("mail-on") !== "1");
-  $("#mail-howto").innerHTML = ol(MAIL_HOWTO[$("#mail-host").value] || []);
+  const custom = !$("#mail-domain").value, host = mailHost();
+  $("#mail-domain-custom").classList.toggle("hidden", !custom);
+  $("#mail-adv").classList.toggle("hidden", !custom || !mailDomain());
+  $("#mail-adv summary").textContent = `메일 서버: ${host || "찾는 중…"} (보통은 그대로 두면 돼요)`;
+  $("#mail-host-note").textContent = custom ? hostNote : "";
+  $("#mail-howto").innerHTML = ol(MAIL_HOWTO[host] || (custom && host ? MAIL_HOWTO_OTHER : []));
+  $("#mail-pw").placeholder = D.mail.has_password ? "저장된 비밀번호 사용 (바꿀 때만 입력)"
+    : host === "imap.gmail.com" ? "앱 비밀번호 16자리" : "비밀번호 (2단계 인증을 쓰면 앱 비밀번호)";
 }
 
 function canNext() {
@@ -368,7 +516,11 @@ function canNext() {
   return true;
 }
 function nav() {
-  $("#next").disabled = !canNext();
+  const name = steps[step].dataset.step, nx = $("#next");
+  nx.textContent = name === "마무리" ? "저장" : name === "끝" ? "닫기"
+                 : name === "브리핑 AI" && radio("ai") && !aiReady() ? "나중에 하기" : "다음";
+  nx.className = nx.textContent === "나중에 하기" ? "later" : "primary";  // AI가 아직 안 됐으면 넘어갈 수는 있지만 덜 눈에 띄게
+  nx.disabled = !canNext();
   $("#prev").classList.toggle("hidden", step === 0 || step === steps.length - 1);
 }
 
@@ -377,9 +529,8 @@ function go(i) {
   steps.forEach((s, j) => s.classList.toggle("on", j === step));
   document.querySelectorAll("#steps span").forEach((s, j) => s.className = j === step ? "on" : j < step ? "done" : "");
   const last = steps[step].dataset.step;
-  $("#next").textContent = last === "마무리" ? "저장" : last === "끝" ? "닫기" : "다음";
   say($("#msg"), "");
-  if (last === "브리핑 AI" && radio("ai")) aiStatus();
+  if (last === "브리핑 AI") { aiRender(); aiRefresh(); }
   if (last === "캘린더") calView();
   nav();
   document.querySelector("main").scrollTop = 0;
@@ -390,13 +541,18 @@ async function next() {
   if (name === "끝") return api().close();
   if (name === "캘린더" && D.calendar_apps[radio("cal")].source === "ics" && !icsRows().some(r => r.url.trim()))
     return say($("#msg"), "주소를 넣거나 「AI에게 연결 맡기기」를 써 주세요. 나중에 하려면 「안 씀」을 골라요.", "err-t");
+  if (name === "메일" && radio("mail-on") === "1") {
+    if (!$("#mail-id").value.trim() || !mailDomain()) return say($("#msg"), "메일 아이디와 @ 뒤 주소를 넣어 주세요.", "err-t");
+    if (!mailHost()) return say($("#msg"), "메일 서버를 찾는 중이에요. 잠깐 뒤 다시 눌러 주세요.", "err-t");
+    if (!$("#mail-pw").value.trim() && !D.mail.has_password) return say($("#msg"), "비밀번호를 넣어 주세요.", "err-t");
+  }
   if (name !== "마무리") return go(step + 1);
   say($("#msg"), "저장 중…");
   $("#next").disabled = true;
   const r = await api().save({
-    provider: radio("ai"), plan: $("#plan").value, tools: D.provider === radio("ai") && D.tools ? D.tools : D.ais[radio("ai")].tools,
+    provider: radio("ai"), plan: radio("plan") || "", tools: D.provider === radio("ai") && D.tools ? D.tools : D.ais[radio("ai")].tools,
     source: D.calendar_apps[radio("cal")].source, ics: icsRows(), holidays: $("#holidays").checked,
-    mail: D.mail.supported ? { enabled: radio("mail-on") === "1", host: $("#mail-host").value, user: $("#mail-user").value,
+    mail: D.mail.supported ? { enabled: radio("mail-on") === "1", host: mailHost(), user: mailUser(),
                                password: $("#mail-pw").value, quiet_hours: $("#mail-quiet").value } : null,
     character: radio("char") || D.character, briefing_after: $("#time").value,
     use_windows_location: $("#winloc").checked, place: $("#place").value,

@@ -30,7 +30,14 @@ AIS = {
     "gemini": {"name": "Gemini", "plans": ["Google AI Pro", "Google AI Ultra", "무료"], "tools": "Gemini"},
 }
 SOURCES = ("timetree", "ics", "none")
-MAIL_HOSTS = {"imap.gmail.com": "Gmail", "imap.naver.com": "네이버 메일", "imap.daum.net": "다음 메일"}
+# 메일 주소 도메인 → IMAP 서버. 목록에 없는 도메인은 guess_mail_host()가 MX 레코드로 추측한다
+MAIL_DOMAINS = {"gmail.com": "imap.gmail.com", "naver.com": "imap.naver.com", "daum.net": "imap.daum.net",
+                "hanmail.net": "imap.daum.net", "kakao.com": "imap.kakao.com"}
+# MX 서버 이름 끝 → IMAP 서버 (회사·학교 도메인이 구글·네이버웍스 메일을 쓰는 경우)
+MX_HOSTS = {"google.com": "imap.gmail.com", "googlemail.com": "imap.gmail.com",
+            "worksmobile.com": "imap.worksmobile.com", "naver.com": "imap.naver.com", "daum.net": "imap.daum.net",
+            "kakao.com": "imap.kakao.com"}
+MS_NOTE = "Microsoft(Outlook·365) 메일은 비밀번호로 IMAP 로그인하는 것을 막아 두어서 연결이 안 될 수 있어요."
 REFRESH_PATH = ("$env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + "
                 "[Environment]::GetEnvironmentVariable('Path','User')")
 # 새 터미널에서 돌릴 설치·로그인 명령 (이미 설치돼 있으면 로그인만)
@@ -40,8 +47,9 @@ AI_SETUP = {
         "  Write-Host 'Claude Code 설치 중...'; irm https://claude.ai/install.ps1 | iex",
         "  $env:Path += \";$env:USERPROFILE\\.local\\bin\"",
         "}",
-        "Write-Host ''; Write-Host '브라우저가 열리면 Claude 계정으로 로그인하세요. 대화 화면이 나오면 /exit 입력 후 이 창을 닫으면 돼요.'",
-        "claude",
+        "Write-Host ''; Write-Host '브라우저가 열리면 Claude 계정으로 로그인하세요. 끝나면 설정 창이 알아채요. 이 창은 닫아도 돼요.'",
+        "claude auth login --claudeai",
+        "if ($LASTEXITCODE -ne 0) { claude }  # auth 명령이 없는 옛 버전이면 대화 화면에서 로그인",
     ],
     "codex": [
         "if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {",
@@ -49,7 +57,7 @@ AI_SETUP = {
         "  winget install --id OpenAI.Codex -e --source winget --accept-package-agreements --accept-source-agreements",
         "  " + REFRESH_PATH,
         "}",
-        "Write-Host ''; Write-Host '브라우저가 열리면 ChatGPT 계정으로 로그인하세요. 끝나면 이 창을 닫으면 돼요.'",
+        "Write-Host ''; Write-Host '브라우저가 열리면 ChatGPT 계정으로 로그인하세요. 끝나면 설정 창이 알아채요. 이 창은 닫아도 돼요.'",
         "codex login",
     ],
     "gemini": [
@@ -62,7 +70,7 @@ AI_SETUP = {
         "  Write-Host 'Gemini CLI 설치 중...'; npm install -g @google/gemini-cli",
         "  " + REFRESH_PATH,
         "}",
-        "Write-Host ''; Write-Host '「Sign in with Google」을 골라 로그인하세요. 대화 화면이 나오면 /quit 입력 후 이 창을 닫으면 돼요.'",
+        "Write-Host ''; Write-Host '「Sign in with Google」을 골라 로그인하세요. 대화 화면이 나오면 설정 창이 알아채요. /quit 입력 후 이 창을 닫으면 돼요.'",
         "gemini",
     ],
 }
@@ -262,7 +270,7 @@ def current():
         "mail": {"supported": mail_supported(), "enabled": mail.get("enabled", False),
                  "host": mail.get("host", "imap.gmail.com"), "user": mail.get("user", ""),
                  "has_password": bool(mail.get("password")), "quiet_hours": mail.get("quiet_hours", "")},
-        "mail_hosts": MAIL_HOSTS,
+        "mail_domains": MAIL_DOMAINS,
         "character": char,
         "characters": chars,
         "ais": AIS,
@@ -298,8 +306,9 @@ def validate(ch):
         mail = {**mail, "enabled": bool(mail.get("enabled")), "user": (mail.get("user") or "").strip(),
                 "password": (mail.get("password") or "").replace(" ", ""),  # 앱 비밀번호는 띄어 써서 보여줌
                 "quiet_hours": (mail.get("quiet_hours") or "").strip()}
-        if mail.get("host") not in MAIL_HOSTS:
-            raise ValueError("메일 서비스를 골라 주세요.")
+        mail["host"] = (mail.get("host") or "").strip().lower()
+        if mail["enabled"] and not re.fullmatch(r"[a-z0-9-]+(\.[a-z0-9-]+)+", mail["host"]):
+            raise ValueError("메일 서버 주소를 확인해 주세요 (예: imap.gmail.com).")
         if mail["enabled"] and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", mail["user"]):
             raise ValueError("메일 주소를 확인해 주세요.")
         if mail["enabled"] and not mail["password"] and not current()["mail"]["has_password"]:
@@ -356,6 +365,34 @@ def geocode_place(name):
     return {"name": name, "lat": round(float(res[0]["lat"]), 2), "lon": round(float(res[0]["lon"]), 2)}
 
 
+def host_from_mx(domain, mx_names):
+    """MX 서버 이름들 → {host, note}. 아는 곳이 없으면 imap.<도메인>."""
+    for mx in mx_names:
+        mx = mx.lower().rstrip(".")
+        for end, host in MX_HOSTS.items():
+            if mx == end or mx.endswith("." + end):
+                return {"host": host, "note": ""}
+        if mx.endswith(".outlook.com") or mx.endswith(".office365.com"):
+            return {"host": "outlook.office365.com", "note": MS_NOTE}
+    return {"host": f"imap.{domain}", "note": ""}
+
+
+def guess_mail_host(domain):
+    """메일 주소 도메인 → {host, note}. 목록에 없으면 nslookup으로 MX를 보고 추측한다."""
+    domain = (domain or "").strip().lower()
+    if domain in MAIL_DOMAINS:
+        return {"host": MAIL_DOMAINS[domain], "note": ""}
+    if not re.fullmatch(r"[a-z0-9-]+(\.[a-z0-9-]+)+", domain):
+        return {"host": "", "note": ""}
+    try:
+        r = subprocess.run(["nslookup", "-type=mx", domain], capture_output=True, text=True, errors="replace",
+                           timeout=8, creationflags=subprocess.CREATE_NO_WINDOW)
+        mxs = re.findall(r"mail exchanger = (\S+)", r.stdout)
+    except (OSError, subprocess.TimeoutExpired):
+        mxs = []
+    return host_from_mx(domain, mxs)
+
+
 def check_mail(host, user, password):
     """IMAP 로그인 → 받은편지함을 읽기 전용으로 열어 보기만 한다. 실패하면 ValueError."""
     import imaplib
@@ -408,27 +445,61 @@ def add_ics(name, url):
 
 # ---------------------------------------------------------------- AI CLI 설치·로그인·캘린더 연결 (새 터미널)
 
+def _llm_cfg(provider):
+    """저장된 [llm] 설정(claude_path 등)에 고른 AI만 바꿔 끼운 cfg."""
+    return {"llm": {**tomllib.loads(base_text()).get("llm", {}), "provider": provider}}
+
+
 def ai_status(provider):
+    """{installed, logged_in(True/False/None=알 수 없음), path, plan(알아낸 요금제, 없으면 "")}"""
     from popme import llm
-    cfg = {"llm": {}}
     finder = {"claude": llm.find_claude, "codex": llm.find_codex, "gemini": llm.find_gemini}[provider]
     try:
-        exe = finder(cfg)
+        exe = finder(_llm_cfg(provider))
     except RuntimeError:
-        return {"installed": False, "logged_in": False}
-    home = Path.home()
+        return {"installed": False, "logged_in": False, "plan": ""}
+    home, plan = Path.home(), ""
+
+    def run(*args):
+        return subprocess.run([exe, *args], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                              timeout=20, creationflags=subprocess.CREATE_NO_WINDOW)
     if provider == "codex":
         try:
-            r = subprocess.run([exe, "login", "status"], capture_output=True, text=True, timeout=20,
-                               creationflags=subprocess.CREATE_NO_WINDOW)
+            r = run("login", "status")
             logged = "logged in" in (r.stdout + r.stderr).lower()
         except Exception:
             logged = None
     elif provider == "claude":
-        logged = (home / ".claude" / ".credentials.json").exists() or None  # 다른 방식 로그인이면 알 수 없음
+        logged = None
+        try:  # claude auth status: {"loggedIn": true, "subscriptionType": "pro", ...} (옛 버전엔 없음)
+            st = json.loads(run("auth", "status", "--json").stdout)
+            logged = bool(st.get("loggedIn"))
+            plan = {"pro": "Claude Pro", "max": "Claude Max"}.get(str(st.get("subscriptionType", "")).lower(), "")
+        except Exception:
+            logged = (home / ".claude" / ".credentials.json").exists() or None  # 다른 방식 로그인이면 알 수 없음
     else:
         logged = (home / ".gemini" / "oauth_creds.json").exists() or None
-    return {"installed": True, "logged_in": logged, "path": exe}
+    return {"installed": True, "logged_in": logged, "path": exe, "plan": plan}
+
+
+def ai_test(provider):
+    """고른 AI를 실제로 한 번 불러 본다 (도구 끈 상태, 짧은 답). 실패하면 ValueError(사용자에게 보일 문장)."""
+    from popme import llm
+    name = AIS[provider]["name"]
+    try:
+        answer = llm.ask(_llm_cfg(provider), "짧게 한 문장으로만 답한다.", "「준비됐어요」라고만 답해 주세요.", timeout=120)
+    except subprocess.TimeoutExpired:
+        raise ValueError(f"{name}이(가) 2분 안에 답하지 않았어요. 잠시 뒤 「다시 불러 보기」를 눌러 주세요.")
+    except (RuntimeError, OSError) as e:
+        err = str(e).lower()
+        if any(k in err for k in ("login", "auth", "api key", "credential", "401")):
+            raise ValueError(f"{name} 로그인이 필요해요. 「로그인 하기」를 눌러 주세요.")
+        if any(k in err for k in ("limit", "quota", "429", "rate")):
+            raise ValueError(f"{name} 사용 한도에 걸렸어요. 한도가 풀리면 브리핑도 써져요. 그대로 다음으로 가도 돼요.")
+        raise ValueError(f"{name}을(를) 불러 보지 못했어요: {str(e)[:200]}")
+    if not answer.strip():
+        raise ValueError(f"{name}이(가) 빈 답을 줬어요. 「다시 불러 보기」를 눌러 주세요.")
+    return answer.strip()[:60]
 
 
 def _console(lines, title):
@@ -492,6 +563,15 @@ class Api:
 
     def ai_setup(self, provider):
         open_ai_setup(provider)
+
+    def ai_test(self, provider):
+        try:
+            return {"ok": True, "answer": ai_test(provider)}
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
+
+    def guess_mail_host(self, domain):
+        return guess_mail_host(domain)
 
     def calendar_helper(self, provider, app):
         try:
