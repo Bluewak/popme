@@ -6,14 +6,14 @@ import time
 from datetime import datetime
 
 from popme import briefing, chrome, config, discovery, event_weather, llm
-from popme.collectors import NeedLogin, ics, rss, threads, timetree, x
+from popme.collectors import NeedLogin, caldav, ics, rss, threads, timetree, x
 from popme.db import DB
 
 log = logging.getLogger(__name__)
 
 
 def calendar_source(cfg):
-    """일정을 어디서 읽나: "timetree"(기본) | "ics"(구글·iCloud 등 ICS 주소) | "none"."""
+    """일정을 어디서 읽나: "timetree"(기본) | "ics"(구글 등 ICS 주소) | "caldav"(iCloud 계정 + 앱 암호) | "none"."""
     return cfg.get("calendar", {}).get("source", "timetree")
 
 
@@ -77,6 +77,8 @@ class Jobs:
         try:
             if source == "ics":
                 self.db.upsert_events(*ics.collect(self.cfg, progress, warnings))
+            elif source == "caldav":
+                self.db.upsert_events(*caldav.collect(self.cfg, progress, warnings))
             elif source == "timetree":
                 self.db.upsert_events(*timetree.collect(ctx, self.cfg, progress))
             if source != "none":

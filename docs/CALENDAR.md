@@ -1,6 +1,6 @@
 # 일정: TimeTree 대신 다른 캘린더 쓰기
 
-POPME는 기본으로 **TimeTree**를 씁니다. 구글·iCloud 등은 **A(ICS 주소)를 설정만 하면** 바로 쓸 수 있습니다. TimeTree 공식 API는 2023-12-22에 종료됐기 때문에, 로그인해 둔 전용 Chrome에서 TimeTree 웹 앱과 같은 요청을 보내 일정을 읽고 씁니다.
+POPME는 기본으로 **TimeTree**를 씁니다. 아이폰 기본 캘린더(iCloud)는 **Apple 계정 + 앱 암호**(아래 A-0), 구글 등은 **A(ICS 주소)**를 설정만 하면 바로 쓸 수 있습니다. TimeTree 공식 API는 2023-12-22에 종료됐기 때문에, 로그인해 둔 전용 Chrome에서 TimeTree 웹 앱과 같은 요청을 보내 일정을 읽고 씁니다.
 
 다른 캘린더(Google, 네이버, Outlook, Apple 등)를 쓰려면 **일정을 다루는 4곳만** 바꾸면 됩니다. 브리핑·수집·캐릭터 쪽은 손대지 않아도 됩니다.
 
@@ -36,6 +36,24 @@ POPME는 기본으로 **TimeTree**를 씁니다. 구글·iCloud 등은 **A(ICS �
 캘린더 목록은 `popme/planner.py` `calendar_names()`가 DB의 `calendar_id`에서 뽑으므로 따로 바꿀 필요 없습니다.
 
 ## 3. 서비스별 방법
+
+### A-0. 아이폰 기본 캘린더(iCloud) — Apple 계정 + 앱 암호 (내장), 읽기 전용
+`popme/collectors/caldav.py`. 설정 창에서 **아이폰 기본 캘린더**(또는 **미니캘 → 아이폰 캘린더와 연결**)를 고르고 두 가지만 넣으면 캘린더 목록이 나옵니다. 캘린더마다 공개 주소를 만들 필요가 없습니다.
+
+1. [Apple 계정 페이지](https://account.apple.com/account/manage) → 로그인 및 보안 → **앱 암호** → `+` → 이름 `POPME` → 나온 `xxxx-xxxx-xxxx-xxxx` 복사 (Apple 계정 비밀번호가 아님. 2단계 인증이 켜져 있어야 만들 수 있음)
+2. 설정 창에 Apple 계정 이메일과 앱 암호를 넣고 **연결 확인** → 읽을 캘린더 고르기
+
+```toml
+[calendar]
+source = "caldav"
+[caldav]
+server = "https://caldav.icloud.com"
+user = "Apple 계정 이메일"
+password = "앱 암호"                # config.toml에 평문 저장. 같은 페이지에서 언제든 지울 수 있음
+calendars = [{ name = "집", url = "https://pNN-caldav.icloud.com/.../calendars/home/" }]
+```
+
+설정을 바꾸지 않고 연결만 시험하려면: `python -m popme.setup_window check-caldav 'Apple 계정 이메일'` (앱 암호를 물어보고 캘린더별 일정 수만 보여 줌). 같은 CalDAV 표준이라 `server`만 바꾸면 다른 CalDAV 서비스도 읽을 수 있습니다.
 
 ### A. ICS(iCal) 주소로 읽기 — 설정만 하면 됨 (내장), 읽기 전용
 코드가 이미 들어 있습니다 (`popme/collectors/ics.py`). 설정 창(설치할 때, 또는 트레이 > 설정 바꾸기)에서 캘린더 앱을 고르고 주소를 넣거나 **AI에게 연결 맡기기**를 누르면 됩니다. 직접 고치려면 `config.toml`에:

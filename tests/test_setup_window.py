@@ -95,3 +95,29 @@ def test_default_character_is_not_pinned(tmp_path, monkeypatch):
 def test_validate_rejects(kw, msg):
     with pytest.raises(ValueError, match=msg):
         choices(**kw)
+
+
+def test_caldav_saved(monkeypatch):
+    monkeypatch.setattr(sw, "current", lambda: {"caldav": {"has_password": False}})
+    cals = [{"name": "집", "url": "https://p1-caldav.icloud.com/1/calendars/home/"}]
+    dav = {"user": " me@example.com ", "password": "abcd-efgh-ijkl-mnop", "calendars": cals}
+    out = sw.apply(EXAMPLE, choices(source="caldav", caldav=dav, holidays=False))
+    cfg = tomllib.loads(out)
+    assert cfg["calendar"]["source"] == "caldav" and cfg["calendar"]["holidays"] is False
+    assert cfg["caldav"] == {"server": "https://caldav.icloud.com", "user": "me@example.com",
+                             "password": "abcd-efgh-ijkl-mnop", "calendars": cals}
+    # 앱 암호를 비워 두면 저장된 것을 그대로 둔다
+    monkeypatch.setattr(sw, "current", lambda: {"caldav": {"has_password": True}})
+    again = tomllib.loads(sw.apply(out, choices(source="caldav", caldav={**dav, "password": ""})))
+    assert again["caldav"]["password"] == "abcd-efgh-ijkl-mnop"
+
+
+@pytest.mark.parametrize("dav, msg", [
+    ({"user": "나", "password": "x", "calendars": [{"name": "a", "url": "https://a/"}]}, "이메일"),
+    ({"user": "me@example.com", "password": "", "calendars": [{"name": "a", "url": "https://a/"}]}, "앱 암호"),
+    ({"user": "me@example.com", "password": "x", "calendars": []}, "연결 확인"),
+])
+def test_caldav_rejects(monkeypatch, dav, msg):
+    monkeypatch.setattr(sw, "current", lambda: {"caldav": {"has_password": False}})
+    with pytest.raises(ValueError, match=msg):
+        choices(source="caldav", caldav=dav)

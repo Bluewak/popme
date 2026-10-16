@@ -34,6 +34,12 @@
   .check small, .card small, .hint { display: block; color: var(--muted); font-size: 12px; }
   .cards { display: grid; gap: 7px; }
   .cards.two { grid-template-columns: 1fr 1fr; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .chip { border: 2px solid var(--line); background: #fff; border-radius: 999px; padding: 1px 14px; cursor: pointer; }
+  .chip input { display: none; }
+  .chip:has(input:checked) { border-color: var(--accent); background: #fff4ec; color: var(--brown); }
+  .cals label { display: flex; gap: 8px; align-items: center; padding: 3px 0; cursor: pointer; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: none; }
   .card { display: block; background: #fff; border: 2px solid var(--line); border-radius: 12px; padding: 8px 12px; cursor: pointer; }
   .card input { display: none; }
   .card b { font-size: 15px; color: var(--brown); }
@@ -99,7 +105,31 @@
       설정이 끝나면 트레이 아이콘 우클릭 → <b>전용 Chrome 열기 (로그인)</b>에서 TimeTree에 로그인하면 돼요.
       TimeTree는 캐릭터에게 일정 추가를 부탁할 수도 있어요.
     </div>
+    <div id="cal-minical" class="box hidden" style="margin-top:10px">
+      <b>미니캘이 어느 캘린더와 연결돼 있나요?</b>
+      <div class="chips">
+        <label class="chip"><input type="radio" name="via" value="icloud">아이폰 캘린더 (iCloud)</label>
+        <label class="chip"><input type="radio" name="via" value="google">구글 캘린더</label>
+        <label class="chip"><input type="radio" name="via" value="unknown">잘 모르겠어요</label>
+      </div>
+      <div id="via-help" class="howto hidden"></div>
+    </div>
+    <div id="cal-caldav" class="hidden" style="margin-top:10px">
+      <div class="box">
+        <b>Apple 계정으로 연결</b>
+        <small class="hint">아이폰 캘린더를 바로 읽어요. 두 가지만 넣어 주세요.</small>
+        <div class="row"><input type="text" id="dav-user" placeholder="Apple 계정 이메일" autocomplete="off"></div>
+        <div class="row"><input type="password" id="dav-pw" placeholder="앱 암호 xxxx-xxxx-xxxx-xxxx" autocomplete="off"><button id="dav-eye">보기</button></div>
+        <div class="howto" id="dav-howto"></div>
+        <div class="row"><button id="dav-check">연결 확인</button></div>
+        <div id="dav-msg" class="msg"></div>
+        <div id="dav-cals" class="cals"></div>
+        <div class="secret">앱 암호는 이 PC의 config.toml에만 저장돼요. 캘린더 읽기에만 쓰고, Apple 계정 페이지에서 언제든 지울 수 있어요.</div>
+      </div>
+      <small class="hint"><a id="dav-fallback">앱 암호를 만들 수 없나요? 공개 캘린더 주소로 연결하기</a></small>
+    </div>
     <div id="cal-ics" class="hidden" style="margin-top:10px">
+      <small class="hint hidden" id="dav-back-row"><a id="dav-back">← Apple 계정으로 연결하기 (더 쉬워요)</a></small>
       <div class="box">
         <b>AI에게 맡기기</b>
         <small class="hint">고른 AI가 새 창에서 한 단계씩 안내하고, 받은 주소를 확인해서 저장해 줘요.</small>
@@ -111,10 +141,10 @@
         <div class="howto" id="cal-howto"></div>
         <div id="ics-rows"></div>
         <div class="row"><button id="ics-add">+ 캘린더 추가</button></div>
-        <label class="inline"><input type="checkbox" id="holidays"> 대한민국 공휴일도 보기</label>
         <div class="secret">이 주소는 비밀번호처럼 다뤄 주세요. 주소만 알면 누구나 일정을 볼 수 있어요.</div>
       </div>
     </div>
+    <label class="inline hidden" id="holidays-row"><input type="checkbox" id="holidays"> 대한민국 공휴일도 보기</label>
   </section>
 
   <!-- 3. 메일 (메일 알림 기능이 있는 버전만) -->
@@ -181,6 +211,16 @@ const CAL_HOWTO = {
   naver: ["네이버 캘린더 → <b>환경설정</b> → <b>캘린더 관리</b>", "내보내기/공유의 <b>ICS(iCal) 주소</b>를 복사해 붙여 넣어요"],
   outlook: ["outlook.com → <b>설정</b> → <b>캘린더</b> → <b>공유 캘린더</b>", "<b>캘린더 게시</b>에서 <b>ICS 링크</b>를 복사해 붙여 넣어요"],
 };
+const DAV_HOWTO = [
+  "<a data-url='https://account.apple.com/account/manage'>Apple 계정 페이지</a>에 로그인해요 (아이폰과 같은 계정)",
+  "<b>로그인 및 보안</b> → <b>앱 암호</b> → <b>+</b> → 이름 <b>POPME</b> → 만들기",
+  "나온 <b>xxxx-xxxx-xxxx-xxxx</b>를 위 칸에 붙여 넣어요 (한 번만 보여 줘요)",
+];
+const VIA_HELP = [
+  "미니캘은 아이폰에 등록된 캘린더를 그대로 보여 줘요",
+  "아이폰 <b>설정 → 앱 → 캘린더 → 캘린더 계정</b>을 열어요 (옛 iOS: 설정 → 캘린더 → 계정)",
+  "<b>iCloud</b>에 캘린더가 켜져 있으면 「아이폰 캘린더」, <b>Gmail</b>이면 「구글 캘린더」를 골라요. 둘 다 켜져 있으면 일정을 주로 넣는 쪽을 골라요",
+];
 const MAIL_HOWTO = {
   "imap.gmail.com": ["구글 계정에 <a data-url='https://myaccount.google.com/signinoptions/twosv'>2단계 인증</a>을 켜요 (켜져 있으면 넘어가요)",
                      "<a data-url='https://myaccount.google.com/apppasswords'>앱 비밀번호 만들기</a>에서 이름 <b>POPME</b> → 만들기",
@@ -239,7 +279,23 @@ function init() {
   $("#cal-cards").append(...Object.entries(D.calendar_apps).map(([k, c]) => el("label", { className: "card", innerHTML:
     `<input type="radio" name="cal" value="${k}"><b>${c.name}</b>` })));
   setRadio("cal", guessCal());
-  document.querySelectorAll("input[name=cal]").forEach(r => r.onchange = calView);
+  davFallback = D.source === "ics" && radio("cal") === "icloud";  // 예전에 iCloud 공개 주소로 연결해 둔 경우
+  if (D.source === "caldav" && D.exists) setRadio("via", "icloud");
+  document.querySelectorAll("input[name=cal], input[name=via]").forEach(r => r.onchange = calView);
+  $("#dav-user").value = D.caldav.user;
+  if (D.caldav.has_password) $("#dav-pw").placeholder = "저장된 앱 암호 사용 (바꿀 때만 입력)";
+  $("#dav-howto").innerHTML = ol(DAV_HOWTO);
+  $("#via-help").innerHTML = ol(VIA_HELP);
+  davList(D.caldav.calendars.map(c => ({ ...c, on: true })));
+  if (D.caldav.calendars.length) say($("#dav-msg"), `저장된 캘린더 ${D.caldav.calendars.length}개를 읽어요. 바꾸려면 「연결 확인」을 눌러요.`, "ok-t");
+  $("#dav-eye").onclick = () => {
+    const pw = $("#dav-pw"), show = pw.type === "password";
+    pw.type = show ? "text" : "password";
+    $("#dav-eye").textContent = show ? "숨기기" : "보기";
+  };
+  $("#dav-check").onclick = davCheck;
+  $("#dav-fallback").onclick = () => { davFallback = true; calView(); };
+  $("#dav-back").onclick = () => { davFallback = false; calView(); };
   D.ics.forEach(addRow); if (!D.ics.length) addRow();
   $("#ics-add").onclick = () => addRow();
   $("#holidays").checked = D.holidays;
@@ -301,16 +357,34 @@ async function aiStatus() {
 }
 
 function guessCal() {
+  if (D.source === "caldav") return D.exists ? "icloud" : "";
   if (D.source !== "ics") return D.source === "none" ? "none" : (D.exists ? "timetree" : "");
   const u = (D.ics[0] || {}).url || "";
   return /icloud/.test(u) ? "icloud" : /naver/.test(u) ? "naver" : /outlook|office/.test(u) ? "outlook" : "google";
 }
 
+// 실제로 쓸 읽기 방법: "timetree" | "ics" | "caldav" | "none" | "" (미니캘인데 아직 연결처를 안 고름)
+// 아이폰(iCloud)은 Apple 계정 + 앱 암호(caldav)가 기본이고, 앱 암호를 못 만들면 공개 주소(ics)로
+let davFallback = false;
+function calMode() {
+  const app = radio("cal"), via = radio("via");
+  if (!app) return "";
+  if (app === "icloud" || (app === "minical" && via === "icloud")) return davFallback ? "ics" : "caldav";
+  if (app === "minical") return via === "google" ? "ics" : "";
+  return D.calendar_apps[app].source;
+}
+
 function calView() {
-  const app = radio("cal"), src = app && D.calendar_apps[app].source;
+  const app = radio("cal"), src = calMode(), via = radio("via");
+  const howto = app === "minical" ? (via === "google" ? "google" : "icloud") : app;
   $("#cal-timetree").classList.toggle("hidden", src !== "timetree");
+  $("#cal-minical").classList.toggle("hidden", app !== "minical");
+  $("#via-help").classList.toggle("hidden", !(app === "minical" && via === "unknown"));
+  $("#cal-caldav").classList.toggle("hidden", src !== "caldav");
   $("#cal-ics").classList.toggle("hidden", src !== "ics");
-  if (CAL_HOWTO[app]) $("#cal-howto").innerHTML = ol(CAL_HOWTO[app]);
+  $("#dav-back-row").classList.toggle("hidden", !(src === "ics" && davFallback));
+  $("#holidays-row").classList.toggle("hidden", src !== "ics" && src !== "caldav");
+  if (CAL_HOWTO[howto]) $("#cal-howto").innerHTML = ol(CAL_HOWTO[howto]);
   $("#cal-ai").textContent = `${(D.ais[radio("ai")] || {}).name || "AI"}에게 연결 맡기기`;
   nav();
 }
@@ -335,6 +409,30 @@ function icsRows() {
     const [name, url] = r.querySelectorAll("input");
     return { name: name.value, url: url.value };
   });
+}
+
+function davList(cals) {  // [{name, url, color, on}] → 체크 목록
+  $("#dav-cals").replaceChildren(...cals.map(c => {
+    const cb = el("input", { type: "checkbox", checked: c.on });
+    cb.dataset.name = c.name; cb.dataset.url = c.url;
+    const dot = el("span", { className: "dot" });
+    if (c.color) dot.style.background = c.color;
+    return el("label", {}, cb, dot, c.name);
+  }));
+}
+const davChosen = () => [...document.querySelectorAll("#dav-cals input:checked")].map(c => ({ name: c.dataset.name, url: c.dataset.url }));
+
+async function davCheck() {
+  say($("#dav-msg"), "Apple에 로그인해 보는 중…");
+  $("#dav-check").disabled = true;
+  const r = await api().check_caldav($("#dav-user").value, $("#dav-pw").value);
+  $("#dav-check").disabled = false;
+  if (!r.ok) return say($("#dav-msg"), r.error, "err-t");
+  const saved = new Set(D.caldav.calendars.map(c => c.url));  // 전에 고른 게 있으면 그것만, 처음이면 전부 켠다
+  davList(r.calendars.map(c => ({ ...c, on: !saved.size || saved.has(c.url) })));
+  say($("#dav-msg"), `연결됐어요! 캘린더 ${r.calendars.length}개를 찾았어요. 읽을 것만 골라 주세요.`, "ok-t");
+  $("#dav-howto").classList.add("hidden");  // 앱 암호 만드는 법은 이제 필요 없다
+  $("#dav-cals").scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 
 let poll = null;
@@ -363,7 +461,7 @@ function canNext() {
   const name = steps[step].dataset.step;
   if (name === "준비물") return $("#prereq-ok").checked;
   if (name === "브리핑 AI") return !!radio("ai");
-  if (name === "캘린더") return !!radio("cal");
+  if (name === "캘린더") return !!calMode();
   if (name === "메일") return !!radio("mail-on");
   return true;
 }
@@ -388,14 +486,17 @@ function go(i) {
 async function next() {
   const name = steps[step].dataset.step;
   if (name === "끝") return api().close();
-  if (name === "캘린더" && D.calendar_apps[radio("cal")].source === "ics" && !icsRows().some(r => r.url.trim()))
+  if (name === "캘린더" && calMode() === "caldav" && !davChosen().length)
+    return say($("#msg"), "「연결 확인」을 눌러 읽을 캘린더를 하나 이상 골라 주세요.", "err-t");
+  if (name === "캘린더" && calMode() === "ics" && !icsRows().some(r => r.url.trim()))
     return say($("#msg"), "주소를 넣거나 「AI에게 연결 맡기기」를 써 주세요. 나중에 하려면 「안 씀」을 골라요.", "err-t");
   if (name !== "마무리") return go(step + 1);
   say($("#msg"), "저장 중…");
   $("#next").disabled = true;
   const r = await api().save({
     provider: radio("ai"), plan: $("#plan").value, tools: D.provider === radio("ai") && D.tools ? D.tools : D.ais[radio("ai")].tools,
-    source: D.calendar_apps[radio("cal")].source, ics: icsRows(), holidays: $("#holidays").checked,
+    source: calMode(), ics: icsRows(), holidays: $("#holidays").checked,
+    caldav: { user: $("#dav-user").value, password: $("#dav-pw").value, calendars: davChosen() },
     mail: D.mail.supported ? { enabled: radio("mail-on") === "1", host: $("#mail-host").value, user: $("#mail-user").value,
                                password: $("#mail-pw").value, quiet_hours: $("#mail-quiet").value } : null,
     character: radio("char") || D.character, briefing_after: $("#time").value,
