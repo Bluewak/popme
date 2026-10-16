@@ -26,7 +26,7 @@ import webview
 
 from popme import agenda, briefing, chrome, config, discovery, event_weather, mail, planner, character, weather
 from popme.collectors import timetree
-from popme.jobs import Jobs, calendar_source
+from popme.jobs import CHROME_CLOSED, Jobs, calendar_source
 from popme.pet import PetWindow, icon_image, load_images, write_icon
 
 log = logging.getLogger(__name__)
@@ -51,6 +51,14 @@ def _load_ui_state():
         return json.loads(UI_STATE.read_text(encoding="utf-8"))
     except Exception:
         return {}
+
+
+def _save_ui_state(**kw):
+    """ui.json의 값 몇 개만 바꾼다 (캐릭터 위치 anchor, 수집 안내 횟수 chrome_hints 등)."""
+    try:
+        UI_STATE.write_text(json.dumps({**_load_ui_state(), **kw}), encoding="utf-8")
+    except OSError:
+        pass
 
 
 def _work_area():
@@ -149,10 +157,7 @@ class Api:
             self.set_mode("pet")
 
     def _on_pet_moved(self, anchor):
-        try:
-            UI_STATE.write_text(json.dumps({"anchor": anchor}), encoding="utf-8")
-        except OSError:
-            pass
+        _save_ui_state(anchor=anchor)
         if self._mode != "pet":
             self._apply()
 
@@ -170,7 +175,7 @@ class Api:
         now = time.time()
         next_expr = now + random.uniform(*beh["expression_every_sec"])
         next_chat = now + 60 * random.uniform(*beh["chatter_every_min"])
-        expr, was_away, was_running, last_warn = "idle", False, False, ()
+        expr, was_away, was_running, last_warn, last_status = "idle", False, False, (), ""
         active_since, break_said, greeted = now, False, set()
         next_sleeptalk = now + 60 * random.uniform(3, 6)
         while True:
@@ -188,12 +193,19 @@ class Api:
                 if idle > 300:  # 5분 이상 쉬면 연속 작업 시간 리셋
                     active_since, break_said = now, False
 
-                # 수집 시작 한마디
+                # 수집 시작 한마디 (처음 몇 번은 전용 Chrome 창을 닫지 말라는 안내)
                 if st["running"] and not was_running:
-                    self._say("collecting")
+                    self._say_collecting()
+                # 트레이 메뉴의 「지금 수집」 자리에 진행 상황 (모으는 중… X 수집 중 3/33)
+                if self._tray and (st["running"] != was_running or (st["running"] and st["status"] != last_status)):
+                    last_status = st["status"]
+                    try:
+                        self._tray.update_menu()
+                    except Exception:
+                        log.debug("트레이 메뉴 갱신 실패", exc_info=True)
                 was_running = st["running"]
                 # 수집이 경고와 함께 끝남 → 떨면서 한마디. RSS 피드 몇 개 실패 같은 사소한 경고는 넘어감
-                serious = [w for w in st["warnings"] if not w.startswith("RSS 실패")]
+                serious = [w for w in st["warnings"] if not w.startswith(("RSS 실패", CHROME_CLOSED))]  # Chrome 닫힘은 _on_job이
                 if serious and tuple(st["warnings"]) != last_warn and not st["running"]:
                     last_warn, self._alert_until = tuple(st["warnings"]), now + 15
                     first = serious[0]
@@ -493,8 +505,8 @@ class Api:
         os.startfile(config.BRIEFING_DIR)
 
     # --- 캐릭터가 먼저 말 걸기 ---
-    def _alert(self, kind, text, lead=None, items=None):
-        """items: 말풍선 목록 줄(HTML) — 없으면 브리핑 헤드라인."""
+    def _alert(self, kind, text, lead=None, items=None, action=None):
+        """items: 말풍선 목록 줄(HTML) — 없으면 브리핑 헤드라인. action: {label, call} — 말풍선 버튼 (api.<call>())."""
         self._happy_until = time.time() + 5
         if kind in ("briefing", "urgent", "mail"):
             self._unseen = True
@@ -504,7 +516,7 @@ class Api:
             return
         try:
             self._window.evaluate_js(
-                f"showAlert({json.dumps({'kind': kind, 'text': text, 'lead': lead, 'items': items})})")
+                f"showAlert({json.dumps({'kind': kind, 'text': text, 'lead': lead, 'items': items, 'action': action})})")
             if self._mode != "panel":
                 self.set_mode("bubble")
         except Exception:
@@ -518,10 +530,41 @@ class Api:
             done = self._char.line("collected")  # "다 모았어요~! 브리핑… 보실래요~?"
             self._alert("urgent" if urgent else "briefing", pick["html"],
                         lead=None if urgent or not done else done + "<br>")
+        elif kind == "chrome_closed":  # 수집 중 사용자가 전용 Chrome을 닫음 — 몰래 다시 켜지 않고 다시 모을지 묻는다
+            lead = self._char.line("chrome_closed") or "Chrome 창이 닫혀서 이번엔 일부만 모았어요. 다시 모을까요?"
+            self._alert("warn", f"<br><span class='muted'>{html.escape(msg)} · 브리핑은 모은 데까지로 만들었어요</span>",
+                        lead=lead, action={"label": "다시 모으기", "call": "run_now"})
         else:
             self._alert("warn", "", lead=self._char.line("warn", msg=msg) or self._char.ui["warn_lead"] + msg)
             if self._tray:
                 self._tray.notify(msg, "POPME")
+
+    def _say_collecting(self):
+        """수집 시작 한마디. 처음 3번은 전용 Chrome 창이 무엇인지·닫지 말라는 안내로 (ui.json chrome_hints)."""
+        n = _load_ui_state().get("chrome_hints", 0)
+        hint = self._char.line("collecting_hint") if n < 3 else None
+        if hint:
+            _save_ui_state(chrome_hints=n + 1)
+            return self._show_chat(hint)
+        self._say("collecting")
+
+    def collect_label(self, rebuild=False):
+        """메뉴 이름: 쉬는 중이면 「지금 수집」, 모으는 중이면 「모으는 중… X 수집 중 3/33」."""
+        st = self._jobs.state
+        if not st["running"]:
+            return "브리핑만 다시 만들기" if rebuild else "지금 수집"
+        if rebuild:
+            return "브리핑만 다시 만들기 (모으는 중)"
+        s = st["status"] or "준비 중"
+        return "모으는 중… " + (s if len(s) <= 30 else s[:29] + "…")
+
+    def collect_now(self, collect=True):
+        """메뉴의 「지금 수집」·「브리핑만 다시 만들기」. 이미 모으는 중이면 아무 일 없던 게 아니라 진행 상황을 말한다."""
+        if self._jobs.run_full(collect=collect):
+            return True
+        st = self._jobs.state["status"] or "준비 중"
+        self._show_chat(self._char.line("collect_busy", status=st) or f"지금 모으는 중이에요… {st}")
+        return False
 
     def _on_mail(self, mails):
         """중요 메일 → 말풍선. 조용히 할 때(quiet_hours·전체 화면·방해 금지)는 배지만 — 메일 탭에 남아 있다."""
@@ -609,7 +652,7 @@ def main(restart=False):
     # 캐릭터 우클릭 메뉴
     pet_menu = lambda: [
         ("브리핑 열기", lambda: api.set_mode("panel")),
-        ("지금 수집", jobs.run_full),
+        (api.collect_label(), lambda: api.collect_now()),
         None,
         (f"{name} 숨기기 (트레이에서 다시 보이기)", api._hide_all),
         ("설정 바꾸기", bg(open_settings)),
@@ -629,8 +672,8 @@ def main(restart=False):
         pystray.MenuItem(f"{name} 보이기", lambda i, _: api._show_all(), default=True),
         pystray.MenuItem(f"{name} 숨기기", lambda i, _: api._hide_all()),
         pystray.MenuItem("브리핑 열기", lambda i, _: (api._show_all(), api.set_mode("panel"))),
-        pystray.MenuItem("지금 수집", lambda i, _: jobs.run_full()),
-        pystray.MenuItem("브리핑만 다시 만들기", lambda i, _: jobs.run_full(collect=False)),
+        pystray.MenuItem(lambda i: api.collect_label(), lambda i, _: api.collect_now()),
+        pystray.MenuItem(lambda i: api.collect_label(rebuild=True), lambda i, _: api.collect_now(collect=False)),
         pystray.MenuItem("전용 Chrome 열기 (로그인)", lambda i, _: api.open_chrome_login()),
         pystray.MenuItem("브리핑 폴더 열기", lambda i, _: api.open_folder()),
         pystray.MenuItem("설정 바꾸기", lambda i, _: threading.Thread(target=open_settings, daemon=True).start()),
