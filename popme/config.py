@@ -11,6 +11,7 @@ CHROME_PROFILE = DATA_DIR / "chrome-profile"
 BRIEFING_DIR = DATA_DIR / "briefings"
 RAW_DIR = DATA_DIR / "raw"          # 파서 디버깅용 원본 응답 (최근 것만 유지)
 LOG_PATH = DATA_DIR / "popme.log"
+FIRST_BRIEFING = DATA_DIR / "first-briefing"  # 설정 창의 「첫 브리핑 받아 보기」 → 켜지자마자 수집 (app.py가 지움)
 
 for d in (DATA_DIR, BRIEFING_DIR, RAW_DIR):
     d.mkdir(parents=True, exist_ok=True)
