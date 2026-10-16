@@ -202,7 +202,7 @@ def test_help_data_is_complete():
 
 
 def test_ask_help_stays_in_scope(monkeypatch):
-    """「막혔어요?」 AI는 그 단계 안내·자주 묻는 질문만 받고, 범위 밖이면 답하지 말라는 지시를 받는다."""
+    """「AI한테 해결 요청하기」는 그 단계 안내·자주 묻는 질문만 받고, 범위 밖이면 답하지 말라는 지시를 받는다."""
     from popme import llm
     seen = {}
 
@@ -212,14 +212,14 @@ def test_ask_help_stays_in_scope(monkeypatch):
     monkeypatch.setattr(llm, "ask", fake)
     monkeypatch.setattr(sw, "base_text", lambda: "")
     assert sw.ask_help("codex", "google", "어디서 주소를 찾아요?") == "왼쪽 「내 캘린더의 설정」에서 캘린더 이름을 눌러요."
-    assert seen["provider"] == "codex" and "도와드릴 수 없어요" in seen["system"]
+    assert seen["provider"] == "codex" and "이 단계와 관련된 것만 도와드릴 수 있어요" in seen["system"]
     assert "iCal 형식의 비공개 주소" in seen["prompt"] and "<b>" not in seen["prompt"]  # HTML은 빼고 넘긴다
     assert "앱 암호" not in seen["prompt"]  # 다른 단계(iCloud) 안내는 섞지 않는다
 
     def boom(*a, **k):
         raise RuntimeError("login")
     monkeypatch.setattr(llm, "ask", boom)
-    with pytest.raises(ValueError, match="AI를 부르지 못했어요"):
+    with pytest.raises(ValueError, match="AI가 지금 답하지 못했어요"):
         sw.ask_help("claude", "google", "?")
 
 

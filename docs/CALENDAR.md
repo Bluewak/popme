@@ -60,7 +60,7 @@ calendars = [{ name = "집", url = "https://pNN-caldav.icloud.com/.../calendars/
 설정을 바꾸지 않고 연결만 시험하려면: `python -m popme.setup_window check-caldav 'Apple 계정 이메일'` (앱 암호를 물어보고 캘린더별 일정 수만 보여 줌). 같은 CalDAV 표준이라 `server`만 바꾸면 다른 CalDAV 서비스도 읽을 수 있습니다.
 
 ### A. ICS(iCal) 주소로 읽기 — 설정만 하면 됨 (내장), 읽기 전용
-코드가 이미 들어 있습니다 (`popme/collectors/ics.py`). 설정 창(설치할 때, 또는 트레이 > 설정 바꾸기)에서 캘린더 앱을 고르고 「… 설정 열기」를 누른 뒤 주소를 **복사만** 하면 저절로 들어옵니다 (직접 붙여 넣어도 됨). 막히면 **막혔어요?**. 직접 고치려면 `config.toml`에:
+코드가 이미 들어 있습니다 (`popme/collectors/ics.py`). 설정 창(설치할 때, 또는 트레이 > 설정 바꾸기)에서 캘린더 앱을 고르고 「… 설정 열기」를 누른 뒤 주소를 **복사만** 하면 저절로 들어옵니다 (직접 붙여 넣어도 됨). 막히면 **AI한테 해결 요청하기**. 직접 고치려면 `config.toml`에:
 
 ```toml
 [calendar]

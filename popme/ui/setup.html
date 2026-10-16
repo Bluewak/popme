@@ -73,12 +73,14 @@
   footer { flex: none; display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-top: 2px solid var(--line); background: var(--cream); }
   footer .msg { flex: 1; margin: 0; }
   .hidden { display: none !important; }
-  /* 「막혔어요?」: 정해진 질문 버튼 + 이 단계 안에서만 답하는 AI */
+  /* 「AI한테 해결 요청하기」: 자주 막히는 곳 버튼(정해진 답) + 상황을 적으면 이 단계 안에서만 답하는 AI */
   a.help-toggle { display: inline-block; font-size: 12.5px; margin-top: 6px; }
   .help { background: #fff; border: 1.5px dashed var(--line); border-radius: 10px; padding: 8px 10px; margin-top: 6px; }
   .help button.q { display: block; width: 100%; text-align: left; margin-top: 4px; border-width: 1.5px; border-radius: 8px;
     font: 12.5px/1.5 "Malgun Gothic", system-ui, sans-serif; white-space: normal; }
   .help .a { font-size: 12.5px; background: var(--paper); border-radius: 8px; padding: 6px 8px; margin-top: 6px; }
+  .help .a small { display: block; color: var(--muted); font-size: 11px; }
+  .help .lead2 { display: block; color: var(--muted); font-size: 12px; margin: 1px 0 2px; }
   .check .grow { flex: 1; }
 </style>
 </head>
@@ -126,10 +128,11 @@
       TimeTree는 캐릭터에게 일정 추가를 부탁할 수도 있어요.
     </div>
     <div id="cal-minical" class="box hidden" style="margin-top:10px">
-      <b>미니캘이 어느 캘린더와 연결돼 있나요?</b>
+      <b>미니캘은 어느 계정과 동기화되나요?</b>
+      <small class="hint">미니캘은 일정을 따로 갖지 않고 그 계정의 캘린더를 보여 줘요. 고른 계정의 캘린더를 연결해요.</small>
       <div class="chips">
-        <label class="chip"><input type="radio" name="via" value="icloud">아이폰 캘린더 (iCloud)</label>
-        <label class="chip"><input type="radio" name="via" value="google">구글 캘린더</label>
+        <label class="chip"><input type="radio" name="via" value="icloud">iCloud (아이폰 계정)</label>
+        <label class="chip"><input type="radio" name="via" value="google">구글 계정</label>
         <label class="chip"><input type="radio" name="via" value="unknown">잘 모르겠어요</label>
       </div>
       <div id="via-help" class="howto hidden"></div>
@@ -353,13 +356,11 @@ function init() {
     $("#mail-quiet").value = D.mail.quiet_hours;
     setRadio("mail-on", D.mail.enabled ? "1" : "0");
     document.querySelectorAll("input[name=mail-on]").forEach(r => r.onchange = mailView);
-    $("#mail-id").oninput = () => {  // 아이디@도메인을 통째로 붙여 넣으면 나눠 담는다
-      const v = $("#mail-id").value;
-      if (!v.includes("@")) return;
-      const [i, d] = splitMail(v);
-      $("#mail-id").value = i;
-      if (d) setDomain(d);
-    };
+    // 아이디@도메인을 통째로 넣으면 나눠 담는다. 한 글자씩 칠 때 나누면 「me@」에서 @가 사라지고 뒤 글자가
+    // 아이디에 붙으므로, 붙여 넣을 때·칸을 벗어날 때·다음/연결 확인을 누를 때만 나눈다 (splitId)
+    $("#mail-id").onpaste = () => setTimeout(splitId);
+    $("#mail-id").onchange = splitId;
+    $("#mail-id").placeholder = "아이디 (전체 주소를 붙여 넣어도 돼요)";
     $("#mail-domain").onchange = () => {
       if (!$("#mail-domain").value) { hostTouched = false; hostNote = ""; guessHost(); setTimeout(() => $("#mail-domain-custom").focus()); }
       mailView();
@@ -593,30 +594,35 @@ function watchClipboard(kind, stepName, onFound, keep = false) {
   }, 1500);
 }
 
-// 「막혔어요?」: 자주 막히는 곳은 정해진 답(D.help[key].faq), 그 밖의 질문만 AI가 — 이 단계 안내 안에서만 답한다
-// (setup_window.ask_help). 사용자가 방법을 스스로 찾아 헤매지 않게 답의 범위를 안내로 묶는다
+// 「AI한테 해결 요청하기」: 자주 막히는 곳은 고르면 바로 정해진 답(D.help[key].faq), 목록에 없는 상황만 적어서
+// AI에게 — 이 단계 안내 안에서만 답한다 (setup_window.ask_help). 사용자가 방법을 스스로 찾아 헤매지 않게 답의 범위를 묶는다
 const helps = {};
 function mountHelp(box, keyFn) {
-  const toggle = el("a", { className: "help-toggle", textContent: "막혔어요?" });
+  const toggle = el("a", { className: "help-toggle", textContent: "AI한테 해결 요청하기" });
   const panel = el("div", { className: "help hidden" });
   const fill = () => {
     const key = keyFn(), h = D.help[key];
     if (!h) return panel.classList.add("hidden");
     const ans = el("div", { className: "a hidden" });
-    const show = html => { ans.innerHTML = html; ans.classList.remove("hidden"); ans.scrollIntoView({ block: "nearest" }); };
-    const input = el("input", { type: "text", placeholder: "목록에 없으면 물어보기 (이 단계 안에서만 답해요)" });
-    const ask = el("button", { textContent: "묻기", onclick: async () => {
+    const show = (html, from = "") => {
+      ans.innerHTML = (from ? `<small>${from}</small>` : "") + html;
+      ans.classList.remove("hidden");
+      ans.scrollIntoView({ block: "nearest" });
+    };
+    const input = el("input", { type: "text", placeholder: "막힌 상황을 적어 주세요 (예: 버튼이 안 보여요)" });
+    const ask = el("button", { textContent: "요청하기", onclick: async () => {
       const q = input.value.trim();
-      if (!q) return;
-      if (!radio("ai")) return show("「브리핑 AI」 단계에서 AI를 먼저 골라 주세요.");
+      if (!q) return input.focus();
+      if (!radio("ai")) return show("AI한테 요청하려면 「브리핑 AI」 단계에서 AI를 먼저 골라 주세요.");
       ask.disabled = true;
-      show("이 단계 안내를 보고 답하는 중… (10~30초)");
+      show("AI가 해결 방법을 찾고 있어요… (10~30초)");
       const r = await api().ask_help(radio("ai"), key, q);
       ask.disabled = false;
-      show(esc(r.ok ? r.answer : r.error));
+      show(esc(r.ok ? r.answer : r.error), r.ok ? `${esc(D.ais[radio("ai")].name)}의 답` : "");
     } });
     input.onkeydown = e => { if (e.key === "Enter") ask.click(); };
-    panel.replaceChildren(el("b", { textContent: "자주 막히는 곳" }),
+    panel.replaceChildren(el("b", { textContent: "어디서 막혔나요?" }),
+      el("span", { className: "lead2", textContent: "아래에서 고르면 바로 알려 드려요. 없으면 상황을 적어 AI한테 요청하세요." }),
       ...(h.faq || []).map(([q, a]) => el("button", { className: "q", textContent: q, onclick: () => show(a) })),
       ans, el("div", { className: "row" }, input, ask));
   };
@@ -650,6 +656,13 @@ const splitMail = v => { v = (v || "").trim(); const i = v.lastIndexOf("@"); ret
 const mailDomain = () => $("#mail-domain").value || $("#mail-domain-custom").value.trim().toLowerCase().replace(/^@/, "");
 const mailHost = () => $("#mail-domain").value ? D.mail_domains[$("#mail-domain").value] : $("#mail-host").value.trim();
 const mailUser = () => { const id = $("#mail-id").value.trim(), d = mailDomain(); return id && d ? `${id}@${d}` : id; };
+
+function splitId() {
+  const v = $("#mail-id").value.trim(), [i, d] = splitMail(v);
+  if (!v.includes("@") || !d) return;  // @ 뒤가 아직 없으면 기다린다
+  $("#mail-id").value = i;
+  setDomain(d);
+}
 
 function setDomain(d) {
   if (d in D.mail_domains) $("#mail-domain").value = d;
@@ -686,6 +699,7 @@ function mailView() {
 }
 
 async function mailCheck(first) {
+  splitId();
   say($("#mail-msg"), typeof first === "string" ? first : "확인 중…");
   const r = await api().check_mail(mailHost(), mailUser(), $("#mail-pw").value);
   say($("#mail-msg"), r.ok ? "연결됐어요! 받은편지함을 읽을 수 있어요." : r.error, r.ok ? "ok-t" : "err-t");
@@ -782,6 +796,7 @@ async function next() {
   if (name === "캘린더" && calMode() === "ics" && !icsRows().some(r => r.url.trim()))
     return say($("#msg"), "주소를 넣어 주세요. 위 버튼으로 설정 페이지를 열고 복사하면 저절로 들어와요. 나중에 하려면 「안 씀」을 골라요.", "err-t");
   if (name === "메일" && radio("mail-on") === "1") {
+    splitId();
     if (!$("#mail-id").value.trim() || !mailDomain()) return say($("#msg"), "메일 아이디와 @ 뒤 주소를 넣어 주세요.", "err-t");
     if (!mailHost()) return say($("#msg"), "메일 서버를 찾는 중이에요. 잠깐 뒤 다시 눌러 주세요.", "err-t");
     if (!$("#mail-pw").value.trim() && !D.mail.has_password) return say($("#msg"), "비밀번호를 넣어 주세요.", "err-t");

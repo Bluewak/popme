@@ -3,7 +3,7 @@
 install.ps1이 설치할 때 띄우고, 나중엔 트레이(또는 캐릭터 우클릭) > "설정 바꾸기"로 다시 연다.
 config.toml의 주석·다른 설정은 그대로 두고 고른 값의 줄만 바꾼다 (파일이 없으면 config.example.toml에서 시작).
 
-연결 방법은 HELP(단계별 안내 + 자주 막히는 질문)에 데이터로 둔다. 화면 안내도, 「막혔어요?」의 AI 답도 이것만 쓴다
+연결 방법은 HELP(단계별 안내 + 자주 막히는 질문)에 데이터로 둔다. 화면 안내도, 「AI한테 해결 요청하기」의 답도 이것만 쓴다
 (AI는 이 안내 범위 밖이면 답하지 않는다 — ask_help).
   python -m popme.setup_window check-ics '<주소>'          주소가 열리는지, 일정 몇 개인지
   python -m popme.setup_window check-caldav '<Apple 계정 이메일>'   앱 암호를 물어 iCloud 캘린더·일정 수만 보여 줌 (저장 안 함)
@@ -88,7 +88,7 @@ CALENDAR_APPS = {
     "none": {"name": "안 씀", "source": "none"},
 }
 # 연결 안내: steps = 화면에 보일 순서(HTML 조각, <a data-url>은 평소 브라우저로 열림), faq = 자주 막히는 질문과 정해진 답,
-# open = 「… 열기」 버튼이 여는 주소. 화면과 「막혔어요?」 AI가 같은 내용을 쓴다
+# open = 「… 열기」 버튼이 여는 주소. 화면과 「AI한테 해결 요청하기」가 같은 내용을 쓴다
 HELP = {
     "google": {
         "open": ("구글 캘린더 설정 열기", "https://calendar.google.com/calendar/r/settings"),
@@ -141,7 +141,7 @@ HELP = {
     "minical": {
         "steps": ["미니캘은 아이폰에 등록된 캘린더를 그대로 보여 줘요",
                   "아이폰 <b>설정 → 앱 → 캘린더 → 캘린더 계정</b>을 열어요 (옛 iOS: 설정 → 캘린더 → 계정)",
-                  "<b>iCloud</b>에 캘린더가 켜져 있으면 「아이폰 캘린더」, <b>Gmail</b>이면 「구글 캘린더」를 골라요. "
+                  "<b>iCloud</b>에 캘린더가 켜져 있으면 「iCloud (아이폰 계정)」, <b>Gmail</b>이면 「구글 계정」을 골라요. "
                   "둘 다 켜져 있으면 일정을 주로 넣는 쪽을 골라요"],
         "faq": [["둘 다 써요", "지금은 한 곳만 연결할 수 있어요. 일정을 주로 넣는 쪽을 고르고, 나중에 설정에서 바꿀 수 있어요."]]},
     "gmail": {
@@ -170,11 +170,11 @@ HELP = {
             ["로그인했는데 ✓가 안 켜져요", "로그인을 끝까지 마쳤는지(첫 화면이 보이는지) 봐요. 몇 초 기다리면 저절로 다시 확인해요."],
         ]},
 }
-# 「막혔어요?」 자유 질문: 이 단계 안내 안에서만 답한다
+# 「AI한테 해결 요청하기」에 적은 상황: 이 단계 안내 안에서만 답한다
 HELP_SYSTEM = """너는 POPME 설정 창의 도우미다. 사용자는 컴퓨터를 잘 모를 수 있다.
 반드시 아래 [안내]와 [자주 막히는 곳]에 적힌 내용만 근거로 답한다.
 - 한국어 존댓말, 3문장 이내. 화면에서 무엇을 누르면 되는지만 말한다.
-- [안내]로 답할 수 없는 질문이면 정확히 「여기서는 도와드릴 수 없어요. 다른 방법을 고르거나 나중에 설정해도 돼요.」라고만 답한다.
+- [안내]로 답할 수 없는 질문이면 정확히 「이 단계와 관련된 것만 도와드릴 수 있어요. 다른 방법을 고르거나 나중에 설정해도 돼요.」라고만 답한다.
 - 명령어·코드·다른 앱이나 사이트를 권하지 않는다. 비밀번호·주소를 보여 달라고 하지 않는다."""
 # 로그인 단계: 전용 Chrome에서 사용자가 직접 로그인 → 쿠키(또는 로그인 페이지로 넘기는지)로 확인만 한다
 LOGIN_SITES = {
@@ -634,16 +634,16 @@ def _plain(html):
 
 
 def ask_help(provider, key, question):
-    """「막혔어요?」 자유 질문 — HELP[key] 안내 안에서만 짧게 답한다 (도구 끈 AI). 실패하면 ValueError."""
+    """「AI한테 해결 요청하기」 — 사용자가 적은 상황에 HELP[key] 안내 안에서만 짧게 답한다 (도구 끈 AI). 실패하면 ValueError."""
     from popme import llm
     h = HELP[key]
     guide = "\n".join(f"{i}. {_plain(t)}" for i, t in enumerate(h["steps"], 1))
     faq = "\n".join(f"- {q}: {_plain(a)}" for q, a in h.get("faq", []))
-    prompt = f"[안내]\n{guide}\n\n[자주 막히는 곳]\n{faq}\n\n[사용자 질문]\n{question.strip()[:300]}"
+    prompt = f"[안내]\n{guide}\n\n[자주 막히는 곳]\n{faq}\n\n[사용자가 막힌 상황]\n{question.strip()[:300]}"
     try:
         return llm.ask(_llm_cfg(provider), HELP_SYSTEM, prompt, timeout=90).strip()[:400]
     except Exception as e:
-        raise ValueError(f"AI를 부르지 못했어요. 「브리핑 AI」 단계에서 준비됐는지 봐 주세요. ({str(e)[:80]})")
+        raise ValueError(f"AI가 지금 답하지 못했어요. 「브리핑 AI」 단계에서 준비됐는지 봐 주세요. ({str(e)[:80]})")
 
 
 def check_caldav(user, password):
