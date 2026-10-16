@@ -672,13 +672,21 @@ def _plain(html):
     return re.sub(r"<[^>]+>", "", html)
 
 
-def ask_help(provider, key, question):
-    """「AI한테 해결 요청하기」 — 사용자가 적은 상황에 HELP[key] 안내 안에서만 짧게 답한다 (도구 끈 AI). 실패하면 ValueError."""
+HELP_TURNS = 4  # 이어 묻기 맥락으로 함께 보낼 앞 대화 수
+
+
+def ask_help(provider, key, question, history=()):
+    """「AI한테 해결 요청하기」 — 사용자가 적은 상황에 HELP[key] 안내 안에서만 짧게 답한다 (도구 끈 AI).
+    history = 이 단계의 앞 대화 [{q, a}] — 「그래도 안 돼요」 같은 이어 묻기에 맥락을 준다. 실패하면 ValueError."""
     from popme import llm
     h = HELP[key]
     guide = "\n".join(f"{i}. {_plain(t)}" for i, t in enumerate(h["steps"], 1))
     faq = "\n".join(f"- {q}: {_plain(a)}" for q, a in h.get("faq", []))
-    prompt = f"[안내]\n{guide}\n\n[자주 막히는 곳]\n{faq}\n\n[사용자가 막힌 상황]\n{question.strip()[:300]}"
+    past = "\n".join(f"사용자: {str(t.get('q', ''))[:300]}\n도우미: {_plain(str(t.get('a', '')))[:400]}"
+                     for t in list(history or [])[-HELP_TURNS:])
+    prompt = (f"[안내]\n{guide}\n\n[자주 막히는 곳]\n{faq}\n\n"
+              + (f"[지금까지 대화]\n{past}\n\n" if past else "")
+              + f"[사용자가 막힌 상황]\n{question.strip()[:300]}")
     try:
         return llm.ask(_llm_cfg(provider), HELP_SYSTEM, prompt, timeout=90).strip()[:400]
     except Exception as e:
@@ -844,9 +852,9 @@ class Api:
             log.exception("로그인 창 열기 실패")
             return {"ok": False, "error": f"전용 Chrome을 열지 못했어요: {str(e)[:150]}"}
 
-    def ask_help(self, provider, key, question):
+    def ask_help(self, provider, key, question, history=None):
         try:
-            return {"ok": True, "answer": ask_help(provider, key, question)}
+            return {"ok": True, "answer": ask_help(provider, key, question, history or [])}
         except ValueError as e:
             return {"ok": False, "error": str(e)}
 

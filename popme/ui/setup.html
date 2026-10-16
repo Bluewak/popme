@@ -76,11 +76,22 @@
   /* 「AI한테 해결 요청하기」: 자주 막히는 곳 버튼(정해진 답) + 상황을 적으면 이 단계 안에서만 답하는 AI */
   a.help-toggle { display: inline-block; font-size: 12.5px; margin-top: 6px; }
   .help { background: #fff; border: 1.5px dashed var(--line); border-radius: 10px; padding: 8px 10px; margin-top: 6px; }
-  .help button.q { display: block; width: 100%; text-align: left; margin-top: 4px; border-width: 1.5px; border-radius: 8px;
-    font: 12.5px/1.5 "Malgun Gothic", system-ui, sans-serif; white-space: normal; }
-  .help .a { font-size: 12.5px; background: var(--paper); border-radius: 8px; padding: 6px 8px; margin-top: 6px; }
-  .help .a small { display: block; color: var(--muted); font-size: 11px; }
-  .help .lead2 { display: block; color: var(--muted); font-size: 12px; margin: 1px 0 2px; }
+  .help .lead2 { display: block; color: var(--muted); font-size: 12px; margin: 1px 0 4px; }
+  .help .faqs { display: flex; flex-wrap: wrap; gap: 4px; }
+  .help .faqs button { font: 12px/1.45 "Malgun Gothic", system-ui, sans-serif; border-width: 1.5px; padding: 2px 10px;
+    white-space: normal; text-align: left; }
+  /* 대화: 내 질문은 오른쪽, 답은 왼쪽. 길어지면 이 안에서 스크롤 */
+  .help .chat { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto;
+    margin-top: 8px; padding: 6px; background: var(--paper); border-radius: 8px; }
+  .help .chat:empty { display: none; }
+  .bubble { max-width: 86%; padding: 5px 10px; border-radius: 12px; font-size: 12.5px; line-height: 1.55;
+    white-space: pre-wrap; overflow-wrap: anywhere; }
+  .bubble.me { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+  .bubble.ai { align-self: flex-start; background: #fff; border: 1.5px solid var(--line); border-bottom-left-radius: 4px; }
+  .bubble.err { border-color: var(--err); color: var(--err); }
+  .bubble small { display: block; font-size: 10.5px; color: var(--muted); }
+  .bubble.wait span::after { content: "…"; animation: pulse 1.2s ease-in-out infinite; }
+  .help .send { margin-top: 6px; }
   .check .grow { flex: 1; }
   /* 메일: ① 주소 → ② 만들기(접을 수 있음) → ③ 비밀번호·연결 확인 */
   #mail-form h2.first { margin-top: 2px; }
@@ -629,43 +640,73 @@ function watchClipboard(kind, stepName, onFound, keep = false) {
   }, 1500);
 }
 
-// 「AI한테 해결 요청하기」: 자주 막히는 곳은 고르면 바로 정해진 답(D.help[key].faq), 목록에 없는 상황만 적어서
-// AI에게 — 이 단계 안내 안에서만 답한다 (setup_window.ask_help). 사용자가 방법을 스스로 찾아 헤매지 않게 답의 범위를 묶는다
-const helps = {};
+// 「AI한테 해결 요청하기」: 채팅처럼 내 질문(오른쪽)과 답(왼쪽)이 쌓이고, 길어지면 대화 칸 안에서 스크롤한다.
+// 자주 막히는 곳은 누르면 정해진 답(D.help[key].faq), 목록에 없는 상황은 적어 보내면 AI가 — 이 단계 안내 안에서만,
+// 앞 대화를 맥락으로 받아 답한다 (setup_window.ask_help). 대화는 단계(key)별로 남는다
+const helps = {}, chats = {};  // chats: key → [{who: "me"|"ai", text | html, from, err, wait}]
 function mountHelp(box, keyFn) {
   const toggle = el("a", { className: "help-toggle", textContent: "AI한테 해결 요청하기" });
   const panel = el("div", { className: "help hidden" });
-  const fill = () => {
-    const key = keyFn(), h = D.help[key];
-    if (!h) return panel.classList.add("hidden");
-    const ans = el("div", { className: "a hidden" });
-    const show = (html, from = "") => {
-      ans.innerHTML = (from ? `<small>${from}</small>` : "") + html;
-      ans.classList.remove("hidden");
-      ans.scrollIntoView({ block: "nearest" });
-    };
-    const input = el("input", { type: "text", placeholder: "막힌 상황을 적어 주세요 (예: 버튼이 안 보여요)" });
-    const ask = el("button", { textContent: "요청하기", onclick: async () => {
-      const q = input.value.trim();
-      if (!q) return input.focus();
-      if (!radio("ai")) return show("AI한테 요청하려면 「브리핑 AI」 단계에서 AI를 먼저 골라 주세요.");
-      ask.disabled = true;
-      show("AI가 해결 방법을 찾고 있어요… (10~30초)");
-      const r = await api().ask_help(radio("ai"), key, q);
-      ask.disabled = false;
-      show(esc(r.ok ? r.answer : r.error), r.ok ? `${esc(D.ais[radio("ai")].name)}의 답` : "");
-    } });
-    input.onkeydown = e => { if (e.key === "Enter") ask.click(); };
-    panel.replaceChildren(el("b", { textContent: "어디서 막혔나요?" }),
-      el("span", { className: "lead2", textContent: "아래에서 고르면 바로 알려 드려요. 없으면 상황을 적어 AI한테 요청하세요." }),
-      ...(h.faq || []).map(([q, a]) => el("button", { className: "q", textContent: q, onclick: () => show(a) })),
-      ans, el("div", { className: "row" }, input, ask));
+  const chat = el("div", { className: "chat" });
+  const input = el("input", { type: "text", placeholder: "막힌 상황을 적어 보내세요 (예: 버튼이 안 보여요)" });
+  const send = el("button", { textContent: "보내기" });
+  const faqs = el("div", { className: "faqs" });
+  panel.append(el("b", { textContent: "어디서 막혔나요?" }),
+    el("span", { className: "lead2", textContent: "자주 막히는 곳을 누르거나, 아래에 직접 적어 보내세요." }),
+    faqs, chat, el("div", { className: "row send" }, input, send));
+  let key = null;
+  const log = () => chats[key] || (chats[key] = []);
+  const render = () => {
+    chat.replaceChildren(...log().map(m => {
+      const b = el("div", { className: `bubble ${m.who}${m.err ? " err" : ""}${m.wait ? " wait" : ""}` });
+      if (m.from) b.append(el("small", { textContent: m.from }));
+      const body = el("span");
+      if (m.html) body.innerHTML = m.html; else body.textContent = m.text || "";
+      b.append(body);
+      return b;
+    }));
+    chat.scrollTop = chat.scrollHeight;  // 새 말은 맨 아래
+    if (!panel.classList.contains("hidden")) send.scrollIntoView({ block: "nearest" });  // 입력칸까지 보이게
   };
+  const fill = () => {  // 단계(key)가 바뀔 때만 다시 그린다 — 쓰던 글·대화가 지워지지 않게
+    const k = keyFn(), h = D.help[k];
+    if (!h) return panel.classList.add("hidden");
+    if (k === key) return;
+    key = k;
+    faqs.replaceChildren(...(h.faq || []).map(([q, a]) => el("button", { textContent: q, onclick: () => {
+      log().push({ who: "me", text: q }, { who: "ai", html: a, from: "자주 막히는 곳 안내", q });
+      render();
+    } })));
+    render();
+  };
+  send.onclick = async () => {
+    const q = input.value.trim(), k = key;
+    if (!q) return input.focus();
+    const msgs = log();
+    const history = msgs.filter(m => m.who === "ai" && !m.err && !m.wait && m.q).map(m => ({ q: m.q, a: m.text || m.html }));
+    msgs.push({ who: "me", text: q });
+    input.value = "";
+    if (!radio("ai")) {
+      msgs.push({ who: "ai", err: true, text: "AI한테 요청하려면 「브리핑 AI」 단계에서 AI를 먼저 골라 주세요." });
+      return render();
+    }
+    const name = D.ais[radio("ai")].name, wait = { who: "ai", wait: true, from: name, text: "해결 방법을 찾고 있어요" };
+    msgs.push(wait);
+    send.disabled = true;
+    render();
+    const r = await api().ask_help(radio("ai"), k, q, history);
+    send.disabled = false;
+    Object.assign(wait, r.ok ? { wait: false, text: r.answer, q } : { wait: false, err: true, from: "", text: r.error });
+    if (key === k) render();
+    input.focus();
+  };
+  input.onkeydown = e => { if (e.key === "Enter" && !e.isComposing && !send.disabled) send.click(); };
   toggle.onclick = () => {
     panel.classList.toggle("hidden");
     if (panel.classList.contains("hidden")) return;
     fill();
     panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    input.focus();
   };
   box.replaceChildren(toggle, panel);
   return { refresh: () => { toggle.classList.toggle("hidden", !D.help[keyFn()]); if (!panel.classList.contains("hidden")) fill(); } };
