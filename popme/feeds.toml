@@ -796,7 +796,7 @@ name = 'OpenAI 상태 (API·엔터프라이즈)'
 url = 'https://status.openai.com/feed.rss'
 group = '장애'
 max_chars = 300
-skip = '^(?!.*(API|Responses|Realtime|Batch|Compliance|Enterprise|Widespread|All (users|services)))'
+skip = '^(?!.*(API|Responses|Realtime|Batch|Compliance|Enterprise|Codex|Widespread|All (users|services)))'
 
 [feed.kisa]
 name = 'KISA 보안공지'
@@ -1043,3 +1043,72 @@ group = '새 오픈소스·화제'
 max_chars = 400
 skip = '^v[\d.]+$'
 note = 'HWP·HWPX·PDF → Markdown'
+
+# --- 2026-10-18 AI 코딩 보강: 다른 코딩 도구(기본 꺼짐)·Codex 변경내역·에이전트 코딩 실전 블로그 ---
+
+[feed.codex-changelog]
+name = 'Codex 변경내역'
+url = 'https://developers.openai.com/codex/changelog/rss.xml'
+group = '공식 변경내역'
+max_chars = 1000
+skip = 'Codex CLI Release|ChatGPT for (iOS|Android)'
+note = 'Codex 앱·클라우드·모델 교체·단종 공지 (CLI 릴리스는 GitHub 쪽이 자세해서 뺌)'
+
+[feed.cursor-changelog]
+name = 'Cursor 변경내역'
+url = 'https://cursor.com/changelog/rss.xml'
+group = '공식 변경내역'
+max_chars = 800
+
+[feed.copilot-changelog]
+name = 'GitHub Copilot 변경내역'
+url = 'https://github.blog/changelog/label/copilot/feed/'
+group = '공식 변경내역'
+max_chars = 600
+
+[feed.cline-releases]
+name = 'Cline 릴리스'
+url = 'https://github.com/cline/cline/releases.atom'
+group = '공식 변경내역'
+max_chars = 800
+skip = '^(sdk/|SDK |Desktop )'
+
+[feed.opencode-releases]
+name = 'opencode 릴리스'
+url = 'https://github.com/sst/opencode/releases.atom'
+group = '공식 변경내역'
+max_chars = 800
+
+[feed.windsurf-changelog]
+name = 'Windsurf 변경내역'
+url = 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_windsurf_changelog.xml'
+group = '공식 변경내역'
+max_chars = 600
+via = 'mirror'
+
+[feed.armin-ronacher]
+name = 'Armin Ronacher 블로그'
+url = 'https://lucumr.pocoo.org/feed.atom'
+group = '실사용 검증'
+max_chars = 600
+note = 'Flask 제작자의 에이전트 코딩 실전기'
+
+[feed.ghuntley]
+name = 'Geoffrey Huntley 블로그'
+url = 'https://ghuntley.com/rss/'
+group = '실사용 검증'
+max_chars = 600
+note = '에이전트 루프 패턴'
+
+[feed.steipete]
+name = 'Peter Steinberger 블로그'
+url = 'https://steipete.me/rss.xml'
+group = '실사용 검증'
+max_chars = 600
+note = 'OpenClaw 제작자'
+
+[feed.karpathy]
+name = 'Karpathy 블로그'
+url = 'https://karpathy.bearblog.dev/feed/'
+group = '실사용 검증'
+max_chars = 600
