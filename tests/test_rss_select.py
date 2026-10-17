@@ -4,7 +4,8 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from popme import briefing
-from popme.collectors import rss
+from popme import topics
+from popme.sources import rss
 from popme.db import DB
 
 
@@ -23,7 +24,7 @@ from popme.db import DB
     ("Parsing HTML and XML faster", False),  # html·xml의 ml
 ])
 def test_is_ai(title, want):
-    assert rss.is_ai({"title": title, "summary": ""}) is want
+    assert topics.is_ai({"title": title, "summary": ""}) is want
 
 
 def test_skip_drops_nightly(monkeypatch):
@@ -126,3 +127,24 @@ def test_fetch_reads_gzip_body(monkeypatch):
             return body
     monkeypatch.setattr(rss.urllib.request, "urlopen", lambda req, timeout=20: R())
     assert [i["title"] for i in rss.fetch({"name": "DeepMind", "url": "https://example.com/rss.xml"})] == ["Gemma 4"]
+
+
+@pytest.mark.parametrize("title, topic, want", [
+    ("pandas 3.0: copy-on-write가 기본값이 됩니다", "data", True),
+    ("Spotify가 A/B 테스트에 베이지안을 쓰지 않는 이유", "data", True),
+    ("CUPED로 실험 분산 줄이기", "data", True),
+    ("Muse Spark Open 공개", "data", False),          # Spark는 Apache Spark일 때만
+    ("회귀 테스트를 자동화한 이야기", "data", False),     # 회귀는 분석·모형일 때만
+    ("Biweekly bi-annual report", "data", False),     # BI는 대문자 약어일 때만
+    ("vLLM 0.31: FP8 KV cache 기본 지원", "ml", True),
+    ("Qwen 4 open weights 공개", "ml", True),
+    ("llm-gemini 0.30 plugin release", "ml", False),  # 소문자 llm(플러그인 이름)은 아님
+    ("에픽게임즈 런처 재작성", "ml", False),
+    ("Claude Code로 사이드 프로젝트", "ai+data", True),
+    ("DuckDB 2.0 출시", "ai+data", True),
+    ("Wayland 데스크톱 출시", "ai+data", False),
+    ("아무 글", None, True),                         # topic 없으면 다 통과
+    ("아무 글", "unknown", True),                    # 모르는 이름은 무시
+])
+def test_matches_topics(title, topic, want):
+    assert topics.matches({"title": title, "summary": ""}, topic) is want
