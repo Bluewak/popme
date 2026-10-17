@@ -1,0 +1,103 @@
+# 관심사: AI 코딩 에이전트 — 2026-10 직군별 조사(local/research/)에서 고른 출처와 기준. 출처 정의는 popme/feeds.toml
+id = 'ai-coding'
+name = 'AI 코딩 에이전트'
+tag = 'AI 코딩'
+summary = 'Claude Code·Codex 같은 AI 코딩 도구를 쓰며 개발해요'
+order = 1
+status = "ready"
+topic = 'ai'                 # filter = true인 출처를 거를 판별 규칙 (popme/topics.py)
+criteria = """
+- 혜택과 실제 작업에 영향 있는 것 위주. 잡담·홍보는 버린다.
+- 내가 쓰는 AI 코딩 도구(Claude Code·Codex 등)의 새 기능·바뀐 기본값·요금·혜택이 최우선.
+- 목록에 없는 사람이 만든 새 오픈소스·도구도 눈에 띄면 넣는다.
+"""
+discovery = '에이전트·Claude Code·Codex·개발 도구에 실질 정보를 주는 사람'
+
+[caps]                        # 묶음별 상한 (이 관심사 몫)
+'공식 변경내역' = 40
+'공식 발표' = 30
+'실사용 검증' = 15
+'새 오픈소스·화제' = 20
+'한국 커뮤니티' = 20
+
+[[feeds]]
+id = 'claude-code-releases'
+why = 'Claude Code 새 기능·바뀐 기본값'
+
+[[feeds]]
+id = 'codex-releases'
+why = 'Codex 새 기능·바뀐 기본값'
+
+[[feeds]]
+id = 'pi-releases'
+why = 'pi 코딩 에이전트 릴리스'
+
+[[feeds]]
+id = 'openclaw-releases'
+why = 'OpenClaw 릴리스'
+
+[[feeds]]
+id = 'deepagents-releases'
+why = 'Deep Agents 릴리스'
+
+[[feeds]]
+id = 'gemini-cli-releases'
+why = 'Gemini CLI 릴리스'
+
+[[feeds]]
+id = 'openai-news'
+why = 'OpenAI 공식 발표'
+
+[[feeds]]
+id = 'openai-dev-blog'
+why = 'OpenAI API·Codex 개발자 소식'
+
+[[feeds]]
+id = 'anthropic-news'
+why = 'Anthropic 공식 발표'
+
+[[feeds]]
+id = 'claude-blog'
+why = 'Claude 제품·요금 공지 (릴리스 노트에 없는 소식)'
+
+[[feeds]]
+id = 'anthropic-engineering'
+why = 'Anthropic의 에이전트 설계·평가 글'
+
+[[feeds]]
+id = 'google-ai-blog'
+why = 'Google·Gemini 공식 발표'
+
+[[feeds]]
+id = 'xai-news'
+why = 'xAI·Grok 공식 발표'
+
+[[feeds]]
+id = 'hf-blog'
+why = '오픈 웨이트 모델 공개'
+
+[[feeds]]
+id = 'mistral-news'
+why = 'Mistral 공식 발표'
+
+[[feeds]]
+id = 'simon-willison'
+why = '새 모델·도구를 써 본 실사용 평가'
+
+[[feeds]]
+id = 'geeknews'
+why = '한국 개발자들이 많이 본 AI 글'
+filter = 'ai'
+
+[[feeds]]
+id = 'hn-front'
+why = 'Hacker News 인기 글 중 AI'
+filter = 'ai'
+
+[[feeds]]
+id = 'hn-ai-company'
+why = '100점 넘은 AI 회사 글'
+
+[[feeds]]
+id = 'hn-ai-model'
+why = '100점 넘은 AI 모델 글'

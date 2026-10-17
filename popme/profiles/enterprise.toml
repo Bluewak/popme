@@ -1,0 +1,199 @@
+# 관심사: 엔터프라이즈 도입 (FDE) — 2026-10 직군별 조사(local/research/)에서 고른 출처와 기준. 출처 정의는 popme/feeds.toml
+id = 'enterprise'
+name = '엔터프라이즈 도입 (FDE)'
+tag = '도입'
+summary = '모델 단종·가격·리전, 엔터프라이즈 기능 GA, 국내 규제·클라우드'
+order = 4
+status = "ready"
+topic = 'ent'                 # filter = true인 출처를 거를 판별 규칙 (popme/topics.py)
+criteria = """
+- 모델 단종·은퇴, API 가격·쿼터 변경, 서울·국내 리전 도입, 엔터프라이즈 기능 GA(SSO·감사 로그·DLP·네트워크 통제)를 맨 앞에. 날짜·대상 모델·영향 받는 경로(직접 API/Azure/Bedrock/Google)를 적고 Preview와 GA를 구분한다.
+- 보안은 고객 시스템에 닿는 것만: 프롬프트 인젝션·에이전트·MCP·LLM 게이트웨이 취약점, 큰 API 장애. 심각도·영향 범위·대응을 한 줄로.
+- 국내 규제(AI 기본법·개인정보위·금융권 망분리·공공 클라우드 기준)와 국내 LLM·클라우드(HyperCLOVA X·EXAONE·Solar·네이버·KT·NHN) 소식은 시행일·적용 대상을 적는다.
+- 새 모델은 「어느 클라우드에서 언제 쓸 수 있나·라이선스·가격」으로 카드 하나에 묶고, 벤치마크 수치는 「~라는 주장」으로.
+- SDK·CLI 패치, 다른 리전 확장, 투자·인수, 소비자 기능, 벤더 마케팅·행사 홍보는 넣지 않는다.
+"""
+discovery = '엔터프라이즈 도입·클라우드 AI·AI 보안·국내 규제에 실질 정보를 주는 사람'
+
+[caps]                        # 묶음별 상한 (이 관심사 몫)
+'플랫폼 변경내역' = 15
+'공식 발표' = 20
+'공식 변경내역' = 8
+'장애' = 5
+'보안·규제' = 10
+'실사용 검증' = 8
+'새 오픈소스·화제' = 8
+'한국 커뮤니티' = 10
+'한국 테크블로그' = 8
+
+[[feeds]]
+id = 'aws-whatsnew'
+why = 'Bedrock·AgentCore·서울 리전 새 소식'
+
+[[feeds]]
+id = 'azure-updates'
+why = 'Azure OpenAI·Foundry 새 소식'
+
+[[feeds]]
+id = 'foundry-blog'
+why = 'Microsoft Foundry 월간 새 기능'
+
+[[feeds]]
+id = 'geap-rn'
+why = 'Google 엔터프라이즈 에이전트 플랫폼 변경'
+
+[[feeds]]
+id = 'github-changelog'
+why = 'GitHub Copilot 단종·엔터프라이즈 기능'
+
+[[feeds]]
+id = 'openai-news'
+why = '모델·가격·엔터프라이즈 플랜'
+
+[[feeds]]
+id = 'openai-dev-blog'
+why = 'API 변경'
+
+[[feeds]]
+id = 'anthropic-news'
+why = '모델·가격·엔터프라이즈'
+
+[[feeds]]
+id = 'claude-blog'
+why = 'Claude 엔터프라이즈 기능'
+
+[[feeds]]
+id = 'google-ai-blog'
+why = 'Gemini 발표'
+
+[[feeds]]
+id = 'google-cloud-ai'
+why = 'Google Cloud AI 발표'
+
+[[feeds]]
+id = 'google-dev-blog'
+why = 'Gemini API 새 기능'
+
+[[feeds]]
+id = 'workspace-updates'
+why = 'Workspace Gemini·관리 기능'
+
+[[feeds]]
+id = 'm365-roadmap'
+why = 'M365 Copilot 로드맵 (M365 고객이 많을 때)'
+default = false               # 「더 볼 수 있는 출처」 — 직접 켜야 받는다
+
+[[feeds]]
+id = 'mcp-blog'
+why = 'MCP 명세·인가·로드맵'
+
+[[feeds]]
+id = 'mistral-news'
+why = '온프레미스·소버린 배포'
+
+[[feeds]]
+id = 'hf-blog'
+why = '망분리 고객용 오픈 웨이트(라이선스)'
+
+[[feeds]]
+id = 'cohere-blog'
+why = '엔터프라이즈·소버린 벤더'
+default = false               # 「더 볼 수 있는 출처」 — 직접 켜야 받는다
+
+[[feeds]]
+id = 'mcp-spec'
+why = 'MCP 명세 개정 (사내 커넥터 호환성)'
+
+[[feeds]]
+id = 'mcp-python-sdk'
+why = 'MCP Python SDK'
+
+[[feeds]]
+id = 'mcp-ts-sdk'
+why = 'MCP TypeScript SDK'
+
+[[feeds]]
+id = 'openai-agents-sdk'
+why = 'OpenAI Agents SDK'
+
+[[feeds]]
+id = 'claude-code-releases'
+why = '고객사 코딩 에이전트 배포 변경'
+
+[[feeds]]
+id = 'claude-status'
+why = 'Claude API 장애'
+
+[[feeds]]
+id = 'openai-status'
+why = 'OpenAI API 장애'
+
+[[feeds]]
+id = 'kisa'
+why = 'KISA 보안 공지'
+
+[[feeds]]
+id = 'owasp-genai'
+why = 'LLM 보안 Top 10·익스플로잇 정리'
+
+[[feeds]]
+id = 'embrace-the-red'
+why = '에이전트 취약점 실증'
+
+[[feeds]]
+id = 'msit'
+why = '과기정통부 AI 정책'
+filter = true
+
+[[feeds]]
+id = 'anthropic-engineering'
+why = '에이전트 설계·평가'
+
+[[feeds]]
+id = 'simon-willison'
+why = '프롬프트 인젝션·모델 정리'
+
+[[feeds]]
+id = 'latent-space'
+why = '업계 흐름'
+
+[[feeds]]
+id = 'hamel'
+why = '평가 실무'
+
+[[feeds]]
+id = 'hn-enterprise'
+why = 'Bedrock·Azure·Vertex·MCP 화제'
+
+[[feeds]]
+id = 'hn-front'
+why = 'Hacker News 인기 글 중 AI'
+filter = 'ai'
+
+[[feeds]]
+id = 'aitimes'
+why = '국내 AI 업계 소식 (도입·규제만)'
+filter = true
+
+[[feeds]]
+id = 'geeknews'
+why = '한국 개발자들이 많이 본 AI 글'
+filter = 'ai'
+
+[[feeds]]
+id = 'naver-cloud'
+why = 'HyperCLOVA X·공공 보안 기준'
+
+[[feeds]]
+id = 'aws-korea'
+why = 'AWS 코리아 주간 소식'
+
+[[feeds]]
+id = 'nhn-cloud'
+why = 'NHN Cloud AI 활용'
+
+[[feeds]]
+id = 'kt-cloud'
+why = 'KT Cloud 기술 글'
+filter = 'ai'
+default = false               # 「더 볼 수 있는 출처」 — 직접 켜야 받는다

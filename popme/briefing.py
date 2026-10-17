@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 from popme import agenda, clock, discovery, event_weather, llm, search
 from popme.character import Character
-from popme import topics
+from popme import catalog, topics
 
 log = logging.getLogger(__name__)
 
@@ -216,17 +216,14 @@ def build_data(cfg, db, since_iso, with_events=False):
     return "\n".join(parts)
 
 
-# RSS를 브리핑에 넘길 때 묶음(group)마다 최신순 상한. 예전엔 묶음 이름순 정렬 뒤 앞 120개라
-# 가나다순으로 뒤인 묶음(한국 커뮤니티)이 내용과 상관없이 잘렸다. 공식 출처를 먼저, 넉넉히
-RSS_CAPS = {"공식 변경내역": 40, "공식 발표": 30, "실사용 검증": 15, "새 오픈소스·화제": 20, "한국 커뮤니티": 20}
-RSS_CAP_OTHER = 15
-
-
 def rss_items(cfg, db, since_iso):
-    """브리핑에 넘길 RSS 글. topic이 있는 피드(일반 개발 커뮤니티)는 그 주제 글만("ai", "data", "ml", "ai+data") — 수집은 전부 해 두고
-    여기서 고른다 (관심사가 바뀌어도 같은 자료를 다른 기준으로 고를 수 있게)."""
-    topic = {f.get("name"): f.get("topic") for f in cfg.get("rss", [])}
-    skip = {f.get("name"): re.compile(f["skip"], re.I) for f in cfg.get("rss", []) if f.get("skip")}  # 이미 저장된 시험판도
+    """브리핑에 넘길 RSS 글. 지금 받는 출처(popme/catalog.py active)의 글만, 출처마다 거르기 규칙(topic: "ai", "data",
+    "ai+data" …)이 있으면 그 주제 글만 — 수집은 전부 해 두고 여기서 고른다 (관심사가 바뀌어도 같은 자료를 다른 기준으로).
+    묶음(group)마다 최신순 상한(catalog.caps). 예전엔 묶음 이름순 정렬 뒤 앞 120개라 가나다순으로 뒤인 묶음이 잘렸다."""
+    feeds = {f.get("name"): f for f in catalog.active(cfg)}
+    only_active = "news" in cfg  # 예전 config는 DB의 모든 출처 (옮기기 전)
+    skip = {n: re.compile(f["skip"], re.I) for n, f in feeds.items() if f.get("skip")}  # 이미 저장된 시험판도
+    caps = catalog.caps(cfg)
     # 넣을 글: 올라온 시각이 구간 안이거나, 이번에 처음 본 글이면서 이틀 안에 올라온 글.
     # 미러 피드(Anthropic·Claude)는 시각 없이 날짜만 줘서 0시로 찍히는데, 그러면 낮에 올라온 글이 구간 밖으로 밀린다.
     # 처음 본 시각(collected_at)은 바뀌지 않으니 다음 날 브리핑에 또 들어가지 않는다
@@ -242,13 +239,16 @@ def rss_items(cfg, db, since_iso):
         posted = min(datetime.fromisoformat(r["published"]), seen) if r["published"] else seen
         if posted < since and not new:
             continue
-        if not topics.matches(r, topic.get(r["source"])):
+        feed = feeds.get(r["source"])
+        if feed is None and only_active:
+            continue
+        if not topics.matches(r, (feed or {}).get("topic")):
             continue
         if r["source"] in skip and skip[r["source"]].search(r["title"] or ""):
             continue
-        groups.setdefault(r["grp"], []).append(r)
-    order = list(RSS_CAPS) + sorted(g for g in groups if g not in RSS_CAPS)
-    return [r for g in order for r in groups.get(g, [])[:RSS_CAPS.get(g, RSS_CAP_OTHER)]]
+        groups.setdefault((feed or {}).get("group") or r["grp"], []).append(r)  # 묶음을 옮긴 출처는 지금 묶음으로
+    order = list(caps) + sorted(g for g in groups if g not in caps)
+    return [r for g in order for r in groups.get(g, [])[:caps.get(g, catalog.EXTRA_CAP)]]
 
 
 def _fill(template, **kw):

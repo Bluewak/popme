@@ -1,0 +1,219 @@
+# 관심사: LLM 앱·RAG — 2026-10 직군별 조사(local/research/)에서 고른 출처와 기준. 출처 정의는 popme/feeds.toml
+id = 'llm-apps'
+name = 'LLM 앱·RAG'
+tag = 'LLM 앱'
+summary = 'RAG·에이전트 앱: 프레임워크·벡터 DB·임베딩·문서 파싱·평가'
+order = 5
+status = "ready"
+topic = 'rag'                 # filter = true인 출처를 거를 판별 규칙 (popme/topics.py)
+criteria = """
+- 쓰는 프레임워크(LangChain·LangGraph·LlamaIndex·DSPy·Agents SDK·MCP)와 벡터 DB의 깨지는 변경·지원 중단·기본값 변경·보안 패치는 영향 버전·옮기는 법과 함께 맨 앞에. 패치 릴리스는 검색 결과·인덱스·체크포인트가 바뀔 때만.
+- LLM API의 구조화 출력·툴 호출·캐시·가격·단종, 새 임베딩·리랭커(차원·가격·한국어 지원·다시 색인해야 하는지)는 놓치지 않는다.
+- 새 RAG·검색 기법은 공개 벤치마크나 재현 가능한 수치가 있을 때만, 벤더 수치는 「~라는 주장」으로. 개념 설명·입문·「RAG is dead」 류·고객 사례·웨비나·제휴는 버린다.
+- 프롬프트 인젝션·에이전트 보안은 실제 CVE·공개 PoC와 방어법이 있는 것만.
+- HWP·스캔 PDF·표 파싱, 한국어 임베딩, 국내 구축 사례는 작아도 넣는다. rc·nightly·dev·내부 태그는 넣지 않는다.
+"""
+discovery = 'RAG·검색·임베딩·문서 파싱·LLM 앱 평가에 실질 정보를 주는 사람'
+
+[caps]                        # 묶음별 상한 (이 관심사 몫)
+'공식 변경내역' = 30
+'플랫폼 변경내역' = 3
+'공식 발표' = 15
+'실사용 검증' = 8
+'보안·규제' = 5
+'새 오픈소스·화제' = 8
+'해외 커뮤니티' = 8
+'한국 커뮤니티' = 8
+'한국 테크블로그' = 5
+
+[[feeds]]
+id = 'langchain-changelog'
+why = 'LangChain·LangGraph 주요 릴리스 요약'
+
+[[feeds]]
+id = 'langgraph-releases'
+why = 'LangGraph 변경'
+
+[[feeds]]
+id = 'langsmith-changelog'
+why = 'LangSmith 변경'
+
+[[feeds]]
+id = 'llamaindex-releases'
+why = 'LlamaIndex 변경'
+
+[[feeds]]
+id = 'dspy-releases'
+why = 'DSPy 변경'
+
+[[feeds]]
+id = 'haystack-releases'
+why = 'Haystack 변경'
+
+[[feeds]]
+id = 'openai-agents-sdk'
+why = 'OpenAI Agents SDK 변경'
+
+[[feeds]]
+id = 'mcp-spec'
+why = 'MCP 명세 개정'
+
+[[feeds]]
+id = 'qdrant-releases'
+why = 'Qdrant 변경'
+
+[[feeds]]
+id = 'milvus-releases'
+why = 'Milvus 변경'
+
+[[feeds]]
+id = 'weaviate-releases'
+why = 'Weaviate 변경·보안'
+
+[[feeds]]
+id = 'pgvector-tags'
+why = 'pgvector 새 버전'
+
+[[feeds]]
+id = 'chroma-releases'
+why = 'Chroma 변경'
+
+[[feeds]]
+id = 'sentence-transformers-releases'
+why = 'sentence-transformers 변경'
+
+[[feeds]]
+id = 'docling-releases'
+why = 'Docling 문서 파싱 변경'
+
+[[feeds]]
+id = 'unstructured-releases'
+why = 'Unstructured 문서 파싱 변경'
+
+[[feeds]]
+id = 'langfuse-releases'
+why = 'Langfuse 관측 변경'
+
+[[feeds]]
+id = 'phoenix-releases'
+why = 'Arize Phoenix 관측 변경 (Langfuse 대신 쓸 때)'
+default = false               # 「더 볼 수 있는 출처」 — 직접 켜야 받는다
+
+[[feeds]]
+id = 'openai-news'
+why = 'API 구조화 출력·툴 호출·가격'
+
+[[feeds]]
+id = 'openai-dev-blog'
+why = 'OpenAI API 변경'
+
+[[feeds]]
+id = 'anthropic-news'
+why = 'Anthropic 모델·API'
+
+[[feeds]]
+id = 'claude-blog'
+why = 'Claude API 기능'
+
+[[feeds]]
+id = 'google-ai-blog'
+why = 'Gemini API 기능'
+
+[[feeds]]
+id = 'hf-blog'
+why = '임베딩·오픈 모델 공개'
+
+[[feeds]]
+id = 'weaviate-blog'
+why = 'Weaviate 기능·보안 공지'
+
+[[feeds]]
+id = 'qdrant-blog'
+why = 'Qdrant 기능·검색 실측'
+
+[[feeds]]
+id = 'pinecone-blog'
+why = 'Pinecone 기능·가격'
+
+[[feeds]]
+id = 'voyage-blog'
+why = '임베딩·리랭커 출시'
+
+[[feeds]]
+id = 'cohere-blog'
+why = 'Cohere 임베딩·리랭커 (검색 관련만)'
+filter = true
+
+[[feeds]]
+id = 'langchain-blog'
+why = 'LangChain 공식 발표 (고객 사례 뺌)'
+
+[[feeds]]
+id = 'foundry-blog'
+why = 'Microsoft 문서 AI·에이전트'
+
+[[feeds]]
+id = 'aws-ml-blog'
+why = 'AWS RAG 관련 글'
+filter = true
+
+[[feeds]]
+id = 'anthropic-engineering'
+why = '컨텍스트 엔지니어링·에이전트 설계'
+
+[[feeds]]
+id = 'simon-willison'
+why = '프롬프트 인젝션·모델 정리'
+
+[[feeds]]
+id = 'hamel'
+why = '평가·LLM-as-judge'
+
+[[feeds]]
+id = 'elastic-search-labs'
+why = '검색·리랭커·kNN 실측'
+
+[[feeds]]
+id = 'embrace-the-red'
+why = '프롬프트 인젝션 실제 CVE'
+
+[[feeds]]
+id = 'owasp-genai'
+why = 'LLM 보안 Top 10'
+
+[[feeds]]
+id = 'hn-rag'
+why = 'Hacker News RAG 화제'
+
+[[feeds]]
+id = 'kordoc-releases'
+why = 'HWP·HWPX 문서 변환기'
+
+[[feeds]]
+id = 'reddit-rag'
+why = 'RAG 커뮤니티 주간 인기'
+
+[[feeds]]
+id = 'hn-front'
+why = 'Hacker News 인기 글 중 AI'
+filter = 'ai'
+
+[[feeds]]
+id = 'geeknews'
+why = '한국 개발자들이 많이 본 AI 글'
+filter = 'ai'
+
+[[feeds]]
+id = 'pytorchkr'
+why = '한국 커뮤니티 RAG·임베딩 소식'
+filter = true
+
+[[feeds]]
+id = 'naver-d2'
+why = '네이버 검색·RAG 글'
+filter = true
+
+[[feeds]]
+id = 'toss-tech'
+why = '토스 RAG·검색 글'
+filter = true

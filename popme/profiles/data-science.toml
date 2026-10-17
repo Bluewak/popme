@@ -1,0 +1,258 @@
+# 관심사: 데이터 사이언스 — 2026-10 직군별 조사(local/research/)에서 고른 출처와 기준. 출처 정의는 popme/feeds.toml
+id = 'data-science'
+name = '데이터 사이언스'
+tag = '데이터'
+summary = 'pandas·SQL·실험·통계, 데이터 플랫폼 가격·변경'
+order = 2
+status = "ready"
+topic = 'data'                 # filter = true인 출처를 거를 판별 규칙 (popme/topics.py)
+criteria = """
+- 쓰는 라이브러리(pandas·Polars·scikit-learn·statsmodels·PyMC·DuckDB·dbt 등)와 데이터 플랫폼의 메이저 버전·기본값 변경·지원 종료·가격·쿼터가 최우선. 버그 수정 릴리스는 결과 수치가 바뀌는 수정(통계 검정·난수·결측·조인)일 때만.
+- 실험 설계·인과추론·통계는 실제 회사가 적용한 사례나 오래 쓸 방법론만. 입문 튜토리얼·리스트형 글·벤더 고객사례·행사 홍보는 버린다.
+- LLM 소식은 분석 업무·데이터 제품에 쓰는 법(평가·라벨링·text-to-SQL·분석 에이전트·API 가격·batch)일 때만.
+- 논문은 하루 1편까지, 실무 영향이 분명한 것만. 벤치마크 수치는 「~라는 주장」으로.
+- 시험판(dev·rc·nightly), 리전 확장, 커넥터 Beta 추가는 넣지 않는다.
+"""
+discovery = '실험·통계·데이터 도구·LLM 분석 활용에 실질 정보를 주는 사람'
+
+[caps]                        # 묶음별 상한 (이 관심사 몫)
+'공식 변경내역' = 20
+'플랫폼 변경내역' = 15
+'공식 발표' = 15
+'실사용 검증' = 20
+'한국 테크블로그' = 8
+'새 오픈소스·화제' = 10
+'한국 커뮤니티' = 10
+'논문' = 3
+
+[[feeds]]
+id = 'pandas-releases'
+why = 'pandas 메이저 버전·기본값 변경'
+
+[[feeds]]
+id = 'polars-releases'
+why = 'Polars 메이저 버전·기본값 변경'
+
+[[feeds]]
+id = 'sklearn-releases'
+why = 'scikit-learn 변경'
+
+[[feeds]]
+id = 'statsmodels-releases'
+why = 'statsmodels 변경'
+
+[[feeds]]
+id = 'pymc-releases'
+why = 'PyMC 변경'
+
+[[feeds]]
+id = 'numpy-releases'
+why = 'NumPy 변경'
+
+[[feeds]]
+id = 'duckdb-releases'
+why = 'DuckDB 메이저 버전·기본값 변경'
+
+[[feeds]]
+id = 'dbt-core-releases'
+why = 'dbt 변경'
+
+[[feeds]]
+id = 'mlflow-releases'
+why = 'MLflow 변경'
+
+[[feeds]]
+id = 'jupyterlab-releases'
+why = 'JupyterLab 변경'
+
+[[feeds]]
+id = 'marimo-releases'
+why = 'marimo 노트북 변경'
+
+[[feeds]]
+id = 'xgboost-releases'
+why = 'XGBoost 변경'
+
+[[feeds]]
+id = 'causalml-releases'
+why = 'causalml(인과추론) 변경'
+
+[[feeds]]
+id = 'prophet-releases'
+why = 'Prophet 변경'
+
+[[feeds]]
+id = 'bigquery-rn'
+why = 'BigQuery 가격·기능·지원 종료'
+
+[[feeds]]
+id = 'looker-rn'
+why = 'Looker 변경'
+
+[[feeds]]
+id = 'databricks-rn'
+why = 'Databricks 변경 (잡공지 뺌)'
+
+[[feeds]]
+id = 'aws-bigdata'
+why = 'AWS 데이터 서비스 소식'
+
+[[feeds]]
+id = 'powerbi-blog'
+why = 'Power BI 월간 기능 요약'
+
+[[feeds]]
+id = 'fabric-blog'
+why = 'Microsoft Fabric 소식'
+
+[[feeds]]
+id = 'dbt-blog'
+why = 'dbt 공식 발표'
+
+[[feeds]]
+id = 'duckdb-blog'
+why = 'DuckDB 공식 발표'
+
+[[feeds]]
+id = 'sklearn-blog'
+why = 'scikit-learn 릴리스 해설'
+
+[[feeds]]
+id = 'posit-blog'
+why = 'Posit(R·Positron) 소식'
+
+[[feeds]]
+id = 'snowflake-blog'
+why = 'Snowflake 소식'
+
+[[feeds]]
+id = 'python-blog'
+why = 'Python 공식 발표'
+
+[[feeds]]
+id = 'openai-news'
+why = 'LLM API 가격·기능'
+
+[[feeds]]
+id = 'openai-dev-blog'
+why = 'OpenAI API 소식'
+
+[[feeds]]
+id = 'anthropic-news'
+why = 'Anthropic 모델·요금'
+
+[[feeds]]
+id = 'claude-blog'
+why = 'Claude 제품·요금 공지'
+
+[[feeds]]
+id = 'google-ai-blog'
+why = 'Gemini·BigQuery 연동 소식'
+
+[[feeds]]
+id = 'gelman'
+why = '통계 담론'
+
+[[feeds]]
+id = 'meta-analytics'
+why = '인과추론·A/B 테스트 사례'
+
+[[feeds]]
+id = 'ms-exp'
+why = '실험 플랫폼 방법론'
+
+[[feeds]]
+id = 'spotify-eng'
+why = '실험 사례'
+
+[[feeds]]
+id = 'booking-ai'
+why = '실험 사례'
+
+[[feeds]]
+id = 'etsy-eng'
+why = '실험 사례 (분산 감소)'
+
+[[feeds]]
+id = 'instacart-tech'
+why = '실험 사례'
+
+[[feeds]]
+id = 'netflix-tech'
+why = '현업 사례'
+
+[[feeds]]
+id = 'airbnb-eng'
+why = '현업 사례'
+
+[[feeds]]
+id = 'pinterest-eng'
+why = '지표·현업 사례'
+
+[[feeds]]
+id = 'spotify-research'
+why = '추천·평가'
+
+[[feeds]]
+id = 'google-research'
+why = '시계열·표 데이터 연구'
+
+[[feeds]]
+id = 'hamel'
+why = 'LLM 평가 실무'
+
+[[feeds]]
+id = 'simon-willison'
+why = 'LLM 도구 실사용'
+
+[[feeds]]
+id = 'kakao-tech'
+why = '카카오 데이터·추천 글'
+
+[[feeds]]
+id = 'ly-tech'
+why = 'LY 분석 글'
+filter = true
+
+[[feeds]]
+id = 'naver-d2'
+why = '네이버 데이터 글'
+filter = true
+
+[[feeds]]
+id = 'toss-tech'
+why = '토스 데이터 글'
+filter = true
+
+[[feeds]]
+id = 'woowahan-tech'
+why = '배민 데이터 글'
+filter = true
+
+[[feeds]]
+id = 'musinsa-tech'
+why = '무신사 개인화·추천'
+filter = true
+
+[[feeds]]
+id = 'zzsza-blog'
+why = '데이터 사이언티스트 커리어'
+
+[[feeds]]
+id = 'hn-data'
+why = 'Hacker News 데이터 도구 글'
+
+[[feeds]]
+id = 'hn-front'
+why = 'Hacker News 인기 글 중 AI·데이터'
+filter = 'ai+data'
+
+[[feeds]]
+id = 'geeknews'
+why = '한국 개발자들이 많이 본 AI·데이터 글'
+filter = 'ai+data'
+
+[[feeds]]
+id = 'arxiv-econ-em'
+why = '계량경제 논문 (하루 0~1편만)'
+default = false               # 「더 볼 수 있는 출처」 — 직접 켜야 받는다

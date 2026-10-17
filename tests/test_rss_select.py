@@ -1,9 +1,9 @@
-"""RSS 고르기 (popme/collectors/rss.py, popme/briefing.py rss_items): 커뮤니티는 AI 글만, 묶음별 상한, 시험판 빼기."""
+"""RSS 고르기 (popme/topics.py, popme/briefing.py rss_items): 커뮤니티는 AI 글만, 묶음별 상한, 시험판 빼기."""
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from popme import briefing
+from popme import briefing, catalog
 from popme import topics
 from popme.sources import rss
 from popme.db import DB
@@ -65,7 +65,7 @@ def test_rss_items_filters_community_and_caps_groups(tmp_path, monkeypatch):
     got = briefing.rss_items(cfg, db, (now - timedelta(days=2)).isoformat())
     official = [r for r in got if r["grp"] == "공식 변경내역"]
     community = [r for r in got if r["grp"] == "한국 커뮤니티"]
-    assert len(official) == briefing.RSS_CAPS["공식 변경내역"] and official[0]["title"] == "v0"  # 최신부터
+    assert len(official) == catalog.LEGACY_CAPS["공식 변경내역"] and official[0]["title"] == "v0"  # 최신부터
     assert len(community) == 15 and all("Claude" in r["title"] for r in community)  # AI 글만
     assert got.index(official[0]) < got.index(community[0])  # 공식 출처가 먼저
     assert "옛 글" not in [r["title"] for r in got]

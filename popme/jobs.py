@@ -5,7 +5,7 @@ import threading
 import time
 from datetime import datetime
 
-from popme import briefing, chrome, config, discovery, event_weather, llm, sources
+from popme import briefing, catalog, chrome, config, discovery, event_weather, llm, sources
 from popme.collectors import NeedLogin, caldav, ics, threads, timetree, x
 from popme.db import DB
 
@@ -150,7 +150,7 @@ class Jobs:
             if collect:
                 self._browser_collect(warnings)
                 self._progress("RSS 수집 중")
-                items, errs = sources.collect(self.cfg.get("rss", []), self._progress)
+                items, errs = sources.collect(catalog.active(self.cfg), self._progress)
                 self.db.upsert_items(items)
                 warnings += [f"RSS 실패 — {e}" for e in errs]
             if make_brief:
