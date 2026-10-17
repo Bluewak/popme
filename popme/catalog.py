@@ -99,6 +99,23 @@ def caps(cfg):
     return total
 
 
+def save_interests(ids):
+    """고른 관심사를 config.toml [news] interests에 바로 저장 (주석·다른 설정은 그대로). 모르는 id는 버린다.
+    출처 목록은 다음 수집부터 바뀐다. 반환: 저장한 id들."""
+    from popme.setup_window import base_text, set_value
+    known = {p["id"] for p in profiles(drafts=True)}
+    ids = [i for i in dict.fromkeys(ids) if i in known]
+    text = set_value(base_text(), "news", "interests", ids, before=("llm",))
+    tomllib.loads(text)  # 깨진 설정은 쓰지 않는다
+    config.CONFIG_PATH.write_text(text, encoding="utf-8", newline="\n")
+    return ids
+
+
+def tags():
+    """관심사 태그 → id (태그 고치기에서 허용할 값)."""
+    return {p["tag"]: p["id"] for p in profiles(drafts=True)}
+
+
 # ---------------------------------------------------------------- 예전 config 옮기기
 
 def _norm(url):
