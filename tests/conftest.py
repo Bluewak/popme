@@ -21,3 +21,11 @@ def no_personal_config(monkeypatch, tmp_path):
     """테스트는 내 config.toml을 읽지도 고치지도 않는다 (config.load가 예전 형식을 옮기므로) — 없는 경로로 돌려 example을 쓰게."""
     from popme import config
     monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.toml")
+
+
+@pytest.fixture(autouse=True)
+def no_feed_cache(monkeypatch, tmp_path):
+    """RSS 조건부 요청 캐시(ETag 등)도 내 PC 것 대신 임시 파일로."""
+    from popme.sources import rss
+    monkeypatch.setattr(rss, "CACHE_PATH", tmp_path / "feed-cache.json")
+    monkeypatch.setattr(rss, "_cache", None)

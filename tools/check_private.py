@@ -22,7 +22,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 BLOCKED_FILES = [
-    "config.toml", "PLAN.md", ".private-words.txt", "*.db", "*.log", "*.zip",
+    "config.toml", "config.toml.bak-*", "PLAN.md", ".private-words.txt", "*.db", "*.log", "*.zip",
     "assets/backup/*", "docs/bubble_mockups.png",
     "*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp", "*.ico",  # 이미지는 아래 허용 목록에 있는 것만
 ]

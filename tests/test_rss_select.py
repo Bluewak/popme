@@ -34,6 +34,8 @@ def test_skip_drops_nightly(monkeypatch):
     </feed>"""
 
     class R:
+        headers = {}
+
         def __enter__(self):
             return self
 
@@ -117,6 +119,8 @@ def test_fetch_reads_gzip_body(monkeypatch):
     body = gzip.compress(b'<rss><channel><item><title>Gemma 4</title><link>https://g/1</link></item></channel></rss>')
 
     class R:
+        headers = {}
+
         def __enter__(self):
             return self
 

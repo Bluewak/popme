@@ -56,3 +56,62 @@ def test_unknown_type_is_an_error():
 ])
 def test_ent_rag_topics(title, topic, want):
     assert topics.matches({"title": title, "summary": ""}, topic) is want
+
+
+def test_rss_asks_only_for_changes(monkeypatch):
+    """두 번째부터는 ETag·Last-Modified를 붙여 묻고, 304(바뀐 것 없음)면 빈 목록 — 글은 이미 DB에 있다."""
+    import json
+    import urllib.error
+    from popme.sources import rss
+    atom = b'<feed xmlns="http://www.w3.org/2005/Atom"><entry><title>v1</title><link href="https://g/1"/></entry></feed>'
+    seen = []
+
+    class R:
+        headers = {"ETag": 'W/"abc"', "Last-Modified": "Sat, 17 Oct 2026 15:17:32 GMT"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+        def read(self):
+            return atom
+
+    def urlopen(req, timeout=20):
+        seen.append(dict(req.header_items()))
+        if req.get_header("If-none-match") == 'W/"abc"':
+            raise urllib.error.HTTPError(req.full_url, 304, "Not Modified", {}, None)
+        return R()
+
+    monkeypatch.setattr(rss.urllib.request, "urlopen", urlopen)
+    feed = {"name": "Codex 릴리스", "url": "https://github.com/openai/codex/releases.atom"}
+    assert [i["title"] for i in rss.fetch(feed)] == ["v1"]
+    assert rss.fetch(feed) == []
+    assert seen[1]["If-modified-since"] == "Sat, 17 Oct 2026 15:17:32 GMT"
+    rss.flush()
+    assert json.loads(rss.CACHE_PATH.read_text(encoding="utf-8"))[feed["url"]]["etag"] == 'W/"abc"'
+    # 오래된 값은 쓰지 않는다 (DB를 지웠어도 다시 받게)
+    rss._cache[feed["url"]]["at"] = "2026-01-01T00:00:00+00:00"
+    assert [i["title"] for i in rss.fetch(feed)] == ["v1"]
+
+
+def test_rss_broken_body_is_not_remembered(monkeypatch):
+    from popme.sources import rss
+
+    class R:
+        headers = {"ETag": '"x"'}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+        def read(self):
+            return b"<not xml"
+
+    monkeypatch.setattr(rss.urllib.request, "urlopen", lambda req, timeout=20: R())
+    with pytest.raises(Exception):
+        rss.fetch({"name": "x", "url": "https://e/x"})
+    assert "https://e/x" not in rss._load()
