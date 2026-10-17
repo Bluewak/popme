@@ -25,7 +25,15 @@ logging.basicConfig(
 
 
 def load() -> dict:
-    """개인 설정 config.toml (저장소 제외) → 없으면 config.example.toml."""
+    """개인 설정 config.toml (저장소 제외) → 없으면 config.example.toml.
+    예전 형식(관심사 없이 [[rss]]만)이면 먼저 새 형식으로 옮긴다 (백업: config.toml.bak-날짜)."""
+    from popme import catalog
+    try:
+        note = catalog.migrate_file()
+        if note:
+            logging.getLogger(__name__).info(note)
+    except Exception:
+        logging.getLogger(__name__).exception("소식 출처 옮기기 실패 — 예전 형식 그대로 씀")
     path = CONFIG_PATH if CONFIG_PATH.exists() else ROOT / "config.example.toml"
     with open(path, "rb") as f:
         return tomllib.load(f)

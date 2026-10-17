@@ -1,0 +1,1045 @@
+# POPME 소식 출처 목록 — 관심사(popme/profiles/*.toml)가 id로 가리킨다.
+# id는 절대 바꾸지 않는다 (config의 off·on·tweak이 id로 가리킨다). 같은 출처의 주소만 바뀌면 url만 고친다.
+# name을 바꾸면 old_names에 예전 이름을 남긴다 (DB에 저장된 글이 이름으로 이어져 있다).
+# group = 묶음(브리핑에 넘길 때 상한 단위·화면에서 접히는 그룹), type = 출처 모듈 (없으면 rss — popme/sources/)
+# skip = 빼고 싶은 제목(정규식). via = "mirror"면 공식 RSS가 없어 github.com/Olshansk/rss-feeds 미러를 쓴다 (멈추기 쉬움)
+# 2026-10 직군별 조사(AI 코딩·데이터 사이언스·ML 엔지니어링·엔터프라이즈 도입·LLM 앱)에서 실제로 열어 확인한 것들
+
+[feed.claude-code-releases]
+name = 'Claude Code 릴리스'
+url = 'https://github.com/anthropics/claude-code/releases.atom'
+group = '공식 변경내역'
+max_chars = 1500
+
+[feed.codex-releases]
+name = 'Codex 릴리스'
+url = 'https://github.com/openai/codex/releases.atom'
+group = '공식 변경내역'
+max_chars = 1500
+skip = 'alpha|beta|-rc'
+
+[feed.pi-releases]
+name = 'pi 릴리스'
+url = 'https://github.com/badlogic/pi-mono/releases.atom'
+group = '공식 변경내역'
+max_chars = 1000
+
+[feed.openclaw-releases]
+name = 'OpenClaw 릴리스'
+url = 'https://github.com/openclaw/openclaw/releases.atom'
+group = '공식 변경내역'
+max_chars = 1000
+skip = 'release-publish|beta'
+
+[feed.deepagents-releases]
+name = 'Deep Agents 릴리스'
+url = 'https://github.com/langchain-ai/deepagents/releases.atom'
+group = '공식 변경내역'
+max_chars = 1000
+
+[feed.gemini-cli-releases]
+name = 'Gemini CLI 릴리스'
+url = 'https://github.com/google-gemini/gemini-cli/releases.atom'
+group = '공식 변경내역'
+max_chars = 1000
+skip = 'nightly|preview'
+
+[feed.openai-news]
+name = 'OpenAI 뉴스'
+url = 'https://openai.com/news/rss.xml'
+group = '공식 발표'
+max_chars = 400
+
+[feed.openai-dev-blog]
+name = 'OpenAI 개발자 블로그'
+url = 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_openai_developer.xml'
+group = '공식 발표'
+max_chars = 400
+via = "mirror"
+
+[feed.anthropic-news]
+name = 'Anthropic 뉴스'
+url = 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_news.xml'
+group = '공식 발표'
+max_chars = 400
+via = "mirror"
+
+[feed.claude-blog]
+name = 'Claude 블로그'
+url = 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_claude.xml'
+group = '공식 발표'
+max_chars = 400
+via = "mirror"
+
+[feed.anthropic-engineering]
+name = 'Anthropic 엔지니어링'
+url = 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_engineering.xml'
+group = '실사용 검증'
+max_chars = 400
+via = "mirror"
+
+[feed.google-ai-blog]
+name = 'Google AI 블로그'
+url = 'https://blog.google/technology/ai/rss/'
+group = '공식 발표'
+max_chars = 400
+
+[feed.xai-news]
+name = 'xAI 뉴스'
+url = 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_xainews.xml'
+group = '공식 발표'
+max_chars = 400
+via = "mirror"
+
+[feed.hf-blog]
+name = 'Hugging Face 블로그'
+url = 'https://huggingface.co/blog/feed.xml'
+group = '공식 발표'
+max_chars = 400
+
+[feed.mistral-news]
+name = 'Mistral 뉴스'
+url = 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_mistral.xml'
+group = '공식 발표'
+max_chars = 400
+via = "mirror"
+
+[feed.simon-willison]
+name = 'Simon Willison 블로그'
+url = 'https://simonwillison.net/atom/everything/'
+group = '실사용 검증'
+max_chars = 600
+
+[feed.geeknews]
+name = 'GeekNews'
+url = 'https://news.hada.io/rss/news'
+group = '한국 커뮤니티'
+max_chars = 300
+
+[feed.hn-front]
+name = 'Hacker News 인기'
+url = 'https://hnrss.org/frontpage?points=300'
+group = '새 오픈소스·화제'
+max_chars = 200
+
+[feed.hn-ai-company]
+name = 'Hacker News AI 회사'
+url = 'https://hnrss.org/newest?q=Claude+OR+OpenAI+OR+Anthropic+OR+Codex&points=100'
+group = '새 오픈소스·화제'
+max_chars = 200
+
+[feed.hn-ai-model]
+name = 'Hacker News AI 모델'
+url = 'https://hnrss.org/newest?q=LLM+OR+Gemini+OR+Grok+OR+xAI+OR+Llama&points=100'
+group = '새 오픈소스·화제'
+max_chars = 200
+
+[feed.pandas-releases]
+name = 'pandas 릴리스'
+url = 'https://github.com/pandas-dev/pandas/releases.atom'
+group = '공식 변경내역'
+max_chars = 1000
+skip = 'dev|rc'
+
+[feed.polars-releases]
+name = 'Polars 릴리스'
+url = 'https://github.com/pola-rs/polars/releases.atom'
+group = '공식 변경내역'
+max_chars = 1000
+skip = 'rc|beta'
+
+[feed.sklearn-releases]
+name = 'scikit-learn 릴리스'
+url = 'https://github.com/scikit-learn/scikit-learn/releases.atom'
+group = '공식 변경내역'
+max_chars = 1000
+skip = 'rc'
+
+[feed.statsmodels-releases]
+name = 'statsmodels 릴리스'
+url = 'https://github.com/statsmodels/statsmodels/releases.atom'
+group = '공식 변경내역'
+max_chars = 1000
+
+[feed.pymc-releases]
+name = 'PyMC 릴리스'
+url = 'https://github.com/pymc-devs/pymc/releases.atom'
+group = '공식 변경내역'
+max_chars = 800
+
+[feed.numpy-releases]
+name = 'NumPy 릴리스'
+url = 'https://github.com/numpy/numpy/releases.atom'
+group = '공식 변경내역'
+max_chars = 800
+skip = 'rc'
+
+[feed.duckdb-releases]
+name = 'DuckDB 릴리스'
+url = 'https://github.com/duckdb/duckdb/releases.atom'
+group = '공식 변경내역'
+max_chars = 800
+
+[feed.dbt-core-releases]
+name = 'dbt-core 릴리스'
+url = 'https://github.com/dbt-labs/dbt-core/releases.atom'
+group = '공식 변경내역'
+max_chars = 800
+skip = 'b\d|a\d|rc|dev|test'
+
+[feed.mlflow-releases]
+name = 'MLflow 릴리스'
+url = 'https://github.com/mlflow/mlflow/releases.atom'
+group = '공식 변경내역'
+max_chars = 800
+skip = 'rc\d|^ts/|TypeScript|^MLflow 2\.'
+
+[feed.jupyterlab-releases]
+name = 'JupyterLab 릴리스'
+url = 'https://github.com/jupyterlab/jupyterlab/releases.atom'
+group = '공식 변경내역'
+max_chars = 600
+skip = '@jupyterlab|a\d|b\d|rc|alpha'
+
+[feed.marimo-releases]
+name = 'marimo 릴리스'
+url = 'https://github.com/marimo-team/marimo/releases.atom'
+group = '공식 변경내역'
+max_chars = 600
+
+[feed.xgboost-releases]
+name = 'XGBoost 릴리스'
+url = 'https://github.com/dmlc/xgboost/releases.atom'
+group = '공식 변경내역'
+max_chars = 600
+
+[feed.causalml-releases]
+name = 'causalml 릴리스'
+url = 'https://github.com/uber/causalml/releases.atom'
+group = '공식 변경내역'
+max_chars = 600
+
+[feed.prophet-releases]
+name = 'Prophet 릴리스'
+url = 'https://github.com/facebook/prophet/releases.atom'
+group = '공식 변경내역'
+max_chars = 600
+
+[feed.bigquery-rn]
+name = 'BigQuery 변경내역'
+url = 'https://cloud.google.com/feeds/bigquery-release-notes.xml'
+group = '플랫폼 변경내역'
+max_chars = 1500
+note = '제목이 날짜뿐 — 본문을 길게'
+
+[feed.looker-rn]
+name = 'Looker 변경내역'
+url = 'https://cloud.google.com/feeds/looker-release-notes.xml'
+group = '플랫폼 변경내역'
+max_chars = 800
+
+[feed.databricks-rn]
+name = 'Databricks 변경내역'
+url = 'https://docs.databricks.com/aws/en/feed.xml'
+group = '플랫폼 변경내역'
+max_chars = 300
+skip = 'connector is available|compliance security profile|private connectivity|ingress|egress|will soon be available|Unity Gateway'
+note = '하루 약 5건, 앞날짜 글 있음'
+
+[feed.aws-bigdata]
+name = 'AWS 빅데이터 블로그'
+url = 'https://aws.amazon.com/blogs/big-data/feed/'
+group = '플랫폼 변경내역'
+max_chars = 300
+
+[feed.powerbi-blog]
+name = 'Power BI 블로그'
+url = 'https://powerbi.microsoft.com/en-us/blog/feed/'
+group = '플랫폼 변경내역'
+max_chars = 300
+
+[feed.fabric-blog]
+name = 'Microsoft Fabric 블로그'
+url = 'https://blog.fabric.microsoft.com/en-us/blog/feed/'
+group = '플랫폼 변경내역'
+max_chars = 300
+
+[feed.dbt-blog]
+name = 'dbt 블로그'
+url = 'https://www.getdbt.com/blog/rss.xml'
+group = '공식 발표'
+max_chars = 400
+
+[feed.duckdb-blog]
+name = 'DuckDB 블로그'
+url = 'https://duckdb.org/feed.xml'
+group = '공식 발표'
+max_chars = 400
+
+[feed.sklearn-blog]
+name = 'scikit-learn 블로그'
+url = 'https://blog.scikit-learn.org/feed.xml'
+group = '공식 발표'
+max_chars = 400
+
+[feed.posit-blog]
+name = 'Posit 블로그'
+url = 'https://posit.co/blog/rss/'
+group = '공식 발표'
+max_chars = 400
+
+[feed.snowflake-blog]
+name = 'Snowflake 블로그'
+url = 'https://www.snowflake.com/feed/'
+group = '공식 발표'
+max_chars = 300
+note = '공식 release notes RSS는 못 찾음, 마케팅 많음'
+
+[feed.python-blog]
+name = 'Python 공식 블로그'
+url = 'https://blog.python.org/feeds/posts/default'
+group = '공식 발표'
+max_chars = 300
+
+[feed.gelman]
+name = 'Gelman 블로그'
+url = 'https://statmodeling.stat.columbia.edu/feed/'
+group = '실사용 검증'
+max_chars = 400
+
+[feed.meta-analytics]
+name = 'Analytics at Meta'
+url = 'https://medium.com/feed/@AnalyticsAtMeta'
+group = '실사용 검증'
+max_chars = 400
+
+[feed.ms-exp]
+name = 'Microsoft ExP'
+url = 'https://www.microsoft.com/en-us/research/group/experimentation-platform-exp/feed/'
+group = '실사용 검증'
+max_chars = 400
+
+[feed.spotify-eng]
+name = 'Spotify 엔지니어링'
+url = 'https://engineering.atspotify.com/feed/'
+group = '실사용 검증'
+max_chars = 400
+
+[feed.booking-ai]
+name = 'Booking.com AI'
+url = 'https://booking.ai/feed'
+group = '실사용 검증'
+max_chars = 400
+
+[feed.etsy-eng]
+name = 'Etsy Code as Craft'
+url = 'https://www.etsy.com/codeascraft/rss'
+group = '실사용 검증'
+max_chars = 400
+
+[feed.instacart-tech]
+name = 'Instacart 테크'
+url = 'https://tech.instacart.com/feed'
+group = '실사용 검증'
+max_chars = 400
+
+[feed.netflix-tech]
+name = 'Netflix 테크'
+url = 'https://netflixtechblog.com/feed'
+group = '실사용 검증'
+max_chars = 400
+note = '글 날짜가 한꺼번에 찍혀 나옴'
+
+[feed.airbnb-eng]
+name = 'Airbnb 엔지니어링'
+url = 'https://medium.com/feed/airbnb-engineering'
+group = '실사용 검증'
+max_chars = 400
+
+[feed.pinterest-eng]
+name = 'Pinterest 엔지니어링'
+url = 'https://medium.com/feed/pinterest-engineering'
+group = '실사용 검증'
+max_chars = 400
+
+[feed.spotify-research]
+name = 'Spotify 리서치'
+url = 'https://research.atspotify.com/feed/'
+group = '실사용 검증'
+max_chars = 400
+
+[feed.google-research]
+name = 'Google Research'
+url = 'https://research.google/blog/rss/'
+group = '실사용 검증'
+max_chars = 400
+
+[feed.hamel]
+name = 'Hamel Husain'
+url = 'https://hamel.dev/index.xml'
+group = '실사용 검증'
+max_chars = 400
+
+[feed.kakao-tech]
+name = '카카오 기술블로그'
+url = 'https://tech.kakao.com/feed/'
+group = '한국 테크블로그'
+max_chars = 300
+
+[feed.ly-tech]
+name = 'LY 기술블로그'
+url = 'https://techblog.lycorp.co.jp/ko/feed/index.xml'
+group = '한국 테크블로그'
+max_chars = 300
+
+[feed.naver-d2]
+name = '네이버 D2'
+url = 'https://d2.naver.com/d2.atom'
+group = '한국 테크블로그'
+max_chars = 300
+
+[feed.toss-tech]
+name = '토스 기술블로그'
+url = 'https://toss.tech/rss.xml'
+group = '한국 테크블로그'
+max_chars = 300
+
+[feed.woowahan-tech]
+name = '우아한형제들 기술블로그'
+url = 'https://techblog.woowahan.com/feed/'
+group = '한국 테크블로그'
+max_chars = 300
+
+[feed.musinsa-tech]
+name = '무신사 테크'
+url = 'https://medium.com/feed/musinsa-tech'
+group = '한국 테크블로그'
+max_chars = 300
+
+[feed.zzsza-blog]
+name = '변성윤 블로그'
+url = 'https://zzsza.github.io/feed.xml'
+group = '한국 테크블로그'
+max_chars = 300
+
+[feed.hn-data]
+name = 'Hacker News 데이터'
+url = 'https://hnrss.org/newest?q=DuckDB+OR+Polars+OR+pandas+OR+Jupyter+OR+statistics+OR+Bayesian&points=50'
+group = '새 오픈소스·화제'
+max_chars = 200
+
+[feed.arxiv-econ-em]
+name = 'arXiv 계량경제'
+url = 'https://rss.arxiv.org/rss/econ.EM'
+group = '논문'
+max_chars = 300
+note = '하루 9건, 모든 글 날짜가 같음'
+
+[feed.pytorch-releases]
+name = 'PyTorch 릴리스'
+url = 'https://pypi.org/rss/project/torch/releases.xml'
+group = '공식 변경내역'
+max_chars = 200
+note = 'GitHub atom은 trunk/ 태그뿐이라 PyPI (본문 없음)'
+
+[feed.transformers-releases]
+name = 'transformers 릴리스'
+url = 'https://github.com/huggingface/transformers/releases.atom'
+group = '공식 변경내역'
+max_chars = 1500
+skip = 'rc\d'
+
+[feed.vllm-releases]
+name = 'vLLM 릴리스'
+url = 'https://github.com/vllm-project/vllm/releases.atom'
+group = '공식 변경내역'
+max_chars = 1500
+skip = 'rc\d|^proto-'
+
+[feed.sglang-releases]
+name = 'SGLang 릴리스'
+url = 'https://github.com/sgl-project/sglang/releases.atom'
+group = '공식 변경내역'
+max_chars = 1500
+skip = 'rc\d'
+
+[feed.trtllm-releases]
+name = 'TensorRT-LLM 릴리스'
+url = 'https://github.com/NVIDIA/TensorRT-LLM/releases.atom'
+group = '공식 변경내역'
+max_chars = 1000
+note = '주 1회 rc가 사실상 릴리스'
+
+[feed.ollama-releases]
+name = 'Ollama 릴리스'
+url = 'https://github.com/ollama/ollama/releases.atom'
+group = '공식 변경내역'
+max_chars = 800
+skip = '-rc'
+
+[feed.llama-cpp-releases]
+name = 'llama.cpp 릴리스'
+url = 'https://github.com/ggml-org/llama.cpp/releases.atom'
+group = '공식 변경내역'
+max_chars = 800
+skip = '^b\d+'
+note = '하루 ~10개 빌드 — 정식을 놓칠 수 있음'
+
+[feed.dynamo-releases]
+name = 'Dynamo 릴리스'
+url = 'https://github.com/ai-dynamo/dynamo/releases.atom'
+group = '공식 변경내역'
+max_chars = 1000
+skip = '-dev|-post'
+
+[feed.llm-d-releases]
+name = 'llm-d 릴리스'
+url = 'https://github.com/llm-d/llm-d/releases.atom'
+group = '공식 변경내역'
+max_chars = 1000
+skip = 'rc'
+
+[feed.flashinfer-releases]
+name = 'FlashInfer 릴리스'
+url = 'https://github.com/flashinfer-ai/flashinfer/releases.atom'
+group = '공식 변경내역'
+max_chars = 800
+skip = 'rc\d'
+
+[feed.flash-attention-releases]
+name = 'FlashAttention 릴리스'
+url = 'https://github.com/Dao-AILab/flash-attention/releases.atom'
+group = '공식 변경내역'
+max_chars = 800
+skip = 'beta'
+
+[feed.lmcache-releases]
+name = 'LMCache 릴리스'
+url = 'https://github.com/LMCache/LMCache/releases.atom'
+group = '공식 변경내역'
+max_chars = 800
+skip = 'nightly|rc\d'
+
+[feed.triton-releases]
+name = 'Triton 릴리스'
+url = 'https://github.com/triton-lang/triton/releases.atom'
+group = '공식 변경내역'
+max_chars = 800
+skip = 'tutorial'
+
+[feed.triton-server-releases]
+name = 'Triton Inference Server 릴리스'
+url = 'https://github.com/triton-inference-server/server/releases.atom'
+group = '공식 변경내역'
+max_chars = 800
+
+[feed.ray-releases]
+name = 'Ray 릴리스'
+url = 'https://github.com/ray-project/ray/releases.atom'
+group = '공식 변경내역'
+max_chars = 800
+
+[feed.deepspeed-releases]
+name = 'DeepSpeed 릴리스'
+url = 'https://github.com/deepspeedai/DeepSpeed/releases.atom'
+group = '공식 변경내역'
+max_chars = 800
+skip = 'nightly'
+
+[feed.megatron-releases]
+name = 'Megatron-LM 릴리스'
+url = 'https://github.com/NVIDIA/Megatron-LM/releases.atom'
+group = '공식 변경내역'
+max_chars = 800
+skip = 'rc\d'
+
+[feed.transformer-engine-releases]
+name = 'TransformerEngine 릴리스'
+url = 'https://github.com/NVIDIA/TransformerEngine/releases.atom'
+group = '공식 변경내역'
+max_chars = 800
+skip = 'stage|validation'
+
+[feed.trl-releases]
+name = 'TRL 릴리스'
+url = 'https://github.com/huggingface/trl/releases.atom'
+group = '공식 변경내역'
+max_chars = 800
+
+[feed.peft-releases]
+name = 'PEFT 릴리스'
+url = 'https://github.com/huggingface/peft/releases.atom'
+group = '공식 변경내역'
+max_chars = 800
+
+[feed.unsloth-releases]
+name = 'Unsloth 릴리스'
+url = 'https://github.com/unslothai/unsloth/releases.atom'
+group = '공식 변경내역'
+max_chars = 800
+
+[feed.hf-hub-releases]
+name = 'huggingface_hub 릴리스'
+url = 'https://github.com/huggingface/huggingface_hub/releases.atom'
+group = '공식 변경내역'
+max_chars = 600
+skip = 'rc\d'
+
+[feed.kserve-releases]
+name = 'KServe 릴리스'
+url = 'https://github.com/kserve/kserve/releases.atom'
+group = '공식 변경내역'
+max_chars = 600
+skip = 'rc\d'
+
+[feed.pytorch-blog]
+name = 'PyTorch 블로그'
+url = 'https://pytorch.org/feed/'
+group = '공식 발표'
+max_chars = 400
+
+[feed.vllm-blog]
+name = 'vLLM 블로그'
+url = 'https://vllm.ai/blog/rss.xml'
+group = '공식 발표'
+max_chars = 400
+
+[feed.nvidia-dev]
+name = 'NVIDIA 개발자 블로그'
+url = 'https://developer.nvidia.com/blog/feed'
+group = '공식 발표'
+max_chars = 400
+
+[feed.deepmind-blog]
+name = 'Google DeepMind 블로그'
+url = 'https://deepmind.google/blog/rss.xml'
+group = '공식 발표'
+max_chars = 400
+note = '가끔 gzip으로 줌 (읽음)'
+
+[feed.together-blog]
+name = 'Together AI 블로그'
+url = 'https://www.together.ai/blog/rss.xml'
+group = '공식 발표'
+max_chars = 400
+
+[feed.ollama-blog]
+name = 'Ollama 블로그'
+url = 'https://ollama.com/blog/rss.xml'
+group = '공식 발표'
+max_chars = 400
+
+[feed.mlcommons]
+name = 'MLCommons'
+url = 'https://mlcommons.org/feed/'
+group = '공식 발표'
+max_chars = 300
+
+[feed.aws-whatsnew]
+name = 'AWS 새 소식 (AI·ML만)'
+url = 'https://aws.amazon.com/about-aws/whats-new/recent/feed/'
+group = '플랫폼 변경내역'
+max_chars = 400
+skip = '^(?!.*(Bedrock|AgentCore|Amazon Q|Kiro|Nova|SageMaker|Kendra|Textract|Comprehend|Guardrails|Seoul|EC2 (P|G|Trn|Inf)\d|Trainium|Inferentia|GPU|HyperPod|Neuron))'
+note = '하루 9건 → 포함 목록으로 1~2건'
+
+[feed.semianalysis]
+name = 'SemiAnalysis'
+url = 'https://newsletter.semianalysis.com/feed'
+group = '실사용 검증'
+max_chars = 400
+
+[feed.interconnects]
+name = 'Interconnects'
+url = 'https://www.interconnects.ai/feed'
+group = '실사용 검증'
+max_chars = 400
+
+[feed.raschka]
+name = 'Sebastian Raschka'
+url = 'https://magazine.sebastianraschka.com/feed'
+group = '실사용 검증'
+max_chars = 400
+
+[feed.epoch-ai]
+name = 'Epoch AI'
+url = 'https://epoch.ai/atom.xml'
+group = '실사용 검증'
+max_chars = 300
+
+[feed.latent-space]
+name = 'Latent Space'
+url = 'https://www.latent.space/feed'
+group = '실사용 검증'
+max_chars = 400
+note = '[AINews] 일간 요약 포함'
+
+[feed.hn-open-models]
+name = 'Hacker News 오픈 모델'
+url = 'https://hnrss.org/newest?q=Qwen+OR+DeepSeek&points=100'
+group = '새 오픈소스·화제'
+max_chars = 200
+
+[feed.hn-open-weight]
+name = 'Hacker News 오픈 웨이트'
+url = 'https://hnrss.org/newest?q=open-weight&points=100'
+group = '새 오픈소스·화제'
+max_chars = 200
+
+[feed.reddit-localllama]
+name = 'r/LocalLLaMA 오늘 인기'
+url = 'https://www.reddit.com/r/LocalLLaMA/top/.rss?t=day'
+group = '해외 커뮤니티'
+max_chars = 200
+note = '연달아 요청하면 429'
+
+[feed.pytorchkr]
+name = 'PyTorchKR 소식'
+url = 'https://discuss.pytorch.kr/c/news/14.rss'
+group = '한국 커뮤니티'
+max_chars = 300
+
+[feed.azure-updates]
+name = 'Azure 업데이트 (AI만)'
+url = 'https://www.microsoft.com/releasecommunications/api/v2/azure/rss'
+group = '플랫폼 변경내역'
+max_chars = 400
+skip = '^(?!.*(OpenAI|Foundry|AI Search|Content Understanding|Document Intelligence|Copilot|Agent|GPT|\bAI\b))'
+
+[feed.foundry-blog]
+name = 'Microsoft Foundry 블로그'
+url = 'https://devblogs.microsoft.com/foundry/feed/'
+group = '플랫폼 변경내역'
+max_chars = 400
+
+[feed.geap-rn]
+name = 'Gemini Enterprise Agent Platform 릴리스 노트'
+url = 'https://cloud.google.com/feeds/gemini-enterprise-agent-platform-release-notes.xml'
+group = '플랫폼 변경내역'
+max_chars = 1500
+note = '옛 Vertex AI. 제목이 날짜뿐'
+
+[feed.github-changelog]
+name = 'GitHub 변경내역 (Copilot·엔터프라이즈)'
+url = 'https://github.blog/changelog/feed/'
+group = '플랫폼 변경내역'
+max_chars = 400
+skip = '^(?!.*(Copilot|deprecat|retire|sunset|Enterprise|EMU|SAML|SCIM|audit|data residency|MCP))'
+
+[feed.google-cloud-ai]
+name = 'Google Cloud AI 블로그'
+url = 'https://cloudblog.withgoogle.com/products/ai-machine-learning/rss/'
+group = '공식 발표'
+max_chars = 400
+
+[feed.google-dev-blog]
+name = 'Google 개발자 블로그'
+url = 'https://developers.googleblog.com/feeds/posts/default'
+group = '공식 발표'
+max_chars = 400
+note = '글에 날짜가 없음'
+
+[feed.workspace-updates]
+name = 'Google Workspace 업데이트 (AI·관리)'
+url = 'https://workspaceupdates.googleblog.com/feeds/posts/default'
+group = '공식 발표'
+max_chars = 300
+skip = '^(?!.*(Gemini|\bAI\b|NotebookLM|agent|admin|data|security|encrypt|generally available))'
+
+[feed.m365-roadmap]
+name = 'M365 로드맵 (Copilot)'
+url = 'https://www.microsoft.com/releasecommunications/api/v2/m365/rss'
+group = '공식 발표'
+max_chars = 300
+skip = '^(?!.*(Copilot|Agent 365))|^(Dynamics|Microsoft Dataverse|Power |Microsoft Viva)'
+note = '30일 411건 → 하루 1건쯤'
+
+[feed.mcp-blog]
+name = 'MCP 블로그'
+url = 'https://blog.modelcontextprotocol.io/index.xml'
+group = '공식 발표'
+max_chars = 400
+
+[feed.mcp-spec]
+name = 'MCP 명세 릴리스'
+url = 'https://github.com/modelcontextprotocol/modelcontextprotocol/releases.atom'
+group = '공식 변경내역'
+max_chars = 1500
+
+[feed.mcp-python-sdk]
+name = 'MCP Python SDK'
+url = 'https://github.com/modelcontextprotocol/python-sdk/releases.atom'
+group = '공식 변경내역'
+max_chars = 800
+
+[feed.mcp-ts-sdk]
+name = 'MCP TypeScript SDK'
+url = 'https://github.com/modelcontextprotocol/typescript-sdk/releases.atom'
+group = '공식 변경내역'
+max_chars = 800
+skip = '^@|^1\.'
+
+[feed.openai-agents-sdk]
+name = 'OpenAI Agents SDK'
+url = 'https://github.com/openai/openai-agents-python/releases.atom'
+group = '공식 변경내역'
+max_chars = 1000
+
+[feed.claude-status]
+name = 'Claude 상태'
+url = 'https://status.claude.com/history.rss'
+group = '장애'
+max_chars = 300
+
+[feed.openai-status]
+name = 'OpenAI 상태 (API·엔터프라이즈)'
+url = 'https://status.openai.com/feed.rss'
+group = '장애'
+max_chars = 300
+skip = '^(?!.*(API|Responses|Realtime|Batch|Compliance|Enterprise|Widespread|All (users|services)))'
+
+[feed.kisa]
+name = 'KISA 보안공지'
+url = 'https://www.boho.or.kr/kr/rss.do?bbsId=B0000133'
+group = '보안·규제'
+max_chars = 300
+skip = '스미싱|피싱|사칭'
+
+[feed.owasp-genai]
+name = 'OWASP GenAI'
+url = 'https://genai.owasp.org/feed/'
+group = '보안·규제'
+max_chars = 400
+
+[feed.embrace-the-red]
+name = 'Embrace The Red'
+url = 'https://embracethered.com/blog/index.xml'
+group = '보안·규제'
+max_chars = 400
+note = '프롬프트 인젝션·에이전트 취약점 실증'
+
+[feed.msit]
+name = '과기정통부 보도자료'
+url = 'https://www.msit.go.kr/user/rss/rss.do?bbsSeqNo=94'
+group = '보안·규제'
+max_chars = 300
+note = '글에 날짜가 없음'
+
+[feed.aitimes]
+name = 'AI타임스'
+url = 'https://www.aitimes.com/rss/allArticle.xml'
+group = '한국 커뮤니티'
+max_chars = 300
+note = '하루 33건'
+
+[feed.naver-cloud]
+name = '네이버클라우드 블로그'
+url = 'https://rss.blog.naver.com/n_cloudplatform.xml'
+group = '한국 테크블로그'
+max_chars = 300
+skip = '프로모션|이벤트|웨비나|모집|아카데미|행사 스케치'
+
+[feed.aws-korea]
+name = 'AWS 코리아 블로그'
+url = 'https://aws.amazon.com/ko/blogs/korea/feed/'
+group = '한국 테크블로그'
+max_chars = 300
+
+[feed.nhn-cloud]
+name = 'NHN Cloud Meetup'
+url = 'https://meetup.nhncloud.com/rss'
+group = '한국 테크블로그'
+max_chars = 300
+
+[feed.kt-cloud]
+name = 'KT Cloud 기술 블로그'
+url = 'https://tech.ktcloud.com/rss'
+group = '한국 테크블로그'
+max_chars = 300
+
+[feed.hn-enterprise]
+name = 'Hacker News 엔터프라이즈'
+url = 'https://hnrss.org/newest?q=Bedrock+OR+Azure+OR+Vertex+OR+MCP&points=100'
+group = '새 오픈소스·화제'
+max_chars = 200
+skip = 'Emacs'
+
+[feed.cohere-blog]
+name = 'Cohere 블로그'
+url = 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_cohere.xml'
+group = '공식 발표'
+max_chars = 400
+skip = '^(what is|understanding|expect more)|partner|acquire|expands|office|sovereign|\bROI\b|change management|utilities|govern'
+via = "mirror"
+
+[feed.langchain-changelog]
+name = 'LangChain 변경내역'
+url = 'https://docs.langchain.com/oss/python/releases/changelog/rss.xml'
+group = '공식 변경내역'
+max_chars = 1500
+
+[feed.langgraph-releases]
+name = 'LangGraph 릴리스'
+url = 'https://github.com/langchain-ai/langgraph/releases.atom'
+group = '공식 변경내역'
+max_chars = 1000
+skip = '^langgraph-(cli|sdk)'
+
+[feed.langsmith-changelog]
+name = 'LangSmith 변경내역'
+url = 'https://docs.langchain.com/langsmith/changelog/rss.xml'
+group = '공식 변경내역'
+max_chars = 1000
+
+[feed.llamaindex-releases]
+name = 'LlamaIndex 릴리스'
+url = 'https://github.com/run-llama/llama_index/releases.atom'
+group = '공식 변경내역'
+max_chars = 1500
+
+[feed.dspy-releases]
+name = 'DSPy 릴리스'
+url = 'https://github.com/stanfordnlp/dspy/releases.atom'
+group = '공식 변경내역'
+max_chars = 1000
+skip = 'b\d$'
+
+[feed.haystack-releases]
+name = 'Haystack 릴리스'
+url = 'https://github.com/deepset-ai/haystack/releases.atom'
+group = '공식 변경내역'
+max_chars = 1000
+skip = '-rc\d'
+
+[feed.qdrant-releases]
+name = 'Qdrant 릴리스'
+url = 'https://github.com/qdrant/qdrant/releases.atom'
+group = '공식 변경내역'
+max_chars = 1000
+skip = '^(?!v\d)'
+
+[feed.milvus-releases]
+name = 'Milvus 릴리스'
+url = 'https://github.com/milvus-io/milvus/releases.atom'
+group = '공식 변경내역'
+max_chars = 1000
+skip = '^(pkg|client)/'
+
+[feed.weaviate-releases]
+name = 'Weaviate 릴리스'
+url = 'https://github.com/weaviate/weaviate/releases.atom'
+group = '공식 변경내역'
+max_chars = 600
+
+[feed.pgvector-tags]
+name = 'pgvector 태그'
+url = 'https://github.com/pgvector/pgvector/tags.atom'
+group = '공식 변경내역'
+max_chars = 200
+note = '릴리스 없이 태그만'
+
+[feed.chroma-releases]
+name = 'Chroma 릴리스'
+url = 'https://github.com/chroma-core/chroma/releases.atom'
+group = '공식 변경내역'
+max_chars = 600
+skip = '^(cli-|foundation)|^latest$'
+
+[feed.sentence-transformers-releases]
+name = 'sentence-transformers 릴리스'
+url = 'https://github.com/huggingface/sentence-transformers/releases.atom'
+group = '공식 변경내역'
+max_chars = 1000
+
+[feed.docling-releases]
+name = 'Docling 릴리스'
+url = 'https://github.com/docling-project/docling/releases.atom'
+group = '공식 변경내역'
+max_chars = 600
+
+[feed.unstructured-releases]
+name = 'Unstructured 릴리스'
+url = 'https://github.com/Unstructured-IO/unstructured/releases.atom'
+group = '공식 변경내역'
+max_chars = 600
+
+[feed.langfuse-releases]
+name = 'Langfuse 릴리스'
+url = 'https://github.com/langfuse/langfuse/releases.atom'
+group = '공식 변경내역'
+max_chars = 600
+skip = '^v3\.'
+
+[feed.phoenix-releases]
+name = 'Arize Phoenix 릴리스'
+url = 'https://github.com/Arize-ai/phoenix/releases.atom'
+group = '공식 변경내역'
+max_chars = 600
+skip = '^@arizeai|^arize-phoenix-'
+
+[feed.weaviate-blog]
+name = 'Weaviate 블로그'
+url = 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_weaviate.xml'
+group = '공식 발표'
+max_chars = 400
+via = "mirror"
+
+[feed.qdrant-blog]
+name = 'Qdrant 블로그'
+url = 'https://qdrant.tech/blog/index.xml'
+group = '공식 발표'
+max_chars = 400
+skip = '^How .+ Built|Hybrid Cloud'
+
+[feed.pinecone-blog]
+name = 'Pinecone 블로그'
+url = 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_pinecone.xml'
+group = '공식 발표'
+max_chars = 400
+via = "mirror"
+
+[feed.voyage-blog]
+name = 'Voyage AI 블로그'
+url = 'https://blog.voyageai.com/feed/'
+group = '공식 발표'
+max_chars = 400
+
+[feed.langchain-blog]
+name = 'LangChain 블로그'
+url = 'https://www.langchain.com/blog/rss.xml'
+group = '공식 발표'
+max_chars = 400
+skip = 'how .+ (built|turned|uses|scaled)|webinar'
+
+[feed.aws-ml-blog]
+name = 'AWS ML 블로그'
+url = 'https://aws.amazon.com/blogs/machine-learning/feed/'
+group = '공식 발표'
+max_chars = 300
+
+[feed.elastic-search-labs]
+name = 'Elastic Search Labs'
+url = 'https://www.elastic.co/search-labs/rss/feed'
+group = '실사용 검증'
+max_chars = 400
+
+[feed.hn-rag]
+name = 'Hacker News RAG'
+url = 'https://hnrss.org/newest?q=RAG+OR+embeddings+OR+reranker+OR+LangChain&points=40'
+group = '새 오픈소스·화제'
+max_chars = 200
+
+[feed.reddit-rag]
+name = 'r/Rag'
+url = 'https://www.reddit.com/r/Rag/top/.rss?t=week'
+group = '해외 커뮤니티'
+max_chars = 300
+skip = '^(can anyone|any ?one (suggest|recommend)|need help|help|beginner|how (do|can|should) i (start|learn|get started)|is it (possible|worth))'
+
+[feed.kordoc-releases]
+name = 'kordoc 릴리스'
+url = 'https://github.com/chrisryugj/kordoc/releases.atom'
+group = '새 오픈소스·화제'
+max_chars = 400
+skip = '^v[\d.]+$'
+note = 'HWP·HWPX·PDF → Markdown'

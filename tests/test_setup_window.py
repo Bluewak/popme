@@ -33,7 +33,7 @@ def test_gemini_and_ics():
     assert cfg["calendar"]["ics"][1] == {"name": "캘린더 2", "url": rows[1]["url"]}  # 이름 없으면 번호, URL 속 #은 주석이 아님
     # 다른 설정·주석은 그대로
     assert cfg["x"]["accounts"] == tomllib.loads(EXAMPLE)["x"]["accounts"]
-    assert "# 교차 확인·새 오픈소스 발굴용" in out
+    assert "# 소식 출처 — 고른 관심사" in out
     assert 'provider = "gemini"   # 브리핑 쓸 AI' in out  # 오른쪽 주석 칸 유지
     # 다시 열어 같은 값으로 저장하면 그대로
     assert sw.apply(out, choices(provider="gemini", plan="Google AI Pro", tools="Gemini", source="ics", ics=rows,

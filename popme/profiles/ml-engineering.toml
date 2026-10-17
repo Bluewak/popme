@@ -1,0 +1,229 @@
+# 관심사: ML 엔지니어링 — 2026-10 직군별 조사(local/research/)에서 고른 출처와 기준. 출처 정의는 popme/feeds.toml
+id = 'ml-engineering'
+name = 'ML 엔지니어링'
+tag = 'ML'
+summary = '모델 서빙·학습·GPU 비용, 오픈 웨이트 모델'
+order = 3
+status = "ready"
+topic = 'ml'                 # filter = true인 출처를 거를 판별 규칙 (popme/topics.py)
+criteria = """
+- 보안 권고(CVE·RCE·pickle/torch.load·인증 없는 엔드포인트)는 심각도·영향 버전·고친 버전을 적어 맨 앞에.
+- 프레임워크 릴리스(vLLM·SGLang·TensorRT-LLM·PyTorch·transformers 등)는 깨지는 변경·기본값 변경·지원 CUDA/Python 변화·새 모델·하드웨어 지원·성능 수치만. rc·nightly·dev는 무시.
+- 오픈 웨이트 모델 공개는 같은 모델을 다룬 여러 출처를 카드 하나로, 전체/활성 파라미터·컨텍스트·라이선스·필요 VRAM·vLLM/SGLang/llama.cpp 지원 여부를 적는다.
+- GPU·클라우드는 가격·새 인스턴스·리전(특히 서울)·용량처럼 비용 결정에 닿는 것만. 투자·파트너십·데이터센터 건설·고객 사례·근거 없는 순위 주장은 뺀다.
+- 기법·논문은 재현 가능한 수치(처리량·지연·메모리)가 있는 것 1~2개만.
+"""
+discovery = 'LLM 서빙·학습·GPU 인프라에 실질 정보를 주는 사람'
+
+[caps]                        # 묶음별 상한 (이 관심사 몫)
+'공식 변경내역' = 25
+'공식 발표' = 15
+'플랫폼 변경내역' = 5
+'실사용 검증' = 8
+'새 오픈소스·화제' = 10
+'해외 커뮤니티' = 10
+'한국 커뮤니티' = 10
+'한국 테크블로그' = 3
+
+[[feeds]]
+id = 'pytorch-releases'
+why = 'PyTorch 버전 (CUDA·Python 지원)'
+
+[[feeds]]
+id = 'transformers-releases'
+why = 'transformers 변경·새 모델 지원'
+
+[[feeds]]
+id = 'vllm-releases'
+why = 'vLLM 깨지는 변경·새 모델 지원'
+
+[[feeds]]
+id = 'sglang-releases'
+why = 'SGLang 변경'
+
+[[feeds]]
+id = 'trtllm-releases'
+why = 'TensorRT-LLM 변경'
+
+[[feeds]]
+id = 'ollama-releases'
+why = 'Ollama 변경'
+
+[[feeds]]
+id = 'llama-cpp-releases'
+why = 'llama.cpp 정식 릴리스'
+
+[[feeds]]
+id = 'dynamo-releases'
+why = 'NVIDIA Dynamo 변경'
+
+[[feeds]]
+id = 'llm-d-releases'
+why = 'llm-d 변경'
+
+[[feeds]]
+id = 'flashinfer-releases'
+why = 'FlashInfer 변경'
+
+[[feeds]]
+id = 'flash-attention-releases'
+why = 'FlashAttention 변경'
+
+[[feeds]]
+id = 'lmcache-releases'
+why = 'LMCache 변경'
+
+[[feeds]]
+id = 'triton-releases'
+why = 'Triton 변경'
+
+[[feeds]]
+id = 'triton-server-releases'
+why = 'Triton Inference Server 변경'
+
+[[feeds]]
+id = 'ray-releases'
+why = 'Ray 변경'
+
+[[feeds]]
+id = 'deepspeed-releases'
+why = 'DeepSpeed 변경'
+
+[[feeds]]
+id = 'megatron-releases'
+why = 'Megatron-LM 변경'
+
+[[feeds]]
+id = 'transformer-engine-releases'
+why = 'TransformerEngine 변경'
+
+[[feeds]]
+id = 'trl-releases'
+why = 'TRL(학습 레시피) 변경'
+
+[[feeds]]
+id = 'peft-releases'
+why = 'PEFT 변경'
+
+[[feeds]]
+id = 'unsloth-releases'
+why = 'Unsloth 변경'
+
+[[feeds]]
+id = 'hf-hub-releases'
+why = 'huggingface_hub 변경'
+
+[[feeds]]
+id = 'mlflow-releases'
+why = 'MLflow 변경'
+
+[[feeds]]
+id = 'kserve-releases'
+why = 'KServe 변경'
+
+[[feeds]]
+id = 'hf-blog'
+why = '오픈 웨이트 모델 공개'
+
+[[feeds]]
+id = 'pytorch-blog'
+why = 'PyTorch 공식 발표'
+
+[[feeds]]
+id = 'vllm-blog'
+why = 'vLLM 기법·성능'
+
+[[feeds]]
+id = 'nvidia-dev'
+why = 'NVIDIA 추론 최적화'
+
+[[feeds]]
+id = 'deepmind-blog'
+why = 'Gemma·Gemini 공개'
+
+[[feeds]]
+id = 'together-blog'
+why = '추론 최적화 사례'
+
+[[feeds]]
+id = 'ollama-blog'
+why = 'Ollama 공식 발표'
+
+[[feeds]]
+id = 'mlcommons'
+why = 'MLPerf 결과'
+
+[[feeds]]
+id = 'openai-news'
+why = 'API 모델·가격·오픈 웨이트'
+
+[[feeds]]
+id = 'openai-dev-blog'
+why = 'API 변경·단종'
+
+[[feeds]]
+id = 'google-ai-blog'
+why = 'Gemma·Gemini 출시'
+
+[[feeds]]
+id = 'mistral-news'
+why = '오픈 웨이트 공개'
+
+[[feeds]]
+id = 'aws-whatsnew'
+why = 'GPU 인스턴스·SageMaker·Bedrock 새 소식'
+
+[[feeds]]
+id = 'semianalysis'
+why = 'GPU·HBM·공급·비용'
+
+[[feeds]]
+id = 'interconnects'
+why = '오픈 모델·학습 흐름'
+
+[[feeds]]
+id = 'raschka'
+why = 'LLM 기법 해설'
+
+[[feeds]]
+id = 'epoch-ai'
+why = '벤치마크·컴퓨트 추세'
+
+[[feeds]]
+id = 'latent-space'
+why = '업계 흐름·[AINews] 요약'
+
+[[feeds]]
+id = 'hamel'
+why = '평가(evals)'
+
+[[feeds]]
+id = 'hn-front'
+why = 'Hacker News 인기 글 중 ML'
+filter = 'ml'
+
+[[feeds]]
+id = 'hn-open-models'
+why = 'Qwen·DeepSeek 화제'
+
+[[feeds]]
+id = 'hn-open-weight'
+why = '오픈 웨이트 화제'
+
+[[feeds]]
+id = 'reddit-localllama'
+why = '로컬 LLM 커뮤니티 오늘 인기'
+
+[[feeds]]
+id = 'pytorchkr'
+why = '한국 PyTorch 커뮤니티 소식'
+
+[[feeds]]
+id = 'geeknews'
+why = '한국 개발자들이 많이 본 ML 글'
+filter = 'ml'
+
+[[feeds]]
+id = 'toss-tech'
+why = '토스 GPU·ML 글'
+filter = 'ml'

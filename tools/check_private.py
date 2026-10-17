@@ -28,6 +28,8 @@ BLOCKED_FILES = [
 ]
 # 캐릭터 파일은 공개 예시(character.example.toml)만. 그 밖의 *.toml 캐릭터는 개인 것
 ALLOWED_TOML = {"config.example.toml", "character.example.toml"}
+# 앱이 챙기는 소식 출처·관심사 목록 (개인 설정 아님 — 내용의 개인 단어 검사는 그대로 한다)
+ALLOWED_TOML_PATHS = ["popme/feeds.toml", "popme/profiles/*.toml"]
 ALLOWED_IMAGES = set()  # 공개해도 되는 이미지를 추가할 때 여기에 경로를 적는다
 SKIP_CONTENT = {".gitignore"}  # 올리지 않을 파일 이름을 적는 곳이라 단어 검사에서 뺀다
 TEXT_EXT = {".py", ".md", ".toml", ".html", ".ps1", ".txt", ".json", ".yml", ".yaml", ".js", ".css", ".cfg", ""}
@@ -67,7 +69,8 @@ def check(items, words):
                                               for p in BLOCKED_FILES):
             problems.append(f"{path}: 올리면 안 되는 파일")
             continue
-        if path.endswith(".toml") and name not in ALLOWED_TOML:
+        if (path.endswith(".toml") and name not in ALLOWED_TOML
+                and not any(fnmatch.fnmatch(path, p) for p in ALLOWED_TOML_PATHS)):
             problems.append(f"{path}: 개인 설정·캐릭터 파일일 수 있음 (공개는 *.example.toml만)")
             continue
         if len(data) > MAX_BYTES:
