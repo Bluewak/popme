@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 from popme import agenda, clock, discovery, event_weather, llm, search
 from popme.character import Character
-from popme.collectors import rss
+from popme import topics
 
 log = logging.getLogger(__name__)
 
@@ -242,7 +242,7 @@ def rss_items(cfg, db, since_iso):
         posted = min(datetime.fromisoformat(r["published"]), seen) if r["published"] else seen
         if posted < since and not new:
             continue
-        if not rss.matches(r, topic.get(r["source"])):
+        if not topics.matches(r, topic.get(r["source"])):
             continue
         if r["source"] in skip and skip[r["source"]].search(r["title"] or ""):
             continue

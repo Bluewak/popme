@@ -36,7 +36,8 @@
 [feed.codex-releases]          # id는 절대 바꾸지 않는다 (config·DB가 id로 가리킴)
 name = "Codex 릴리스"
 url = "https://github.com/openai/codex/releases.atom"
-kind = "공식 변경내역"          # 묶음 = 상한 단위, 화면에서 접히는 그룹
+group = "공식 변경내역"         # 묶음 = 상한 단위, 화면에서 접히는 그룹
+# type = "rss"                # 출처 모듈 종류 (없으면 rss) — 6-1
 max_chars = 1500
 skip = 'alpha|beta|-rc'
 skip_note = "시험판(alpha·beta·rc)은 빼고 받아요"   # 화면에 보일 말
@@ -234,7 +235,7 @@ popme/catalog.py   # feeds.toml·profiles 읽기, config [news]와 합쳐 「지
 ```
 
 - **모듈 규격** (`base.py`)
-  - `fetch(feed: dict, state: dict) -> list[Item]`
+  - `fetch(feed: dict) -> list[Item]` (상태가 필요한 모듈은 B1-5 pagediff에서 `state`를 더한다)
     - `feed`: feeds.toml의 한 항목에 tweak을 반영한 것
     - `state`: 모듈이 다음 실행 때 쓸 값. 예: pagediff의 이전 해시, advisory의 마지막 id
   - `Item` = `{feed_id, url, title, summary, published, extra}`. DB `items`에 그대로 들어간다(`source`는 feed id).
@@ -242,7 +243,7 @@ popme/catalog.py   # feeds.toml·profiles 읽기, config [news]와 합쳐 「지
   - 모듈마다 `describe(feed) -> str`을 둔다. 「소식 출처」 화면의 "이렇게 받아요" 문구로 쓴다.
 - **수집 흐름:** `catalog.active_feeds(cfg)` → URL이 같으면 하나로 합침 → kind별 모듈로 8개씩 동시에 받음 → `db.upsert_items` → 피드 상태 기록
 - **X·Threads:** 로그인한 전용 Chrome이 필요하고 흐름이 달라서 이번에는 그대로 둔다. 다만 같은 `Item`·피드 상태 규격으로 맞춰 둬서, 나중에 관심사별 계정을 묶을 수 있게 한다(열린 질문 5).
-- **새 출처 종류 더하기** = `sources/`에 파일 하나 + `KINDS`에 한 줄 + feeds.toml에 `kind = "…"` 항목. 거르기·태그·화면은 그대로 따라온다.
+- **새 출처 종류 더하기** = `sources/`에 파일 하나 + `KINDS`에 한 줄 + feeds.toml에 `type = "…"` 항목. 거르기·태그·화면은 그대로 따라온다.
 
 ### 6-3. X 계정도 관심사별로 (확정)
 
@@ -271,7 +272,7 @@ popme/catalog.py   # feeds.toml·profiles 읽기, config [news]와 합쳐 「지
 | 모델 단종 감지 | 도입(최우선)·전부 | OpenAI·Anthropic·Gemini·Azure·Bedrock 단종 페이지 본문 해시 비교 → 바뀐 부분만 카드로 | 페이지는 있음, 방법은 미확인 |
 | 화제 논문·트렌딩 모델 | ML | HF daily papers API(upvote 상위 3~5), trending(조직 화이트리스트) | 열리는 것 확인 |
 
-- 셋 다 피드처럼 feeds.toml에 `kind = "advisory" | "pagediff" | "hf"`로 넣는다. 관심사가 id로 가리키게 해서 끄고 켜는 화면을 같이 쓴다.
+- 셋 다 피드처럼 feeds.toml에 `type = "advisory" | "pagediff" | "hf"`로 넣는다. 관심사가 id로 가리키게 해서 끄고 켜는 화면을 같이 쓴다.
 
 ## 8. 만드는 순서
 

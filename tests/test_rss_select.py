@@ -4,7 +4,8 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from popme import briefing
-from popme.collectors import rss
+from popme import topics
+from popme.sources import rss
 from popme.db import DB
 
 
@@ -23,7 +24,7 @@ from popme.db import DB
     ("Parsing HTML and XML faster", False),  # html·xml의 ml
 ])
 def test_is_ai(title, want):
-    assert rss.is_ai({"title": title, "summary": ""}) is want
+    assert topics.is_ai({"title": title, "summary": ""}) is want
 
 
 def test_skip_drops_nightly(monkeypatch):
@@ -146,4 +147,4 @@ def test_fetch_reads_gzip_body(monkeypatch):
     ("아무 글", "unknown", True),                    # 모르는 이름은 무시
 ])
 def test_matches_topics(title, topic, want):
-    assert rss.matches({"title": title, "summary": ""}, topic) is want
+    assert topics.matches({"title": title, "summary": ""}, topic) is want
