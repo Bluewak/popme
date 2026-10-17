@@ -121,6 +121,7 @@ keep_days = 14                     # 메일 목록 보관 기간
 # off = 끈 출처 id, on = 기본은 꺼진 출처 중 켠 것, [news.tweak.<id>] = 그 출처만 skip·max_chars 바꾸기. 설정 창에서 고른다
 [news]
 interests = []                     # 예: ["ai-coding", "data-science"] — ai-coding·data-science·ml-engineering·enterprise·llm-apps
+card_tags = false                  # true면 펼친 카드에서 관심사 태그를 고칠 수 있어요 (그 카드에만 저장)
 
 # 내가 더한 소식 출처 — 형식은 예전과 같다 (name·url·group·max_chars·skip·topic, 관심사를 정하려면 interest = "…")
 

@@ -24,7 +24,7 @@ import markdown
 import pystray
 import webview
 
-from popme import agenda, briefing, chrome, config, discovery, event_weather, mail, planner, character, weather
+from popme import agenda, briefing, catalog, chrome, config, discovery, event_weather, mail, planner, character, weather
 from popme.collectors import timetree
 from popme.jobs import Jobs, calendar_source
 from popme.pet import PetWindow, icon_image, load_images, write_icon
@@ -366,7 +366,8 @@ class Api:
         mails = mail.for_ui(self._jobs.db.mails(mail.overnight_since(), important_only=True)) if self._mail else None
         b = self._jobs.db.latest_briefing()
         if not b:
-            return {"title": "아직 브리핑이 없어요", "agenda": agenda_items, "mails": mails, "headlines": [], "details": ""}
+            return {"title": "아직 브리핑이 없어요", "agenda": agenda_items, "mails": mails, "headlines": [], "details": "",
+                    "none": True, "news": self._news_state()}
         title, _, body = briefing.strip_schedule(b["markdown"]).partition("\n")
         payload = briefing.load_payload(b)
         if payload:  # 카드 형식: 화면이 카드를 직접 그림
@@ -376,8 +377,10 @@ class Api:
                 "agenda": agenda_items,
                 "mails": mails,
                 "headlines": [{**h, "html": html.escape(h["md"])} for h in heads],
-                "items": payload["items"],
+                "items": briefing.for_view(payload),
+                "date": b["date"],
                 "details": "",
+                "news": self._news_state(),
             }
         heads, details = briefing.split_headlines(body)  # 예전 글 형식
         _, details = briefing.pop_section(details, "캐릭터 멘트")  # 캐릭터 대사 목록은 화면에서 숨김
@@ -388,6 +391,41 @@ class Api:
             "headlines": [{**h, "html": _inline_md(h["md"])} for h in heads],
             "details": markdown.markdown(details, extensions=["tables", "sane_lists"]),
         }
+
+    def _news_state(self):
+        """관심사 태그 줄: 고를 수 있는 관심사(지금 고른 것 on), 카드 태그 고치기 켬 여부, 출처 옮기기 알림 (한 번)."""
+        cfg = self._jobs.cfg
+        picked = {p["id"] for p in catalog.chosen(cfg)}
+        try:
+            notice = catalog.NOTICE.read_text(encoding="utf-8") if catalog.NOTICE.exists() else ""
+        except OSError:
+            notice = ""
+        return {"interests": [{"id": p["id"], "tag": p["tag"], "name": p["name"], "summary": p.get("summary", ""),
+                               "on": p["id"] in picked} for p in catalog.profiles()],
+                "card_tags": bool(catalog.news(cfg).get("card_tags")),
+                "notice": notice}
+
+    def set_interests(self, ids):
+        """태그 줄에서 관심사를 넣고 뺀다 → config.toml에 바로 저장. 출처는 다음 수집부터 바뀐다."""
+        catalog.save_interests(ids)
+        self._jobs.cfg["news"] = config.load().get("news", {})
+        return self._news_state()
+
+    def set_card_tags(self, date, index, tags):
+        """펼친 카드의 관심사 태그를 고친다 (그 카드에만 저장, 다음 브리핑에 배우지는 않음)."""
+        b = self._jobs.db.briefing_for(date)
+        payload = briefing.load_payload(b)
+        if not payload or not (0 <= int(index) < len(payload["items"])):
+            return False
+        known = catalog.tags()
+        payload["items"][int(index)]["tags"] = [t for t in dict.fromkeys(tags) if t in known][:2]
+        payload["items"][int(index)]["tags_edited"] = True
+        self._jobs.db.save_briefing_items(date, json.dumps(payload, ensure_ascii=False))
+        return True
+
+    def dismiss_notice(self):
+        catalog.NOTICE.unlink(missing_ok=True)
+        return True
 
     def get_events(self):
         items, _ = briefing.events_block(self._jobs.db, self._jobs.cfg)

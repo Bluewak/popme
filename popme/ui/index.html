@@ -89,6 +89,36 @@
   .chip { font-size: 11px; border-radius: 999px; padding: 0 7px; background: #f3ebdb; color: #6b5646; line-height: 18px; }
   .chip.me { background: #e5f3ea; color: #2f7a52; } .chip.no { background: #eee; color: #999; }
   .chip.do { background: #fde3d6; color: #b6522a; } .chip.cat { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+  /* 관심사 태그 줄: [AI 코딩 ✕][데이터 ✕][+] — 이름을 누르면 그 관심사 카드만, ✕는 빼기(되돌리기 있음) */
+  #news-head { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; margin-bottom: 7px; position: relative; }
+  #news-head .hint { font-size: 11.5px; color: var(--muted); }
+  .ipill { display: inline-flex; border: 1.5px solid var(--brown); border-radius: 999px; overflow: hidden; background: #fff; }
+  .ipill button { border: none; border-radius: 0; padding: 0 3px 0 10px; font-size: 12.5px; background: transparent; }
+  .ipill .ip-x { padding: 0 8px 0 4px; color: var(--muted); }
+  .ipill.on { background: #5b6f86; border-color: #3e5068; } .ipill.on button { color: #fff; }
+  .ip-add { padding: 0 10px; font-size: 12.5px; border-width: 1.5px; border-style: dashed; }
+  .ip-menu { position: absolute; top: 100%; left: 0; right: 0; z-index: 5; margin-top: 4px; padding: 6px;
+    background: var(--paper); border: 2px solid var(--brown); border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+  .ip-menu button { display: block; width: 100%; text-align: left; border: none; border-radius: 8px; padding: 5px 8px; }
+  .ip-menu button:hover { background: #fff3e6; }
+  .ip-menu button span { display: block; font: 11.5px/1.4 "Malgun Gothic", sans-serif; color: var(--muted); }
+  .ip-menu .foot { font-size: 11px; color: var(--muted); padding: 4px 8px 0; border-top: 1px dashed var(--line); margin-top: 4px; }
+  .chip.itag { background: #eef4fb; color: #4d6580; }
+  .tagon { font-size: 12px; color: #4d6580; align-self: center; white-space: nowrap; }
+  .tagon button { border: none; padding: 0 4px; background: transparent; color: var(--muted); }
+  .tagedit { margin-top: 7px; font-size: 11.5px; color: var(--muted); display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+  .tagedit button.chip { border: none; cursor: pointer; font-family: inherit; padding: 0 7px; }
+  .tagedit select { font: 11px "Malgun Gothic", sans-serif; border: 1px dashed var(--muted); border-radius: 999px; background: #fff;
+    color: var(--ink); padding: 0 4px; }
+  .news.gone { opacity: .6; }
+  .notice { background: #fff; border: 1.5px solid var(--accent); border-radius: 10px; padding: 6px 8px 6px 10px; font-size: 12.5px;
+    margin-bottom: 8px; display: flex; gap: 8px; align-items: center; }
+  .notice span { flex: 1; } .notice button { padding: 0 10px; font-size: 12px; border-width: 1.5px; }
+  #toast { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 20; max-width: 92%; width: max-content;
+    background: var(--brown); color: #fff; border-radius: 999px; padding: 5px 6px 5px 14px; font-size: 12.5px;
+    display: none; gap: 8px; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,.2); }
+  #toast.on { display: flex; }
+  #toast button { padding: 0 10px; font-size: 12px; border-width: 1.5px; flex: none; }
   .fold { width: 100%; margin: 4px 0 8px; padding: 5px; border-style: dashed; color: var(--muted); background: transparent; }
   #details table { border-collapse: collapse; width: 100%; font-size: 12px; }
   #details th, #details td { border: 1px solid var(--line); padding: 3px 5px; vertical-align: top; }
@@ -172,6 +202,7 @@
     </section>
   </main>
 </div>
+<div id="toast"><span id="toast-msg"></span><button id="toast-undo">되돌리기</button></div>
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -286,51 +317,139 @@ function agendaHtml(rows) {
   return h || `<span class="muted">일정 없음</span>`;
 }
 
-const CATS = ["전체", "혜택", "업데이트", "흐름", "오픈소스", "커뮤니티", "발굴"];
-let briefCat = "전체", briefLow = false, briefData = null;
+const CATS = ["전체", "혜택·비용", "보안·장애", "규제·정책", "업데이트·단종", "새 모델·도구", "방법·흐름", "사례·커뮤니티", "발굴"];
+let briefCat = "전체", briefLow = false, briefData = null, briefTag = "", briefGone = false, ipMenu = false;
+const openCards = new Set();  // 다시 그려도 펼친 카드는 펼친 채로
+const onTags = () => (briefData?.news?.interests || []).filter(x => x.on).map(x => x.tag);
+const showTags = () => onTags().length >= 2;  // 관심사가 하나면 태그는 다 같으니 안 보인다
+// 뺀 관심사 태그만 달린 카드 — 오늘 브리핑은 다시 만들지 않고 접어 둔다
+const goneCard = it => it.tags.length > 0 && !it.tags.some(t => onTags().includes(t));
+
+let toastTimer = null, toastUndo = null;
+function toast(msg, undo) {
+  $("#toast-msg").textContent = msg;
+  toastUndo = undo || null;
+  $("#toast-undo").style.display = undo ? "" : "none";
+  $("#toast").classList.add("on");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $("#toast").classList.remove("on"), 7000);
+}
+$("#toast-undo").onclick = () => { $("#toast").classList.remove("on"); toastUndo?.(); };
+
 function newsCard(it) {
   const st = it.urgent ? "urgent" : it.status === "확인됨" ? "ok" : "unk";
   const chips = [];
   if (briefCat === "전체") chips.push(`<span class="chip cat">${esc(it.cat)}</span>`);
+  if (showTags() && !briefTag) it.tags.forEach(t => chips.push(`<span class="chip itag">${esc(t)}</span>`));
   if (it.me) chips.push(`<span class="chip ${/해당 없음|비추천/.test(it.me) ? "no" : "me"}">${esc(it.me)}</span>`);
   if (it.todo) chips.push(`<span class="chip do">할 일: ${esc(it.todo)}</span>`);
   (it.chips || []).forEach(c => chips.push(`<span class="chip">${esc(c)}</span>`));
   const links = (it.links || []).map(l => `<a href="${esc(l.url)}">${esc(l.label)}</a>`).join(", ");
-  return `<div class="news ${it.todo ? "todo" : ""} ${it.rel === 1 ? "dim" : ""}">
+  return `<div class="news ${it.todo ? "todo" : ""} ${it.rel === 1 ? "dim" : ""} ${goneCard(it) ? "gone" : ""} ${openCards.has(it._i) ? "open" : ""}" data-i="${it._i}">
     <div class="top"><span class="mark ${st}">${{urgent: "!", ok: "✓", unk: "?"}[st]}</span>
       <div style="flex:1"><div class="t">${esc(it.title)}</div>${chips.length ? `<div class="chips">${chips.join("")}</div>` : ""}</div>
       <span class="arrow">▼</span></div>
-    <div class="b">${esc(it.body)}${links ? ` → ${links}` : ""}</div></div>`;
+    <div class="b">${esc(it.body)}${links ? ` → ${links}` : ""}${briefData.news?.card_tags ? tagEdit(it) : ""}</div></div>`;
 }
+// 카드 태그 고치기 (config [news] card_tags = true일 때만): (데이터 ✕) [+태그]
+function tagEdit(it) {
+  const add = onTags().filter(t => !it.tags.includes(t));
+  return `<div class="tagedit">관심사 ${it.tags.map(t => `<button class="chip itag" data-del="${esc(t)}" title="이 카드에서 빼기">${esc(t)} ✕</button>`).join("")}
+    ${add.length && it.tags.length < 2 ? `<select data-add><option value="">+태그</option>${add.map(t => `<option>${esc(t)}</option>`).join("")}</select>` : ""}</div>`;
+}
+async function setCardTags(i, tags) {
+  const it = briefData.items[i];
+  if (!await api.set_card_tags(briefData.date, i, tags)) return toast("태그를 못 고쳤어요. 브리핑을 다시 열어 주세요");
+  it.tags = tags;
+  renderNews();
+}
+
+// 관심사 태그 줄 + 출처 옮기기 알림 (브리핑이 아직 없어도 보인다)
+function renderHead() {
+  const n = briefData.news;
+  if (!n) return;
+  const on = n.interests.filter(x => x.on), off = n.interests.filter(x => !x.on);
+  let h = n.notice ? `<div class="notice"><span>${esc(n.notice)}</span><button id="notice-ok">확인</button></div>` : "";
+  $("#notice-box").innerHTML = h;
+  h = on.map(x => `<span class="ipill ${showTags() && briefTag === x.tag ? "on" : ""}"><button class="ip-name" data-tag="${esc(x.tag)}"
+      title="${esc(x.name)}${showTags() ? " — 누르면 이 관심사 카드만" : ""}">${esc(x.tag)}</button><button class="ip-x" data-off="${x.id}" title="관심사에서 빼기">✕</button></span>`).join("");
+  h += off.length ? `<button class="ip-add" id="ip-add" title="관심사 더하기">+${on.length ? "" : " 관심사 고르기"}</button>` : "";
+  if (!on.length) h += `<span class="hint">관심사를 고르면 그 분야 소식 출처를 챙겨요</span>`;
+  if (ipMenu && off.length) h += `<div class="ip-menu">${off.map(x => `<button data-on="${x.id}"><b>${esc(x.name)}</b><span>${esc(x.summary)}</span></button>`).join("")}
+    <div class="foot">출처는 다음 수집부터 바뀌어요</div></div>`;
+  $("#news-head").innerHTML = h;
+  $("#notice-ok")?.addEventListener("click", async () => { await api.dismiss_notice(); n.notice = ""; renderHead(); });
+  $("#ip-add")?.addEventListener("click", e => { e.stopPropagation(); ipMenu = !ipMenu; renderHead(); });
+  $("#news-head").querySelectorAll("[data-on]").forEach(b => b.onclick = () => {
+    const x = n.interests.find(i => i.id === b.dataset.on);
+    ipMenu = false;
+    setInterests([...on.map(i => i.id), x.id], `「${x.tag}」 더했어요 · 다음 수집부터 받아요`, on.map(i => i.id));
+  });
+  $("#news-head").querySelectorAll("[data-off]").forEach(b => b.onclick = () => {
+    const x = n.interests.find(i => i.id === b.dataset.off);
+    setInterests(on.filter(i => i.id !== x.id).map(i => i.id), `「${x.tag}」 뺐어요 · 다음 수집부터 안 받아요`, on.map(i => i.id));
+  });
+  $("#news-head").querySelectorAll("[data-tag]").forEach(b => b.onclick = () => {
+    if (!showTags()) return;
+    briefTag = briefTag === b.dataset.tag ? "" : b.dataset.tag;
+    briefCat = "전체"; renderNews();
+  });
+}
+async function setInterests(ids, msg, prev) {
+  briefData.news = await api.set_interests(ids);
+  if (!onTags().includes(briefTag)) briefTag = "";
+  briefData.items ? renderNews() : renderHead();
+  toast(msg, prev && (() => setInterests(prev, "되돌렸어요")));
+}
+document.addEventListener("click", e => {  // 메뉴 밖을 누르면 닫기
+  if (ipMenu && !e.target.closest(".ip-menu")) { ipMenu = false; if (briefData) renderHead(); }
+});
+
 function renderNews() {
-  const items = briefData.items;
+  renderHead();
+  const all = briefData.items;
+  const gone = all.filter(goneCard);
+  const items = all.filter(it => !goneCard(it) && (!briefTag || it.tags.includes(briefTag)));
   const counts = c => c === "전체" ? items.length : items.filter(x => x.cat === c).length;
+  if (!counts(briefCat)) briefCat = "전체";
   $("#filters").innerHTML = CATS.filter(c => counts(c)).map(c =>
-    `<button class="${c === briefCat ? "on" : ""}" data-c="${c}">${c} ${counts(c)}</button>`).join("");
-  $("#filters").querySelectorAll("button").forEach(b => b.onclick = () => { briefCat = b.dataset.c; briefLow = false; renderNews(); });
+    `<button class="${c === briefCat ? "on" : ""}" data-c="${c}">${c} ${counts(c)}</button>`).join("")
+    + (briefTag ? `<span class="tagon">${esc(briefTag)}만 보는 중<button id="tag-clear" title="모두 보기">✕</button></span>` : "");
+  $("#filters").querySelectorAll("button[data-c]").forEach(b => b.onclick = () => { briefCat = b.dataset.c; briefLow = false; renderNews(); });
+  $("#tag-clear")?.addEventListener("click", () => { briefTag = ""; renderNews(); });
   const list = items.filter(it => briefCat === "전체" || it.cat === briefCat)
-    .map((it, i) => [it, i]).sort((a, b) => (b[0].rel - a[0].rel) || (b[0].urgent - a[0].urgent) || (a[1] - b[1])).map(x => x[0]);
+    .sort((a, b) => (b.rel - a.rel) || (b.urgent - a.urgent) || (a._i - b._i));
   const group = (rows, name) => rows.length ? (name ? `<h3>${name}</h3>` : "") + rows.map(newsCard).join("") : "";
   const lo = list.filter(it => it.rel < 2);
   let h = briefCat === "전체"
     ? group(list.filter(it => it.rel === 3), "꼭 볼 것") + group(list.filter(it => it.rel === 2), "알아두면 좋은 것")
     : group(list.filter(it => it.rel >= 2));
   if (lo.length) h += briefLow ? group(lo, "나머지") : `<button class="fold" id="fold">나머지 ${lo.length}개 보기 ▾</button>`;
+  if (gone.length && !briefTag) h += briefGone ? group(gone, "빼 둔 관심사 카드")
+    : `<button class="fold" id="fold-gone">빼 둔 관심사 카드 ${gone.length}개 ▾</button>`;
   $("#news").innerHTML = h || `<p class="muted">이 분류엔 소식이 없어요.</p>`;
   $("#fold")?.addEventListener("click", () => { briefLow = true; renderNews(); });
-  $("#news").querySelectorAll(".news .top").forEach(t => t.onclick = () => t.parentNode.classList.toggle("open"));
+  $("#fold-gone")?.addEventListener("click", () => { briefGone = true; renderNews(); });
+  $("#news").querySelectorAll(".news").forEach(card => {
+    const i = +card.dataset.i;
+    card.querySelector(".top").onclick = () => { card.classList.toggle("open"); openCards[card.classList.contains("open") ? "add" : "delete"](i); };
+    card.querySelectorAll("[data-del]").forEach(b => b.onclick = () => setCardTags(i, briefData.items[i].tags.filter(t => t !== b.dataset.del)));
+    card.querySelector("[data-add]")?.addEventListener("change", e => e.target.value && setCardTags(i, [...briefData.items[i].tags, e.target.value]));
+  });
 }
 
 async function loadBrief() {
   await ready;
   const b = await api.get_briefing();
+  if (briefData?.date !== b.date) openCards.clear();
+  briefData = b;
+  (b.items || []).forEach((it, i) => it._i = i);
   if (b.items) {  // 카드 형식
-    briefData = b;
     if (!CATS.includes(briefCat)) briefCat = "전체";
     $("#brief").innerHTML = `<h1 class="title">${esc(b.title)} <span class="muted" style="font-size:12px">· ${b.items.length}개</span></h1>
       <div class="wx-strip" id="brief-wx"></div>
       <h3>일정</h3><div class="agenda">${agendaHtml(b.agenda)}</div>${overnightMail(b.mails)}
-      <h3>소식</h3><div class="filters" id="filters"></div><div id="news"></div>`;
+      <h3>소식</h3><div id="notice-box"></div><div id="news-head"></div><div class="filters" id="filters"></div><div id="news"></div>`;
     renderNews();
     if ($("#brief-mail")) openable($("#brief-mail"));
     fillBriefWeather();
@@ -340,10 +459,12 @@ async function loadBrief() {
   $("#brief").innerHTML = `<h1 class="title">${esc(b.title)}</h1>
     <div class="wx-strip" id="brief-wx"></div>
     <h3>일정</h3><div class="agenda">${agendaHtml(b.agenda)}</div>${overnightMail(b.mails)}
-    <h3>헤드라인</h3>${heads ? `<ul class="heads">${heads}</ul>` : `<p class="muted">헤드라인이 없는 예전 형식이에요. 트레이 메뉴 > 브리핑만 다시 만들기</p>`}
+    <div id="notice-box"></div>${b.news ? `<h3>관심사</h3><div id="news-head"></div>` : ""}
+    ${b.none ? `<p class="muted">위 「지금 수집」을 누르면 첫 브리핑을 만들어요.</p>` : `<h3>헤드라인</h3>${heads ? `<ul class="heads">${heads}</ul>` : `<p class="muted">헤드라인이 없는 예전 형식이에요. 트레이 메뉴 > 브리핑만 다시 만들기</p>`}`}
     ${b.details ? `<button id="more">자세히 ▾</button><div id="details">${b.details}</div>` : ""}`;
   if ($("#brief-mail")) openable($("#brief-mail"));
   fillBriefWeather();
+  renderHead();
   $("#more")?.addEventListener("click", () => {
     const d = $("#details"); d.classList.toggle("on");
     $("#more").textContent = d.classList.contains("on") ? "접기 ▴" : "자세히 ▾";

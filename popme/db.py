@@ -208,6 +208,11 @@ class DB:
             c.execute("INSERT OR REPLACE INTO briefings (date, markdown, created_at, items) VALUES (?,?,?,?)",
                       (date, markdown, now_iso(), items))
 
+    def save_briefing_items(self, date, items):
+        """이미 만든 브리핑의 카드 JSON만 바꾼다 (카드 태그 고치기). created_at은 그대로."""
+        with self.conn() as c:
+            c.execute("UPDATE briefings SET items=? WHERE date=?", (items, date))
+
     def latest_briefing(self):
         rows = self.q("SELECT * FROM briefings ORDER BY date DESC LIMIT 1")
         return rows[0] if rows else None

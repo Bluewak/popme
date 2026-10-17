@@ -29,7 +29,7 @@ def test_clean_fills_and_fixes_fields():
     items = payload()["items"]
     assert len(items) == 3  # 제목 없는 카드는 버림
     odd = items[1]
-    assert odd["cat"] == "커뮤니티" and odd["rel"] == 2 and odd["status"] == "미확인"
+    assert odd["cat"] == "사례·커뮤니티" and odd["rel"] == 2 and odd["status"] == "미확인"
     assert payload()["lines"] == ["안녕"]
 
 
