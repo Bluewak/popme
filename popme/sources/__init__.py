@@ -43,4 +43,9 @@ def collect(feeds, progress=lambda s: None):
         for out, errs in pool.map(run, by_host.values()):
             items += out
             errors += errs
+    for m in set(KINDS.values()):
+        try:
+            getattr(m, "flush", lambda: None)()  # 조건부 요청용 ETag 등 저장
+        except OSError as e:
+            log.warning("출처 캐시 저장 실패: %s", e)
     return items, errors

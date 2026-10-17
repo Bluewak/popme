@@ -1,5 +1,6 @@
 # --- 개인 설정·캐릭터 (예시 파일 *.example.toml만 올림) ---
 config.toml
+config.toml.bak-*
 character.toml
 shisa.toml
 PLAN.md
