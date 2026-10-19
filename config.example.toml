@@ -13,7 +13,7 @@ briefing_after = "09:00"          # 이 시각 이후 앱이 켜져 있고 오�
 
 [chrome]
 port = 9333                       # POPME 전용 Chrome 디버깅 포트
-minimize_while_collecting = false # true면 수집 중 Chrome 창을 최소화
+minimize_while_collecting = true  # 수집 중 Chrome 창을 최소화 (최소화돼도 수집은 멈추지 않음). false면 화면에 보이게
 
 [x]
 list_url = ""                     # X 리스트가 생기면 넣으세요(있으면 계정별 방문 대신 리스트 1번만 봄)
