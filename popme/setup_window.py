@@ -370,7 +370,22 @@ def current():
         "login_sites": {k: {"name": v["name"], "why": v["why"], "optional": v.get("optional", False)}
                         for k, v in LOGIN_SITES.items()},
         "python": sys.version.split()[0],
+        **interest_choices(cfg),
     }
+
+
+def interest_choices(cfg):
+    """관심사 단계 ①의 카드: 미리 만든 것 + 내가 만든 것, 지금 고른 것."""
+    from popme import catalog
+    feeds = catalog.feeds()
+    out = []
+    for p in catalog.profiles():
+        on = [e["id"] for e in p.get("feeds", []) if e.get("default", True) is not False and e["id"] in feeds]
+        n_ent = len(p.get("people", [])) + len(p.get("companies", []))
+        out.append({"id": p["id"], "name": p["name"], "tag": p["tag"], "summary": p.get("summary", ""),
+                    "custom": bool(p.get("custom")), "count": len(on) or n_ent,
+                    "examples": [feeds[i]["name"] for i in on[:3]] or [e["name"] for e in p.get("people", [])[:3]]})
+    return {"interests": out, "interests_on": [p["id"] for p in catalog.chosen(cfg)]}
 
 
 def _check_url(url):
@@ -433,11 +448,56 @@ def validate(ch):
         # 기본 캐릭터는 이름을 박지 않는다: character.toml을 나중에 만들면 그대로 쓰이고, 없으면 예시로 넘어간다
         char = "character.toml"
     return {**ch, "briefing_after": t, "ics": rows, "caldav": dav, "mail": mail, "character": char,
-            "plan": (ch.get("plan") or "").strip(), "tools": (ch.get("tools") or "").strip()}
+            "plan": (ch.get("plan") or "").strip(), "tools": (ch.get("tools") or "").strip(),
+            **validate_interests(ch.get("interests"))}
+
+
+def validate_interests(it):
+    """관심사 단계 값 → {interests: …}. 단계를 안 거쳤으면(예전 화면) 건드리지 않는다."""
+    if not it:
+        return {}
+    from popme import catalog
+    known = {p["id"] for p in catalog.profiles()}
+    chosen = [i for i in it.get("chosen") or [] if i in known]
+    if not chosen and not it.get("customs"):
+        raise ValueError("관심사를 하나 이상 골라 주세요.")
+    clean = lambda xs, n: [str(x)[:n] for x in xs or [] if str(x).strip()][:20]
+    picks = {}
+    for pid, pk in (it.get("picks") or {}).items():
+        if pid not in known:
+            continue
+        out = {}
+        if pk.get("scope") in ("kr", "world"):
+            out["scope"] = pk["scope"]
+        for k in ("people", "companies", "topics"):
+            if k in pk:
+                out[k] = clean(pk[k], 40)
+        if "extra" in pk:
+            out["extra"] = [{k: str(e[k])[:40] for k in ("kind", "name", "why", "x", "region", "news", "news_en") if e.get(k)}
+                            for e in pk["extra"][:10] if e.get("name")]
+        picks[pid] = out
+    customs = []
+    for c in (it.get("customs") or [])[:5]:
+        f = c.get("final") or {}
+        if not str(c.get("field") or "").strip() or not f:
+            continue
+        customs.append({"field": str(c["field"]).strip()[:40], "scope": "kr" if c.get("scope") == "kr" else "world",
+                        "verified": [e for e in c.get("verified") or [] if isinstance(e, dict) and e.get("name")][:20],
+                        "topics": clean(c.get("topics"), 10),
+                        "final": {"name": str(f.get("name") or c["field"])[:12], "tag": str(f.get("tag") or c["field"])[:6],
+                                  "summary": str(f.get("summary") or "")[:30], "discovery": str(f.get("discovery") or "")[:80],
+                                  "criteria": clean(f.get("criteria"), 120)[:5] or ["광고·홍보는 버린다."]}})
+    return {"interests": {"chosen": chosen, "picks": picks, "customs": customs}}
 
 
 def apply(text, ch):
     """고른 값(validate 거친 것)을 config 텍스트에 반영. 결과는 TOML로 다시 읽어 검사한다."""
+    if ch.get("interest_ids") is not None:  # 관심사 단계: 고른 관심사 + 미리 만든 관심사에서 고친 것 (고친 칸만)
+        text = set_value(text, "news", "interests", ch["interest_ids"], before=("llm",))
+        for pid, pk in (ch.get("picks") or {}).items():
+            for k in ("scope", "people", "companies", "topics", "extra"):
+                if k in pk:
+                    text = set_value(text, f"news.picks.{pid}", k, pk[k], before=("llm",))
     if ch.get("character"):
         text = set_value(text, "character", "file", ch["character"], before=("user",))
     text = set_value(text, "user", "plan", ch["plan"], before=("schedule",))
@@ -879,6 +939,13 @@ class Api:
             place = (ch.get("place") or "").strip()
             if place and place != current()["place"]:
                 ch["weather"] = geocode_place(place)
+            if ch.get("interests"):  # 새 관심사 파일을 먼저 만들고, 고른 관심사 목록에 그 id를 넣는다
+                from popme import interests
+                it = ch["interests"]
+                made = [interests.save_custom(c["field"], c.get("scope", "world"), c.get("verified", []), c.get("topics", []),
+                                              c["final"]) for c in it["customs"] if c.get("field") and c.get("final")]
+                ch["interest_ids"] = list(dict.fromkeys(it["chosen"] + made))
+                ch["picks"] = it["picks"]
             write(apply(base_text(), ch))
         except ValueError as e:
             return {"ok": False, "error": str(e)}
@@ -887,6 +954,33 @@ class Api:
             return {"ok": False, "error": f"저장하지 못했어요: {e}"}
         self._saved = True
         return {"ok": True}
+
+    # --- 관심사 단계 (popme/interests.py) ---
+    def _cfg(self, provider):
+        cfg = tomllib.loads(base_text())
+        if provider in AIS:  # 이번 마법사에서 고른 AI (아직 저장 전일 수 있다)
+            cfg.setdefault("llm", {})["provider"] = provider
+        return cfg
+
+    def interest_preset(self, pid):
+        from popme import interests
+        return interests.preset_view(pid, tomllib.loads(base_text()))
+
+    def interest_suggest(self, field, scope, provider):
+        from popme import interests
+        return interests.suggest(self._cfg(provider), field, scope)
+
+    def interest_verify(self, entities, scope):
+        from popme import interests
+        try:
+            return interests.verify(entities, scope)
+        except Exception:
+            log.exception("관심사 확인 실패")
+            return [{**e, "x_status": "unknown", "feed": None, "news_count": 0} for e in entities]
+
+    def interest_finalize(self, field, scope, people, companies, topics, provider):
+        from popme import interests
+        return interests.finalize(self._cfg(provider), field, scope, people, companies, topics)
 
     def close(self):
         self._window.destroy()

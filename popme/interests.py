@@ -217,7 +217,7 @@ def save_picks(pid, scope, people, companies, topics, extra=()):
     text = base_text()
     sec = f"news.picks.{pid}"
     for k, v in (("scope", scope), ("people", list(people)), ("companies", list(companies)), ("topics", list(topics)),
-                 ("extra", [{k2: e[k2] for k2 in ("name", "why", "x", "region", "news", "news_en") if e.get(k2)} for e in extra])):
+                 ("extra", [{k2: e[k2] for k2 in ("kind", "name", "why", "x", "region", "news", "news_en") if e.get(k2)} for e in extra])):
         text = set_value(text, sec, k, v, before=("llm",))
     tomllib.loads(text)
     config.CONFIG_PATH.write_text(text, encoding="utf-8", newline="\n")
@@ -230,6 +230,8 @@ def preset_view(pid, cfg):
     chosen = {e["name"] for e in catalog.entities(cfg, p)}
     view = lambda key, kind: [{**e, "kind": kind, "on": e["name"] in chosen} for e in p.get(key, [])]
     return {"id": pid, "name": p["name"], "tag": p["tag"], "scope": catalog.scope(cfg, p),
-            "people": view("people", "person") + [{**e, "kind": "person", "on": True} for e in pk.get("extra", [])],
-            "companies": view("companies", "company"),
+            "people": view("people", "person") + [{"kind": "person", **e, "on": True, "added": True}
+                                                  for e in pk.get("extra", []) if e.get("kind", "person") == "person"],
+            "companies": view("companies", "company") + [{**e, "on": True, "added": True}
+                                                         for e in pk.get("extra", []) if e.get("kind") == "company"],
             "topics": [{"name": t, "on": t in pk["topics"] if "topics" in pk else True} for t in p.get("topics", [])]}

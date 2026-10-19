@@ -105,6 +105,38 @@
   details.quiet { margin-top: 10px; }
   details.quiet input[type=time] { width: 140px; }
   #mail-host-note:empty { display: none; }
+  /* 관심사: ① 카드 고르기·직접 입력 → (관심사마다) 범위 › 사람 › 기업 › 궁금한 것 › 확인 */
+  .icard { display: flex; gap: 10px; align-items: flex-start; }
+  .icard .ck { flex: none; width: 20px; height: 20px; border: 2px solid var(--line); border-radius: 6px; margin-top: 2px; background: #fff;
+    display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; }
+  .card:has(input:checked) .ck { background: var(--accent); border-color: var(--accent); }
+  .icard .src { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .mine { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+  .picked { margin-top: 10px; font-size: 12.5px; color: var(--muted); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .picked b { color: var(--brown); font-family: "Jua", sans-serif; font-weight: 400; }
+  .picked .new { background: #fff4ec; border: 1.5px solid var(--accent); border-radius: 999px; padding: 0 4px 0 10px; color: var(--brown); }
+  .isub { display: flex; gap: 4px; align-items: center; font-size: 12px; color: var(--muted); margin: 2px 0 8px; flex-wrap: wrap; }
+  .isub .tg { background: var(--brown); color: #fff; border-radius: 999px; padding: 0 9px; font-family: "Jua", sans-serif; }
+  .isub span.on { color: var(--accent); font-weight: 600; } .isub span.done { color: var(--ok); }
+  .who { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; border-bottom: 1px dashed var(--line); cursor: pointer; }
+  .who:last-child { border-bottom: none; }
+  .who input { margin-top: 4px; accent-color: #e8865a; }
+  .who b { font-family: "Jua", sans-serif; font-weight: 400; font-size: 14.5px; color: var(--brown); }
+  .who small { display: block; color: var(--muted); font-size: 12px; }
+  .grp { font-size: 12px; color: var(--accent); margin: 8px 0 0; font-family: "Jua", sans-serif; }
+  .grp:first-child { margin-top: 0; }
+  .ai-note { font-size: 12px; color: var(--muted); background: #fff; border: 1.5px dashed var(--line); border-radius: 8px; padding: 4px 9px; margin-bottom: 8px; }
+  .res { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; border-bottom: 1px dashed var(--line); }
+  .res:last-child { border-bottom: none; }
+  .res .nm { flex: 0 0 110px; font-family: "Jua", sans-serif; color: var(--brown); font-size: 14px; line-height: 1.35; }
+  .res .ways { flex: 1; display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+  .w { font-size: 11.5px; border-radius: 999px; padding: 0 8px; line-height: 20px; }
+  .w.ok { background: #e5f3ea; color: #2f7a52; } .w.no { background: #eee; color: #999; } .w.wait { background: #fde3d6; color: #b6522a; }
+  .nudge { font-size: 11.5px; color: #a8730f; width: 100%; }
+  .nudge a { margin-left: 4px; }
+  ul.crit { margin: 4px 0; padding-left: 18px; font-size: 12.5px; }
+  .spin { color: var(--muted); padding: 18px 4px; }
+  .spin::after { content: "…"; animation: pulse 1.2s ease-in-out infinite; }
 </style>
 </head>
 <body>
@@ -250,6 +282,9 @@
     <div id="login-helpbox"></div>
   </section>
 
+  <!-- 관심사 (설계 4장) — 로그인 다음: ⑥에서 X 계정을 확인하려면 로그인이 먼저 -->
+  <section data-step="관심사"><div id="int-sub" class="isub hidden"></div><div id="int-body"></div></section>
+
   <!-- 4. 마무리 -->
   <section data-step="마무리">
     <h1>거의 다 됐어요</h1>
@@ -273,6 +308,7 @@
 <footer>
   <button id="prev">이전</button>
   <div id="msg" class="msg"></div>
+  <button id="int-skip" class="hidden" title="고른 관심사(미리 만든 것)는 POPME가 골라 둔 그대로 써요">이대로 모두</button>
   <button class="primary" id="next">다음</button>
 </footer>
 
@@ -445,7 +481,9 @@ function init() {
   $("#place").value = D.place;
 
   helps.login = mountHelp($("#login-helpbox"), () => "login");
-  $("#prev").onclick = () => step === steps.length - 1 ? api().close() : go(step - 1);
+  $("#prev").onclick = () => step === steps.length - 1 ? api().close()
+    : steps[step].dataset.step === "관심사" && intPrev() ? null : go(step - 1);
+  $("#int-skip").onclick = intSkipPresets;
   $("#next").onclick = next;
   go(0);
 }
@@ -876,12 +914,243 @@ function startLoginPoll() {
   }, 3000);
 }
 
+
+// --- 관심사 (설계 4장): ① 고르기·직접 입력 → 관심사마다 범위 › 사람 › 기업 › 궁금한 것 (› 새 관심사는 확인) ---
+let INT = null;
+const ISUBS = { preset: ["scope", "people", "companies", "topics"], custom: ["scope", "people", "companies", "topics", "result"] };
+const INAME = { scope: "범위", people: "사람", companies: "기업", topics: "궁금한 것", result: "확인" };
+function intInit() { INT = { chosen: new Set(D.interests_on), customs: [], qi: -1, sub: 0, data: {}, queue: [], busy: "" }; }
+const intCur = () => INT.qi >= 0 ? INT.queue[INT.qi] : null;
+const intSubName = () => ISUBS[intCur().kind][INT.sub];
+const krName = s => /[가-힣]/.test(s);
+
+const intTop = () => { document.querySelector("main").scrollTop = 0; };
+function intRender() {
+  const c = intCur(), body = $("#int-body"), bar = $("#int-sub");
+  $("#int-skip").classList.toggle("hidden", !(c && c.kind === "preset"));
+  if (!c) { bar.classList.add("hidden"); intPick(body); return nav(); }
+  const d = INT.data[c.key], subs = ISUBS[c.kind];
+  bar.classList.remove("hidden");
+  bar.innerHTML = `<span class="tg">${esc(c.tag)}</span>` + subs.map((x, i) =>
+    `<span class="${i === INT.sub ? "on" : i < INT.sub ? "done" : ""}">${INAME[x]}</span>`).join(" › ");
+  if (INT.busy || !d) { body.innerHTML = `<div class="spin">${esc(INT.busy || "불러오는 중")}</div>`; return nav(); }
+  ({ scope: intScope, people: intList, companies: intList, topics: intTopics, result: intResult })[intSubName()](body, c, d);
+  nav();
+}
+
+function intPick(body) {
+  const cards = D.interests.map(i => `<label class="card icard"><input type="checkbox" data-id="${i.id}" ${INT.chosen.has(i.id) ? "checked" : ""}>
+      <span class="ck">✓</span><span><b>${esc(i.name)}</b><small>${esc(i.summary)}</small>
+      <div class="src">${i.custom ? "내가 만든 관심사 · " : ""}출처 ${i.count}곳 · 예: ${i.examples.map(esc).join(", ")}</div></span></label>`).join("");
+  const picked = [...D.interests.filter(i => INT.chosen.has(i.id)).map(i => `<b>${esc(i.tag)}</b>`),
+                  ...INT.customs.map((f, k) => `<span class="new">${esc(f)} <button class="x" data-del="${k}" title="빼기">✕</button></span>`)];
+  body.innerHTML = `<h1>어떤 소식이 궁금하세요?</h1>
+    <p class="lead">여러 개 골라도 돼요. 고른 관심사마다 사람·기업을 몇 가지 여쭤볼게요.</p>
+    <div class="cards">${cards}</div>
+    <h2>목록에 없으면 직접 적어 주세요</h2>
+    <div class="mine"><input type="text" id="int-field" maxlength="40" placeholder="예: 축구, 반도체, K-뷰티, 부동산"><button id="int-add">더하기</button></div>
+    <small class="hint">무엇이든 돼요. 다음 단계에서 AI가 그 분야의 사람·기업 후보를 골라 드려요.</small>
+    ${picked.length ? `<div class="picked">고른 관심사 ${picked.join(" · ")}</div>` : ""}`;
+  body.querySelectorAll("input[data-id]").forEach(b => b.onchange = () => {
+    b.checked ? INT.chosen.add(b.dataset.id) : INT.chosen.delete(b.dataset.id); intRender(); });
+  const add = () => {
+    const f = $("#int-field").value.trim();
+    if (f && !INT.customs.includes(f) && INT.customs.length < 5) INT.customs.push(f);
+    intRender(); setTimeout(() => $("#int-field")?.focus());
+  };
+  $("#int-add").onclick = add;
+  $("#int-field").onkeydown = e => { if (e.key === "Enter") add(); };
+  body.querySelectorAll("[data-del]").forEach(b => b.onclick = () => { INT.customs.splice(+b.dataset.del, 1); intRender(); });
+}
+
+function intScope(body, c, d) {
+  body.innerHTML = `<h1>어디 소식을 볼까요?</h1>
+    <p class="lead">「한국어만」이면 사람·기업도 국내 위주로 골라요.</p>
+    <div class="cards two">
+      <label class="card"><input type="radio" name="int-scope" value="kr"><b>한국어만</b><small>국내 기사·국내 계정</small></label>
+      <label class="card"><input type="radio" name="int-scope" value="world"><b>해외도</b><small>해외 기사·계정도 함께 (브리핑은 한국어로)</small></label>
+    </div>`;
+  setRadio("int-scope", d.scope);
+  body.querySelectorAll("input[name=int-scope]").forEach(r => r.onchange = () => { d.scope = r.value; if (c.kind === "custom") d.suggested = false; });
+}
+
+function intList(body, c, d) {
+  const key = intSubName(), people = key === "people", rows = d[key];
+  const groups = [["kr", people ? "국내" : "국내"], ["world", people ? "해외" : "세계"]];
+  const order = d.scope === "kr" ? groups : [groups[1], groups[0]];
+  const st = e => e.checked === undefined ? "" : [e.x_status === "ok" ? "X ✓" : "", e.news_count ? `뉴스 ${e.news_count}건` : "",
+    e.x_status !== "ok" && !e.news_count ? "받을 소식을 못 찾았어요" : ""].filter(Boolean).join(" · ");
+  const box = order.map(([r, label]) => {
+    const xs = rows.map((e, i) => [e, i]).filter(([e]) => (e.region || "world") === r);
+    return xs.length ? `<div class="grp">${label}</div>` + xs.map(([e, i]) => `<label class="who"><input type="checkbox" data-i="${i}" ${e.on ? "checked" : ""}>
+      <span><b>${esc(e.name)}</b><small>${esc([e.why, st(e)].filter(Boolean).join(" · "))}</small></span></label>`).join("") : "";
+  }).join("");
+  const note = c.kind === "preset" ? "POPME가 골라 둔 후보예요. 그대로 두셔도 돼요."
+    : d.error ? `${d.error}. 받고 싶은 ${people ? "사람" : "기업·단체"}을 직접 적어 주세요.`
+    : `AI가 「${c.tag} · ${d.scope === "kr" ? "한국어만" : "해외도"}」로 고른 후보예요. 계정은 마지막에 실제로 열어서 확인해요.`;
+  body.innerHTML = `<h1>소식 받고 싶은 ${people ? "사람은" : "기업·단체는"}?</h1>
+    <div class="ai-note">${esc(note)}</div>
+    ${box ? `<div class="box">${box}</div>` : ""}
+    <div class="mine"><input type="text" id="int-ent" maxlength="30" placeholder="더 받고 싶은 ${people ? "사람 이름" : "기업·단체"}"><button id="int-ent-add">더하기</button></div>
+    <div class="msg" id="int-ent-msg"></div>`;
+  body.querySelectorAll("input[data-i]").forEach(b => b.onchange = () => rows[+b.dataset.i].on = b.checked);
+  const add = async () => {
+    const name = $("#int-ent").value.trim();
+    if (!name || rows.some(e => e.name === name)) return;
+    const e = { kind: people ? "person" : "company", name, why: "직접 더함", region: d.scope === "kr" || krName(name) ? "kr" : "world",
+                news: name, news_en: krName(name) ? "" : name, x: "", on: true, added: true };
+    rows.push(e);
+    if (c.kind === "preset") {  // 미리 만든 관심사는 「확인」 단계가 없으니 더할 때 바로 확인한다
+      say($("#int-ent-msg"), `「${name}」 소식을 찾아보는 중…`);
+      Object.assign(e, (await api().interest_verify([e], d.scope))[0], { checked: true });
+    }
+    intRender(); setTimeout(() => $("#int-ent")?.focus());
+  };
+  $("#int-ent-add").onclick = add;
+  $("#int-ent").onkeydown = ev => { if (ev.key === "Enter") add(); };
+}
+
+function intTopics(body, c, d) {
+  body.innerHTML = `<h1>특히 궁금한 건 뭐예요?</h1>
+    <p class="lead">고른 것 위주로 브리핑에 넣어요. 안 골라도 돼요.</p>
+    ${d.topics.length ? `<div class="chips">${d.topics.map((t, i) =>
+      `<label class="chip"><input type="checkbox" data-t="${i}" ${t.on ? "checked" : ""}>${esc(t.name)}</label>`).join("")}</div>`
+      : `<p class="hint">고를 보기가 없어요. 그대로 다음으로 넘어가도 돼요.</p>`}`;
+  body.querySelectorAll("input[data-t]").forEach(b => b.onchange = () => d.topics[+b.dataset.t].on = b.checked);
+}
+
+function intResult(body, c, d) {
+  const on = xs => xs.filter(e => e.on);
+  if (!d.verified) {
+    INT.busy = "사람·기업마다 받을 수 있는 소식을 확인하는 중 (X 계정·공식 사이트·뉴스)";
+    const ents = [...on(d.people), ...on(d.companies)];
+    Promise.all([api().interest_verify(ents, d.scope),
+                 api().interest_finalize(d.field, d.scope, on(d.people), on(d.companies), on(d.topics).map(t => t.name), radio("ai"))])
+      .then(([v, f]) => { d.verified = v; d.final = f; INT.busy = ""; if (intCur() === c) intRender(); });
+    return intRender();
+  }
+  const xLogin = login.x === true;
+  const row = e => {
+    const w = [];
+    if (e.news_count) w.push(`<span class="w ok">뉴스 ✓</span>`);
+    if (e.feed) w.push(`<span class="w ok">공식 소식 ✓</span>`);
+    w.push(e.x_status === "ok" ? `<span class="w ok">X ✓</span>` : e.x_status === "unknown" ? `<span class="w no">X 확인 못 함</span>` : `<span class="w no">X 없음</span>`);
+    if (!e.news_count && !e.feed && e.x_status !== "ok") w.push(`<span class="nudge">받을 소식을 못 찾아서 이 ${e.kind === "person" ? "사람" : "곳"}은 빼고 만들어요</span>`);
+    return `<div class="res"><span class="nm">${esc(e.name)}</span><span class="ways">${w.join("")}</span></div>`;
+  };
+  const ppl = d.verified.filter(e => e.kind === "person"), cos = d.verified.filter(e => e.kind === "company");
+  body.innerHTML = `<h1>이렇게 만들까요?</h1>
+    <p class="lead">「${esc(d.final.name)}」 · 열어서 확인된 것만 받아요.</p>
+    ${!xLogin && d.verified.some(e => e.x_status === "ok") ? `<div class="howto">X에 로그인하면 이 사람·기업들 소식을 더 잘 받을 수 있어요.
+      지금은 뉴스로 받고, 로그인하면 본인이 올리는 글도 받아요. <a data-xlogin>X 로그인하기</a></div>` : ""}
+    ${ppl.length ? `<h2>사람</h2><div class="box">${ppl.map(row).join("")}</div>` : ""}
+    ${cos.length ? `<h2>기업·단체</h2><div class="box">${cos.map(row).join("")}</div>` : ""}
+    <details open><summary>이런 소식을 골라요</summary><ul class="crit">${d.final.criteria.map(x => `<li>${esc(x)}</li>`).join("")}</ul></details>
+    <div class="row"><button id="int-redo">다시 고르기</button></div>`;
+  $("#int-redo").onclick = () => { d.verified = null; d.final = null; INT.sub = 1; intRender(); };
+  body.querySelectorAll("[data-xlogin]").forEach(a => a.onclick = async () => {
+    await api().open_login("x"); say($("#msg"), "열린 Chrome 창에서 X에 로그인해 주세요. 로그인은 나중에 해도 돼요.");
+    startLoginPoll(); });
+}
+
+async function intEnter() {  // 지금 관심사의 자료를 처음 준비
+  const c = intCur();
+  if (INT.data[c.key]) return;
+  if (c.kind === "preset") {
+    INT.busy = "불러오는 중"; intRender();
+    const v = await api().interest_preset(c.id);
+    const names = xs => xs.filter(e => e.on && !e.added).map(e => e.name);
+    INT.data[c.key] = { ...v, base: { scope: v.scope, people: names(v.people), companies: names(v.companies),
+                                     topics: v.topics.filter(t => t.on).map(t => t.name), extra: v.people.some(e => e.added) } };
+    INT.busy = "";
+  } else INT.data[c.key] = { field: c.field, scope: "world", people: [], companies: [], topics: [], suggested: false };
+}
+
+function intCanNext() {
+  const c = intCur();
+  if (!c) return INT.chosen.size + INT.customs.length > 0;
+  if (INT.busy) return false;
+  if (intSubName() === "result") return !!(INT.data[c.key] && INT.data[c.key].final);
+  return true;
+}
+
+async function intNext() {  // 반환: 이 단계를 다 끝냈나
+  if (!intCur()) {
+    INT.queue = [...D.interests.filter(i => INT.chosen.has(i.id) && !i.custom).map(i => ({ key: i.id, kind: "preset", id: i.id, tag: i.tag })),
+                 ...INT.customs.map(f => ({ key: "new:" + f, kind: "custom", field: f, tag: f }))];
+    if (!INT.queue.length) return true;
+    INT.qi = 0; INT.sub = 0;
+    await intEnter(); intRender(); intTop(); return false;
+  }
+  const c = intCur(), d = INT.data[c.key];
+  if (c.kind === "custom" && intSubName() === "scope" && !d.suggested) {  // 범위를 정하면 AI가 사람·기업·궁금한 것 후보를 고른다
+    INT.busy = `AI가 「${c.field}」 사람·기업 후보를 고르는 중 (20초쯤 걸려요)`; INT.sub = 1; intRender();
+    const s = await api().interest_suggest(c.field, d.scope, radio("ai"));
+    const keep = xs => xs.filter(e => e.added);
+    d.people = [...s.people.map(e => ({ ...e, on: true })), ...keep(d.people)];
+    d.companies = [...s.companies.map(e => ({ ...e, on: true })), ...keep(d.companies)];
+    d.topics = s.topics.map(t => ({ name: t, on: false }));
+    d.error = s.error || ""; d.suggested = true; d.verified = null; INT.busy = "";
+    return intRender(), intTop(), false;
+  }
+  if (INT.sub < ISUBS[c.kind].length - 1) { INT.sub++; intRender(); intTop(); return false; }
+  return intAdvance();
+}
+
+async function intAdvance() {  // 다음 관심사로, 없으면 끝
+  if (INT.qi >= INT.queue.length - 1) return true;
+  INT.qi++; INT.sub = 0;
+  await intEnter(); intRender(); intTop(); return false;
+}
+
+async function intSkipPresets() {  // 「이대로 모두」: 남은 미리 만든 관심사는 골라 둔 그대로
+  for (let i = INT.qi; i < INT.queue.length; i++) if (INT.queue[i].kind === "preset") INT.data[INT.queue[i].key] = { skipped: true };
+  const k = INT.queue.findIndex((q, i) => i >= INT.qi && q.kind === "custom");
+  if (k < 0) return go(step + 1);
+  INT.qi = k; INT.sub = 0; await intEnter(); intRender(); intTop();
+}
+
+function intPrev() {  // 반환: 관심사 단계 안에서 처리했나
+  if (!INT || !intCur()) return false;
+  if (INT.sub > 0) INT.sub--;
+  else if (INT.qi > 0) { INT.qi--; INT.sub = ISUBS[intCur().kind].length - 1; if (INT.data[intCur().key]?.skipped) delete INT.data[intCur().key]; }
+  else INT.qi = -1;
+  INT.busy = ""; intRender(); intTop();
+  return true;
+}
+
+function intPayload() {  // 저장할 값: 고른 관심사, 미리 만든 관심사에서 고친 칸만, 새 관심사
+  if (!INT) return null;
+  const picks = {}, customs = [];
+  const names = xs => xs.filter(e => e.on && !e.added).map(e => e.name), same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  for (const c of INT.queue) {
+    const d = INT.data[c.key];
+    if (!d || d.skipped) continue;
+    if (c.kind === "preset") {
+      const pk = {}, b = d.base, tps = d.topics.filter(t => t.on).map(t => t.name);
+      if (d.scope !== b.scope) pk.scope = d.scope;
+      if (!same(names(d.people), b.people)) pk.people = names(d.people);
+      if (!same(names(d.companies), b.companies)) pk.companies = names(d.companies);
+      if (!same(tps, b.topics)) pk.topics = tps;
+      const extra = [...d.people, ...d.companies].filter(e => e.added && e.on).map(e => ({ kind: e.kind, name: e.name, region: e.region,
+        x: e.x_status === "ok" ? e.x : "", news: e.news_count ? e.news : "", news_en: e.news_count ? e.news_en : "" }));
+      if (extra.length || b.extra) pk.extra = extra;
+      if (Object.keys(pk).length) picks[c.id] = pk;
+    } else if (d.final) {
+      customs.push({ field: d.field, scope: d.scope, final: d.final, topics: d.topics.filter(t => t.on).map(t => t.name),
+                     verified: d.verified.filter(e => e.news_count || e.feed || e.x_status === "ok") });
+    }
+  }
+  return { chosen: [...INT.chosen], picks, customs };
+}
+
 function canNext() {
   const name = steps[step].dataset.step;
   if (name === "준비물") return $("#prereq-ok").checked;
   if (name === "브리핑 AI") return !!radio("ai");
   if (name === "캘린더") return !!calMode();
   if (name === "메일") return !!radio("mail-on");
+  if (name === "관심사") return intCanNext();
   return true;
 }
 function nav() {
@@ -904,6 +1173,8 @@ function go(i) {
   if (last === "브리핑 AI") { aiRender(); aiRefresh(); }
   if (last === "캘린더") calView();
   if (last === "로그인") { loginRender(); loginCheck(); startLoginPoll(); }
+  if (last === "관심사") { if (!INT) intInit(); intRender(); }
+  if (last !== "관심사") $("#int-skip").classList.add("hidden");
   nav();
   document.querySelector("main").scrollTop = 0;
 }
@@ -936,6 +1207,7 @@ async function next() {
       say($("#msg"), "");
     }
   }
+  if (name === "관심사" && !await intNext()) return;
   if (name !== "마무리") return go(step + 1);
   say($("#msg"), "저장 중…");
   $("#next").disabled = true;
@@ -947,6 +1219,7 @@ async function next() {
                                password: $("#mail-pw").value, quiet_hours: quietHours() } : null,
     character: radio("char") || D.character, briefing_after: $("#time").value,
     use_windows_location: $("#winloc").checked, place: $("#place").value,
+    interests: intPayload(),
   });
   if (!r.ok) { $("#next").disabled = false; return say($("#msg"), r.error, "err-t"); }
   stopClip();
