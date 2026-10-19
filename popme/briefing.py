@@ -174,11 +174,13 @@ X_VISITS = config.DATA_DIR / "x-visits.json"  # 관심사 계정을 마지막으
 
 
 def x_to_visit(cfg, db, limit=X_VISIT_LIMIT):
-    """이번 수집에서 열 X 계정 handle. 내 핵심 계정·발굴로 추가한 계정은 늘 보고, 관심사 계정은 남은 자리만큼
-    오래 안 본 것부터 (사람 속도는 그대로 두고, 관심사를 늘려도 수집 시간이 늘지 않게 — 설계 6-3)."""
+    """이번 수집에서 열 X 계정 handle. 내 핵심 계정([x] accounts)은 늘 보고, 발굴로 추가한 계정·관심사 계정은
+    남은 자리만큼 오래 안 본 것부터 (사람 속도는 그대로 두고, 계정을 늘려도 수집 시간이 늘지 않게 — 설계 6-3).
+    발굴 계정도 돌아가며: 2026-10-19 발굴 40개가 늘 보는 쪽에 있어서 한 번에 62개를 봤다."""
     accts = core_accounts(cfg, db)
-    fixed = [a["handle"] for a in accts if not a.get("interest")]
-    rotating = [a["handle"] for a in accts if a.get("interest")]
+    mine = {a["handle"].lower() for a in cfg.get("x", {}).get("accounts", [])}
+    fixed = [a["handle"] for a in accts if a["handle"].lower() in mine]
+    rotating = [a["handle"] for a in accts if a["handle"].lower() not in mine]
     room = max(10, limit - len(fixed))
     if len(rotating) <= room:
         return fixed + rotating

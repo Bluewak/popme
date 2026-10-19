@@ -80,16 +80,21 @@ def _db():
     return DB(Path(tempfile.mkdtemp()) / "t.db")
 
 
-def test_x_rotation_keeps_mine_and_rotates_interest_accounts(monkeypatch):
-    mine = [{"handle": f"me{i}", "name": "", "group": "", "focus": ""} for i in range(25)]
-    many = [{"handle": f"i{i}", "name": "", "group": "", "focus": "", "interest": "x"} for i in range(20)]
-    monkeypatch.setattr(briefing, "core_accounts", lambda cfg, db: mine + many)
-    first = briefing.x_to_visit({}, None)
-    assert first[:25] == [a["handle"] for a in mine] and len(first) == 35  # 남는 자리가 적어도 관심사 계정 10개는
-    second = briefing.x_to_visit({}, None)
-    assert set(first[25:]).isdisjoint(second[25:])  # 다음 수집은 아직 안 본 계정부터
+def test_x_rotation_keeps_mine_and_rotates_the_rest(monkeypatch):
+    """내 핵심 계정은 늘, 발굴로 추가한 계정·관심사 계정은 남은 자리만큼 오래 안 본 것부터."""
+    mine = [{"handle": f"me{i}", "name": "", "group": "", "focus": ""} for i in range(14)]
+    found = [{"handle": f"d{i}", "name": "", "group": "발굴로 추가", "focus": ""} for i in range(40)]
+    many = [{"handle": f"i{i}", "name": "", "group": "", "focus": "", "interest": "x"} for i in range(10)]
+    cfg = {"x": {"accounts": mine}}
+    monkeypatch.setattr(briefing, "core_accounts", lambda cfg, db: mine + found + many)
+    first = briefing.x_to_visit(cfg, None)
+    assert first[:14] == [a["handle"] for a in mine] and len(first) == briefing.X_VISIT_LIMIT  # 62개 → 30개
+    second = briefing.x_to_visit(cfg, None)
+    assert set(first[14:]).isdisjoint(second[14:])  # 다음 수집은 아직 안 본 계정부터
+    big = {"x": {"accounts": mine + found[:20]}}  # 내 계정이 30개를 넘어도 돌아가는 쪽은 10개는 본다
+    assert len(briefing.x_to_visit(big, None)) == 34 + 10
     monkeypatch.setattr(briefing, "core_accounts", lambda cfg, db: mine[:3] + many[:5])
-    assert len(briefing.x_to_visit({}, None)) == 8  # 넘지 않으면 다 본다
+    assert len(briefing.x_to_visit(cfg, None)) == 8  # 넘지 않으면 다 본다
 
 
 def test_news_capped_per_person(monkeypatch, tmp_path):
