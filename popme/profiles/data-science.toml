@@ -14,6 +14,7 @@ criteria = """
 - 시험판(dev·rc·nightly), 리전 확장, 커넥터 Beta 추가는 넣지 않는다.
 """
 discovery = '실험·통계·데이터 도구·LLM 분석 활용에 실질 정보를 주는 사람'
+topics = ['라이브러리 큰 변경', '데이터 플랫폼 가격', '실험·인과추론', 'LLM으로 분석하기', '국내 데이터 조직 사례']   # 「특히 궁금한 것」 보기 (관심사 설정 ⑤)
 
 [caps]                        # 묶음별 상한 (이 관심사 몫)
 '공식 변경내역' = 20
@@ -256,3 +257,86 @@ filter = 'ai+data'
 id = 'arxiv-econ-em'
 why = '계량경제 논문 (하루 0~1편만)'
 default = false               # 「더 볼 수 있는 출처」 — 직접 켜야 받는다
+
+# --- 사람·기업 (관심사 설정 ③④의 보기, X 계정은 2026-10-19 oEmbed로 있는지 확인) — default = false면 체크 안 된 채로 보임 ---
+
+[[people]]
+name = 'Wes McKinney'
+why = 'pandas 만든 사람'
+x = 'wesmckinn'
+region = 'world'
+
+[[people]]
+name = 'Ritchie Vink'
+why = 'Polars 만든 사람'
+x = 'RitchieVink'
+region = 'world'
+
+[[people]]
+name = 'Sean J. Taylor'
+why = '실험·예측 실무'
+x = 'seanjtaylor'
+region = 'world'
+
+[[people]]
+name = 'Vicki Boykis'
+why = 'ML·데이터 실무 글'
+x = 'vboykis'
+region = 'world'
+
+[[people]]
+name = 'Chip Huyen'
+why = 'ML 시스템·AI 엔지니어링'
+x = 'chipro'
+region = 'world'
+
+[[people]]
+name = 'Hamel Husain'
+why = 'LLM 평가 실무'
+x = 'HamelHusain'
+region = 'world'
+
+[[people]]
+name = 'Jeremy Howard'
+why = 'fast.ai·실용 ML'
+x = 'jeremyphoward'
+region = 'world'
+default = false
+
+[[people]]
+name = 'Hadley Wickham'
+why = 'tidyverse·R'
+x = 'hadleywickham'
+region = 'world'
+default = false
+
+[[companies]]
+name = 'DuckDB'
+why = 'DuckDB 릴리스·글'
+x = 'duckdb'
+region = 'world'
+
+[[companies]]
+name = 'Databricks'
+why = '플랫폼 변경·가격'
+x = 'databricks'
+region = 'world'
+
+[[companies]]
+name = 'Snowflake'
+why = '플랫폼 변경·가격'
+x = 'SnowflakeDB'
+region = 'world'
+
+[[companies]]
+name = 'dbt Labs'
+why = 'dbt 변경'
+x = 'dbt_labs'
+region = 'world'
+
+[[companies]]
+name = 'Posit'
+why = 'RStudio·Python 도구'
+x = 'posit_pbc'
+region = 'world'
+default = false

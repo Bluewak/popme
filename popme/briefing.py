@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 from popme import agenda, clock, discovery, event_weather, llm, search
 from popme.character import Character
-from popme import catalog, topics
+from popme import catalog, config, topics
 
 log = logging.getLogger(__name__)
 
@@ -121,10 +121,14 @@ def interests_for_brief(cfg):
 def rules_for(cfg):
     """관심사 → 지시문 조각 {criteria, discovery, tags_rule, tags_example}. 태그는 관심사를 2개 이상 골랐을 때만 묻는다."""
     profs = interests_for_brief(cfg)
+
+    def crit(p):  # 관심사 설정 ⑤에서 고른 「특히 궁금한 것」이 있으면 덧붙인다
+        topics_ = catalog.picks(cfg, p["id"]).get("topics") or (p.get("topics") if p.get("custom") else None)
+        return p["criteria"].strip() + (f"\n- 특히 궁금한 것: {'·'.join(topics_)} — 이 주제를 먼저 고른다." if topics_ else "")
     if len(profs) == 1:
-        criteria = profs[0]["criteria"].strip()
+        criteria = crit(profs[0])
     else:
-        criteria = "\n".join(f"[{p['tag']}] {p['summary']}\n{p['criteria'].strip()}" for p in profs)
+        criteria = "\n".join(f"[{p['tag']}] {p['summary']}\n{crit(p)}" for p in profs)
     discovery = " 또는 ".join(dict.fromkeys(p["discovery"] for p in profs if p.get("discovery"))) or "실질 정보를 주는 사람"
     tags = [p["tag"] for p in catalog.chosen(cfg)]
     if len(tags) >= 2:
@@ -153,11 +157,41 @@ def _tweet_line(t):
 
 
 def core_accounts(cfg, db):
+    """볼 X 계정: 내 핵심 계정([x] accounts) + 고른 관심사의 사람·기업 + 발굴로 추가한 계정 (같은 계정은 하나로)."""
     accts = {a["handle"].lower(): a for a in cfg.get("x", {}).get("accounts", [])}
+    for a in catalog.x_accounts(cfg):
+        accts.setdefault(a["handle"].lower(), a)
     for c in discovery.added(db, "x"):
         accts.setdefault(c["handle"].lower(), {"handle": c["handle"], "name": c["name"] or c["handle"],
                                                "group": "발굴로 추가", "focus": c["reason"]})
     return list(accts.values())
+
+
+X_VISIT_LIMIT = 30
+X_VISITS = config.DATA_DIR / "x-visits.json"  # 관심사 계정을 마지막으로 본 시각 (돌아가며 보기)
+
+
+def x_to_visit(cfg, db, limit=X_VISIT_LIMIT):
+    """이번 수집에서 열 X 계정 handle. 내 핵심 계정·발굴로 추가한 계정은 늘 보고, 관심사 계정은 남은 자리만큼
+    오래 안 본 것부터 (사람 속도는 그대로 두고, 관심사를 늘려도 수집 시간이 늘지 않게 — 설계 6-3)."""
+    accts = core_accounts(cfg, db)
+    fixed = [a["handle"] for a in accts if not a.get("interest")]
+    rotating = [a["handle"] for a in accts if a.get("interest")]
+    room = max(10, limit - len(fixed))
+    if len(rotating) <= room:
+        return fixed + rotating
+    try:
+        seen = json.loads(X_VISITS.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        seen = {}
+    pick = sorted(rotating, key=lambda h: seen.get(h.lower(), ""))[:room]
+    now = datetime.now(timezone.utc).isoformat()
+    seen.update({h.lower(): now for h in pick})
+    try:
+        X_VISITS.write_text(json.dumps(seen), encoding="utf-8")
+    except OSError:
+        log.warning("X 돌아가며 보기 기록 저장 실패", exc_info=True)
+    return fixed + pick
 
 
 def threads_accounts(cfg, db):
@@ -282,7 +316,7 @@ def rss_items(cfg, db, since_iso):
     early = (since - timedelta(days=2)).isoformat()
     rows = db.q("SELECT * FROM items WHERE COALESCE(published, collected_at) >= ? "
                 "ORDER BY COALESCE(published, collected_at) DESC", early)
-    groups = {}
+    groups, per_feed = {}, {}
     for r in rows:
         seen = datetime.fromisoformat(r["collected_at"])
         new = seen >= since
@@ -297,6 +331,10 @@ def rss_items(cfg, db, since_iso):
             continue
         if r["source"] in skip and skip[r["source"]].search(r["title"] or ""):
             continue
+        if feed and feed.get("cap"):  # 뉴스 검색: 한 사람·기업이 묶음을 다 차지하지 않게 최신 몇 건만
+            per_feed[r["source"]] = per_feed.get(r["source"], 0) + 1
+            if per_feed[r["source"]] > feed["cap"]:
+                continue
         groups.setdefault((feed or {}).get("group") or r["grp"], []).append(r)  # 묶음을 옮긴 출처는 지금 묶음으로
     order = list(caps) + sorted(g for g in groups if g not in caps)
     return [r for g in order for r in groups.get(g, [])[:caps.get(g, catalog.EXTRA_CAP)]]

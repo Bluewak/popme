@@ -14,6 +14,7 @@ criteria = """
 - HWP·스캔 PDF·표 파싱, 한국어 임베딩, 국내 구축 사례는 작아도 넣는다. rc·nightly·dev·내부 태그는 넣지 않는다.
 """
 discovery = 'RAG·검색·임베딩·문서 파싱·LLM 앱 평가에 실질 정보를 주는 사람'
+topics = ['프레임워크 큰 변경', '벡터 DB·검색', '임베딩·리랭커', '평가·관측', '문서 파싱(HWP·PDF)', '에이전트 보안']   # 「특히 궁금한 것」 보기 (관심사 설정 ⑤)
 
 [caps]                        # 묶음별 상한 (이 관심사 몫)
 '공식 변경내역' = 30
@@ -217,3 +218,93 @@ filter = true
 id = 'toss-tech'
 why = '토스 RAG·검색 글'
 filter = true
+
+# --- 사람·기업 (관심사 설정 ③④의 보기, X 계정은 2026-10-19 oEmbed로 있는지 확인) — default = false면 체크 안 된 채로 보임 ---
+
+[[people]]
+name = 'Harrison Chase'
+why = 'LangChain·Deep Agents'
+x = 'hwchase17'
+region = 'world'
+
+[[people]]
+name = 'Jerry Liu'
+why = 'LlamaIndex·문서 파싱'
+x = 'jerryjliu0'
+region = 'world'
+
+[[people]]
+name = 'Omar Khattab'
+why = 'DSPy·ColBERT'
+x = 'lateinteraction'
+region = 'world'
+
+[[people]]
+name = 'Jason Liu'
+why = '구조화 출력·RAG 실무'
+x = 'jxnlco'
+region = 'world'
+
+[[people]]
+name = 'Eugene Yan'
+why = '추천·LLM 시스템'
+x = 'eugeneyan'
+region = 'world'
+
+[[people]]
+name = 'Jo Kristian Bergum'
+why = '검색·랭킹'
+x = 'jobergum'
+region = 'world'
+
+[[people]]
+name = 'Hamel Husain'
+why = 'LLM 평가 실무'
+x = 'HamelHusain'
+region = 'world'
+
+[[people]]
+name = 'Shreya Shankar'
+why = 'LLM 평가 연구'
+x = 'sh_reya'
+region = 'world'
+default = false
+
+[[companies]]
+name = 'LangChain'
+why = 'LangChain·LangGraph'
+x = 'LangChain'
+region = 'world'
+
+[[companies]]
+name = 'LlamaIndex'
+why = 'LlamaIndex·LlamaParse'
+x = 'llama_index'
+region = 'world'
+
+[[companies]]
+name = 'Qdrant'
+why = '벡터 DB'
+x = 'qdrant_engine'
+region = 'world'
+
+[[companies]]
+name = 'Weaviate'
+why = '벡터 DB'
+x = 'weaviate_io'
+region = 'world'
+default = false
+
+[[companies]]
+name = 'Pinecone'
+why = '벡터 DB'
+x = 'pinecone'
+region = 'world'
+default = false
+
+[[companies]]
+name = 'Cohere'
+why = '임베딩·리랭커'
+x = 'cohere'
+region = 'world'
+default = false

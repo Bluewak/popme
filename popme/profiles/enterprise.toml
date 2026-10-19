@@ -14,6 +14,7 @@ criteria = """
 - SDK·CLI 패치, 다른 리전 확장, 투자·인수, 소비자 기능, 벤더 마케팅·행사 홍보는 넣지 않는다.
 """
 discovery = '엔터프라이즈 도입·클라우드 AI·AI 보안·국내 규제에 실질 정보를 주는 사람'
+topics = ['모델 단종·가격', '리전·데이터 주권', '엔터프라이즈 기능 GA', '보안·장애', '국내 규제·클라우드']   # 「특히 궁금한 것」 보기 (관심사 설정 ⑤)
 
 [caps]                        # 묶음별 상한 (이 관심사 몫)
 '플랫폼 변경내역' = 15
@@ -197,3 +198,87 @@ id = 'kt-cloud'
 why = 'KT Cloud 기술 글'
 filter = 'ai'
 default = false               # 「더 볼 수 있는 출처」 — 직접 켜야 받는다
+
+# --- 사람·기업 (관심사 설정 ③④의 보기, X 계정은 2026-10-19 oEmbed로 있는지 확인) — default = false면 체크 안 된 채로 보임 ---
+
+[[people]]
+name = 'Ethan Mollick'
+why = '기업의 AI 도입 연구'
+x = 'emollick'
+region = 'world'
+
+[[people]]
+name = 'Aaron Levie'
+why = '엔터프라이즈 AI 도입'
+x = 'levie'
+region = 'world'
+
+[[people]]
+name = 'swyx'
+why = 'AI 엔지니어링 흐름'
+x = 'swyx'
+region = 'world'
+
+[[people]]
+name = 'Benedict Evans'
+why = '기술 산업 분석'
+x = 'benedictevans'
+region = 'world'
+default = false
+
+[[people]]
+name = 'Allie K. Miller'
+why = '기업 AI 활용'
+x = 'alliekmiller'
+region = 'world'
+default = false
+
+[[companies]]
+name = 'AWS'
+why = 'Bedrock·클라우드'
+x = 'awscloud'
+region = 'world'
+
+[[companies]]
+name = 'Microsoft Azure'
+why = 'Azure OpenAI·Foundry'
+x = 'Azure'
+region = 'world'
+
+[[companies]]
+name = 'Google Cloud'
+why = 'Vertex·Gemini Enterprise'
+x = 'googlecloud'
+region = 'world'
+
+[[companies]]
+name = 'Anthropic'
+why = 'Claude 엔터프라이즈'
+x = 'AnthropicAI'
+region = 'world'
+
+[[companies]]
+name = 'OpenAI'
+why = 'ChatGPT Enterprise·API'
+x = 'OpenAI'
+region = 'world'
+
+[[companies]]
+name = '업스테이지'
+why = '국내 LLM·문서 AI'
+x = 'upstageai'
+region = 'kr'
+news = '업스테이지'
+
+[[companies]]
+name = 'LG AI연구원'
+why = 'EXAONE'
+x = 'LG_AI_Research'
+region = 'kr'
+news = '엑사원'
+
+[[companies]]
+name = '네이버클라우드'
+why = 'HyperCLOVA X·공공 클라우드'
+region = 'kr'
+news = '"네이버클라우드"'
