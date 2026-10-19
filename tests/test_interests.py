@@ -215,3 +215,94 @@ def test_wizard_save_writes_interests_picks_and_custom(monkeypatch):
     # 관심사를 하나도 안 고르면 저장하지 않는다
     bad = {**ch, "interests": {"chosen": [], "picks": {}, "customs": []}}
     assert sw.Api().save(bad)["ok"] is False
+
+
+# ---------------------------------------------------------------- 보는 방식 → 분야별 질문 (설계 4-6)
+
+def test_clean_questions_follows_template():
+    raw = {"type": "스포츠", "questions": [
+        {"slot": "대상", "text": "응원하는 팀은?", "options": ["토트넘", {"label": "토트넘"}, {"label": "상관없어요"}],
+         "options_by": {"프리미어리그": [{"label": "아스널", "region": "world"}], "빈 갈래": []}},
+        {"slot": "범위", "text": "어떤 리그?", "options": [{"label": "K리그", "region": "kr"}, {"label": "프리미어리그"}]},
+        {"slot": "변화", "text": "대상 위주에는 없는 칸"},
+        {"slot": "범위", "text": "같은 칸 두 번"}]}
+    out = interests.clean_questions(raw, "target")
+    assert out["type"] == "스포츠" and [q["slot"] for q in out["questions"]] == ["범위", "대상"]  # 칸 순서는 틀대로
+    rng, tgt = out["questions"]
+    assert [o["label"] for o in rng["options"]] == ["K리그", "프리미어리그"] and rng["options"][0]["region"] == "kr"
+    assert [o["label"] for o in tgt["options"]] == ["토트넘"]  # 중복·「상관없어요」는 코드가 다룬다
+    assert list(tgt["options_by"]) == ["프리미어리그"]
+    both = interests.clean_questions({"type": "없는 유형", "questions": []}, "both")
+    assert both["type"] == "기타" and [q["slot"] for q in both["questions"]] == ["범위", "변화", "대상"]  # 빠진 칸은 고정 질문
+    assert all(q["options"] == [] for q in both["questions"])
+
+
+def test_questions_never_ask_private_things():
+    raw = {"type": "기타", "questions": [{"slot": "범위", "text": "지지 정당은?", "options": ["가", "나"]},
+                                        {"slot": "대상", "text": "관심 대상은?", "options": ["종교 단체 A", "B"]}]}
+    out = interests.clean_questions(raw, "target")
+    assert all("정당" not in q["text"] for q in out["questions"])
+    assert out["questions"][1]["options"] == []  # 묻지 않는 것이 섞인 질문은 버리고 고정 질문으로
+
+
+def test_questions_uses_headlines_and_checks_targets(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(interests, "research", lambda field, limit=30: ["손흥민 결승골", "K리그 개막"])
+
+    def ask(cfg, system, prompt, timeout=0):
+        seen["prompt"] = prompt
+        return json.dumps({"type": "스포츠", "questions": [
+            {"slot": "범위", "text": "어떤 리그?", "options": [{"label": "K리그", "region": "kr"}]},
+            {"slot": "대상", "text": "응원 팀?", "options": [{"label": "전북 현대", "region": "kr"}, {"label": "가짜 FC", "region": "kr"}],
+             "options_by": {"K리그": [{"label": "울산 HD", "region": "kr"}, {"label": "없는 팀", "region": "world", "en": "Ghost FC"}]}}]},
+            ensure_ascii=False)
+    monkeypatch.setattr(interests.llm, "ask", ask)
+    monkeypatch.setattr(interests, "news_count", lambda e, scope: 0 if e["name"] in ("가짜 FC", "없는 팀") else 4)
+    out = interests.questions({}, "축구", "target")
+    assert "손흥민 결승골" in seen["prompt"] and "범위" in seen["prompt"] and "대상" in seen["prompt"] and "변화" not in seen["prompt"].split("questions:")[1].split("각 질문")[0]
+    tgt = out["questions"][1]
+    assert [o["label"] for o in tgt["options"]] == ["전북 현대"] and [o["label"] for o in tgt["options_by"]["K리그"]] == ["울산 HD"]
+    assert out["headlines"] == ["손흥민 결승골", "K리그 개막"]
+    monkeypatch.setattr(interests.llm, "ask", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("x")))
+    failed = interests.questions({}, "축구", "overview")
+    assert failed["error"] and [q["slot"] for q in failed["questions"]] == ["범위", "변화"]
+
+
+def test_scope_from_answers():
+    qs = [{"slot": "범위", "options": [{"label": "K리그", "region": "kr"}, {"label": "EPL", "region": "world"}], "options_by": {}}]
+    assert interests.scope_from(qs, {"범위": ["K리그"]}) == "kr"
+    assert interests.scope_from(qs, {"범위": ["K리그", "EPL"]}) == "world"
+    assert interests.scope_from(qs, {}) == "world"  # 아무것도 안 골랐으면 해외도
+
+
+def test_suggest_overview_asks_media_and_searches(monkeypatch):
+    seen = {}
+
+    def ask(cfg, system, prompt, timeout=0):
+        seen["prompt"] = prompt
+        return json.dumps({"people": [{"name": "Dylan Patel", "x": "dylan522p"}], "companies": [{"name": "SK하이닉스", "region": "kr"}],
+                           "media": [{"name": "더일렉", "site": "thelec.kr", "region": "kr"}, {"name": "사이트 없음"}],
+                           "searches": ["반도체 업계", "HBM", "D램", "네 번째"], "topics": []}, ensure_ascii=False)
+    monkeypatch.setattr(interests.llm, "ask", ask)
+    s = interests.suggest({}, "반도체", "world", "overview", {"범위": ["메모리"]}, ["HBM 공급 부족"])
+    assert "정리해 전하는 사람" in seen["prompt"] and "범위: 메모리" in seen["prompt"] and "HBM 공급 부족" in seen["prompt"]
+    assert [m["name"] for m in s["media"]] == ["더일렉"] and s["media"][0]["kind"] == "media"
+    assert s["searches"] == ["반도체 업계", "HBM", "D램"]
+    target = interests.suggest({}, "축구", "world", "target", {"대상": ["토트넘"]})
+    assert "당사자" in seen["prompt"] and target["searches"] == []  # 대상 위주는 분야 검색어를 받지 않는다
+
+
+def test_save_custom_with_lens_media_searches():
+    verified = [{"kind": "media", "name": "더일렉", "region": "kr", "site": "thelec.kr", "feed": "https://example.com/elec.xml"},
+                {"kind": "media", "name": "RSS 없음", "region": "world", "feed": None},
+                {"kind": "search", "name": "반도체 업계", "region": "kr", "news_count": 40},
+                {"kind": "search", "name": "기사 없음", "region": "kr", "news_count": 0},
+                {"kind": "company", "name": "SK하이닉스", "region": "kr", "news": "SK하이닉스", "news_count": 80}]
+    final = {"name": "반도체", "tag": "반도체", "summary": "반도체 업계", "criteria": ["큰 변화 먼저", "가십 빼기"], "discovery": "분석가"}
+    pid = interests.save_custom("반도체", "world", verified, [], final, "overview", "산업·기업", {"범위": ["메모리(HBM·D램)"], "변화": []})
+    p = next(x for x in catalog.profiles() if x["id"] == pid)
+    assert p["lens"] == "overview" and p["type"] == "산업·기업" and p["answers"] == {"범위": ["메모리(HBM·D램)"]}
+    got = {f["name"]: f for f in catalog.active(news(interests=[pid]))}
+    assert got["더일렉"]["group"] == "실사용 검증" and "RSS 없음" not in got
+    assert "뉴스 · 반도체 업계" in got and "뉴스 · 기사 없음" not in got and "뉴스 · SK하이닉스" in got
+    assert "고른 것: 범위: 메모리(HBM·D램)" in briefing.rules_for(news(interests=[pid]))["criteria"]

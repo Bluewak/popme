@@ -481,7 +481,11 @@ def validate_interests(it):
         f = c.get("final") or {}
         if not str(c.get("field") or "").strip() or not f:
             continue
+        ans = c.get("answers") if isinstance(c.get("answers"), dict) else {}
         customs.append({"field": str(c["field"]).strip()[:40], "scope": "kr" if c.get("scope") == "kr" else "world",
+                        "lens": c.get("lens") if c.get("lens") in ("overview", "target", "both") else "target",
+                        "type": str(c.get("type") or "기타")[:10],
+                        "answers": {str(k)[:6]: clean(v, 20)[:10] for k, v in list(ans.items())[:3]},
                         "verified": [e for e in c.get("verified") or [] if isinstance(e, dict) and e.get("name")][:20],
                         "topics": clean(c.get("topics"), 10),
                         "final": {"name": str(f.get("name") or c["field"])[:12], "tag": str(f.get("tag") or c["field"])[:6],
@@ -943,7 +947,8 @@ class Api:
                 from popme import interests
                 it = ch["interests"]
                 made = [interests.save_custom(c["field"], c.get("scope", "world"), c.get("verified", []), c.get("topics", []),
-                                              c["final"]) for c in it["customs"] if c.get("field") and c.get("final")]
+                                              c["final"], c.get("lens"), c.get("type"), c.get("answers"))
+                        for c in it["customs"] if c.get("field") and c.get("final")]
                 ch["interest_ids"] = list(dict.fromkeys(it["chosen"] + made))
                 ch["picks"] = it["picks"]
             write(apply(base_text(), ch))
@@ -966,9 +971,13 @@ class Api:
         from popme import interests
         return interests.preset_view(pid, tomllib.loads(base_text()))
 
-    def interest_suggest(self, field, scope, provider):
+    def interest_questions(self, field, lens, provider):
         from popme import interests
-        return interests.suggest(self._cfg(provider), field, scope)
+        return interests.questions(self._cfg(provider), field, lens)
+
+    def interest_suggest(self, field, scope, provider, lens=None, answers=None, headlines=None):
+        from popme import interests
+        return interests.suggest(self._cfg(provider), field, scope, lens, answers, headlines)
 
     def interest_verify(self, entities, scope):
         from popme import interests
@@ -978,9 +987,9 @@ class Api:
             log.exception("관심사 확인 실패")
             return [{**e, "x_status": "unknown", "feed": None, "news_count": 0} for e in entities]
 
-    def interest_finalize(self, field, scope, people, companies, topics, provider):
+    def interest_finalize(self, field, scope, people, companies, topics, provider, lens=None, answers=None):
         from popme import interests
-        return interests.finalize(self._cfg(provider), field, scope, people, companies, topics)
+        return interests.finalize(self._cfg(provider), field, scope, people, companies, topics, lens, answers)
 
     def close(self):
         self._window.destroy()
