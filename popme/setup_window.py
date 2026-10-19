@@ -496,14 +496,29 @@ def validate_interests(it):
     return {"interests": {"chosen": chosen, "picks": picks, "customs": customs}}
 
 
+def apply_interests(text, ids, picks):
+    """고른 관심사 + 미리 만든 관심사에서 고친 것(고친 칸만)을 config 텍스트에."""
+    text = set_value(text, "news", "interests", ids, before=("llm",))
+    for pid, pk in (picks or {}).items():
+        for k in ("scope", "people", "companies", "topics", "extra"):
+            if k in pk:
+                text = set_value(text, f"news.picks.{pid}", k, pk[k], before=("llm",))
+    return text
+
+
+def save_interest_choices(it):
+    """관심사 단계 값(validate_interests 거친 것) 저장: 새 관심사 파일 → 고른 관심사·고친 칸. 반환: 고른 관심사 id."""
+    from popme import interests
+    made = [interests.save_custom(c["field"], c.get("scope", "world"), c.get("verified", []), c.get("topics", []),
+                                  c["final"], c.get("lens"), c.get("type"), c.get("answers"))
+            for c in it["customs"] if c.get("field") and c.get("final")]
+    return list(dict.fromkeys(it["chosen"] + made))
+
+
 def apply(text, ch):
     """고른 값(validate 거친 것)을 config 텍스트에 반영. 결과는 TOML로 다시 읽어 검사한다."""
-    if ch.get("interest_ids") is not None:  # 관심사 단계: 고른 관심사 + 미리 만든 관심사에서 고친 것 (고친 칸만)
-        text = set_value(text, "news", "interests", ch["interest_ids"], before=("llm",))
-        for pid, pk in (ch.get("picks") or {}).items():
-            for k in ("scope", "people", "companies", "topics", "extra"):
-                if k in pk:
-                    text = set_value(text, f"news.picks.{pid}", k, pk[k], before=("llm",))
+    if ch.get("interest_ids") is not None:  # 관심사 단계
+        text = apply_interests(text, ch["interest_ids"], ch.get("picks"))
     if ch.get("character"):
         text = set_value(text, "character", "file", ch["character"], before=("user",))
     text = set_value(text, "user", "plan", ch["plan"], before=("schedule",))
@@ -864,12 +879,26 @@ def chrome_found():
 # ---------------------------------------------------------------- 창
 
 class Api:
-    def __init__(self):
+    def __init__(self, mode=None):
         self._window = None
         self._saved = False
+        self._mode = mode  # {"start": pick|custom|edit, "pid"} — 브리핑 탭에서 「관심사」만 열 때
 
     def get(self):
-        return {**current(), "chrome": chrome_found()}
+        return {**current(), "chrome": chrome_found(), "mode": self._mode}
+
+    def save_interests(self, it):
+        """「관심사」만 연 창의 저장: 다른 설정(AI·캘린더·메일)은 건드리지 않는다."""
+        try:
+            v = validate_interests(it)["interests"]
+            write(apply_interests(base_text(), save_interest_choices(v), v["picks"]))
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
+        except Exception as e:
+            log.exception("관심사 저장 실패")
+            return {"ok": False, "error": f"저장하지 못했어요: {e}"}
+        self._saved = True
+        return {"ok": True}
 
     def ai_status(self, provider):
         return ai_status(provider)
@@ -946,13 +975,8 @@ class Api:
             if place and place != current()["place"]:
                 ch["weather"] = geocode_place(place)
             if ch.get("interests"):  # 새 관심사 파일을 먼저 만들고, 고른 관심사 목록에 그 id를 넣는다
-                from popme import interests
-                it = ch["interests"]
-                made = [interests.save_custom(c["field"], c.get("scope", "world"), c.get("verified", []), c.get("topics", []),
-                                              c["final"], c.get("lens"), c.get("type"), c.get("answers"))
-                        for c in it["customs"] if c.get("field") and c.get("final")]
-                ch["interest_ids"] = list(dict.fromkeys(it["chosen"] + made))
-                ch["picks"] = it["picks"]
+                ch["interest_ids"] = save_interest_choices(ch["interests"])
+                ch["picks"] = ch["interests"]["picks"]
             write(apply(base_text(), ch))
         except ValueError as e:
             return {"ok": False, "error": str(e)}
@@ -1001,10 +1025,11 @@ class Api:
         self._window.destroy()
 
 
-def main():
+def main(mode=None):
     import webview
-    api = Api()
-    api._window = webview.create_window("POPME 설정", url=str(UI), js_api=api, width=520, height=760, min_size=(420, 560))
+    api = Api(mode)
+    api._window = webview.create_window("POPME 관심사" if mode else "POPME 설정", url=str(UI), js_api=api,
+                                        width=520, height=760, min_size=(420, 560))
     webview.start()
     return 0 if api._saved else 1
 
@@ -1025,6 +1050,8 @@ if __name__ == "__main__":
                 print(f"  {c['name']}: 일정 {n}개")
         elif not args:
             sys.exit(main())
+        elif args[:1] == ["interests"]:  # 브리핑 탭에서: 「관심사」 단계만 (start: pick | custom | edit, edit이면 관심사 id)
+            sys.exit(main({"start": (args[1:2] or ["pick"])[0], "pid": (args[2:3] or [""])[0]}))
         else:
             print(__doc__)
             sys.exit(2)

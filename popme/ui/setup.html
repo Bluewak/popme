@@ -362,6 +362,10 @@ function init() {
                                     : "설정은 몇 단계면 끝나요. 먼저 준비물을 확인해 주세요.";
   if (!D.mail.supported) $("#mail-step").remove();
   steps = [...document.querySelectorAll("section")];
+  if (D.mode) {  // 브리핑 탭에서 「관심사」만 연 창: 다른 단계는 숨기고, 저장하면 닫는다
+    steps = steps.filter(s => s.dataset.step === "관심사");
+    $("#steps").style.display = "none";
+  }
   $("#steps").append(...steps.slice(0, -1).map((s, i) => el("span", { textContent: `${i + 1}. ${s.dataset.step}` })));
 
   // 준비물
@@ -946,7 +950,10 @@ const LENS = { overview: ["업계 흐름 전반", "큰 변화·공식 발표·�
                target: ["특정 대상 위주", "좋아하는 기업·팀·제품과 그 사람들 소식"], both: ["둘 다", "흐름은 챙기되 꼭 볼 대상도 몇 개"] };
 const intSubs = c => c.kind === "preset" ? ISUBS.preset : (INT.data[c.key] && INT.data[c.key].subs) || ["lens"];
 const subLabel = (c, x) => x.startsWith("q") ? INT.data[c.key].qs[+x.slice(1)].slot : INAME[x];
-function intInit() { INT = { chosen: new Set(D.interests_on), customs: [], qi: -1, sub: 0, data: {}, queue: [], busy: "" }; }
+function intInit() {
+  INT = { chosen: new Set(D.interests_on), customs: [], qi: -1, sub: 0, data: {}, queue: [], busy: "",
+          only: D.mode && D.mode.start === "edit" ? D.mode.pid : "", onlyNew: !!(D.mode && D.mode.start === "custom") };
+}
 const intCur = () => INT.qi >= 0 ? INT.queue[INT.qi] : null;
 const intSubName = () => intSubs(intCur())[INT.sub];
 const krName = s => /[가-힣]/.test(s);
@@ -1186,6 +1193,7 @@ async function intEnter() {  // 지금 관심사의 자료를 처음 준비
 }
 
 function intCanNext() {
+  if (!INT) return false;  // 「관심사」만 연 창에선 다른 단계 코드가 먼저 nav()를 부른다
   const c = intCur();
   if (!c) return INT.chosen.size + INT.customs.length > 0;
   if (INT.busy) return false;
@@ -1196,7 +1204,9 @@ function intCanNext() {
 
 async function intNext() {  // 반환: 이 단계를 다 끝냈나
   if (!intCur()) {
-    INT.queue = [...D.interests.filter(i => INT.chosen.has(i.id) && !i.custom).map(i => ({ key: i.id, kind: "preset", id: i.id, tag: i.tag })),
+    if (INT.only) INT.chosen.add(INT.only);  // 고치려고 연 관심사는 고른 것으로
+    INT.queue = [...D.interests.filter(i => INT.only ? i.id === INT.only : INT.chosen.has(i.id) && !INT.onlyNew)
+                                .map(i => ({ key: i.id, kind: "preset", id: i.id, tag: i.tag })),
                  ...INT.customs.map(f => ({ key: "new:" + f, kind: "custom", field: f, tag: f }))];
     if (!INT.queue.length) return true;
     INT.qi = 0; INT.sub = 0;
@@ -1246,10 +1256,18 @@ async function intAdvance() {  // 다음 관심사로, 없으면 끝
   await intEnter(); intRender(); intTop(); return false;
 }
 
+async function intSaveMode() {  // 브리핑 탭에서 「관심사」만 연 창의 저장 (다른 설정은 그대로) → 닫으면 패널이 새로 그려진다
+  say($("#msg"), "저장 중…");
+  $("#next").disabled = true;
+  const r = await api().save_interests(intPayload());
+  if (!r.ok) { $("#next").disabled = false; return say($("#msg"), r.error, "err-t"); }
+  api().close();
+}
+
 async function intSkipPresets() {  // 「이대로 모두」: 남은 미리 만든 관심사는 골라 둔 그대로
   for (let i = INT.qi; i < INT.queue.length; i++) if (INT.queue[i].kind === "preset") INT.data[INT.queue[i].key] = { skipped: true };
   const k = INT.queue.findIndex((q, i) => i >= INT.qi && q.kind === "custom");
-  if (k < 0) return go(step + 1);
+  if (k < 0) return D.mode ? intSaveMode() : go(step + 1);
   INT.qi = k; INT.sub = 0; await intEnter(); intRender(); intTop();
 }
 
@@ -1300,7 +1318,9 @@ function canNext() {
 function nav() {
   const name = steps[step].dataset.step, nx = $("#next");
   const later = (name === "브리핑 AI" && radio("ai") && !aiReady()) || (name === "로그인" && !loginReady());
-  nx.textContent = name === "마무리" ? "저장" : name === "끝" ? (D.exists ? "지금 한 번 모아 보기" : "첫 브리핑 받아 보기")
+  const intLast = D.mode && name === "관심사" && INT && (intCur() ? INT.qi === INT.queue.length - 1 && INT.sub === intSubs(intCur()).length - 1
+                                                              : INT.onlyNew && !INT.customs.length);
+  nx.textContent = name === "마무리" || intLast ? "저장" : name === "끝" ? (D.exists ? "지금 한 번 모아 보기" : "첫 브리핑 받아 보기")
                  : later ? "나중에 하기" : name === "메일" && D.mail.supported && !mailReady() ? "연결 확인하고 다음" : "다음";
   nx.className = later ? "later" : "primary";  // 아직 안 됐어도 넘어갈 수는 있지만 덜 눈에 띄게
   nx.disabled = !canNext();
@@ -1317,7 +1337,14 @@ function go(i) {
   if (last === "브리핑 AI") { aiRender(); aiRefresh(); }
   if (last === "캘린더") calView();
   if (last === "로그인") { loginRender(); loginCheck(); startLoginPoll(); }
-  if (last === "관심사") { if (!INT) intInit(); intRender(); }
+  if (last === "관심사") {
+    if (!INT) {
+      intInit();
+      if (INT.only) return intNext().then(done => { if (done) { INT.only = ""; intRender(); } nav(); });  // 태그 우클릭: 그 관심사의 문답부터
+    }
+    intRender();
+    if (INT.onlyNew && !intCur()) setTimeout(() => $("#int-field")?.focus());
+  }
   if (last !== "관심사") $("#int-skip").classList.add("hidden");
   nav();
   document.querySelector("main").scrollTop = 0;
@@ -1352,6 +1379,7 @@ async function next() {
     }
   }
   if (name === "관심사" && !await intNext()) return;
+  if (D.mode) return intSaveMode();  // 「관심사」만 연 창: 여기서 저장하고 닫는다
   if (name !== "마무리") return go(step + 1);
   say($("#msg"), "저장 중…");
   $("#next").disabled = true;
