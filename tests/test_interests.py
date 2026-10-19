@@ -306,3 +306,11 @@ def test_save_custom_with_lens_media_searches():
     assert got["더일렉"]["group"] == "실사용 검증" and "RSS 없음" not in got
     assert "뉴스 · 반도체 업계" in got and "뉴스 · 기사 없음" not in got and "뉴스 · SK하이닉스" in got
     assert "고른 것: 범위: 메모리(HBM·D램)" in briefing.rules_for(news(interests=[pid]))["criteria"]
+
+
+def test_questions_reuses_headlines_from_screen(monkeypatch):
+    """화면이 먼저 받아 「읽는 중」으로 보여 준 헤드라인을 그대로 쓴다 (두 번 받지 않음)."""
+    monkeypatch.setattr(interests, "research", lambda *a, **k: (_ for _ in ()).throw(AssertionError("다시 받으면 안 됨")))
+    monkeypatch.setattr(interests.llm, "ask", lambda *a, **k: '{"type": "스포츠", "questions": []}')
+    out = interests.questions({}, "축구", "overview", ["토트넘, 새 감독 선임 임박"])
+    assert out["headlines"] == ["토트넘, 새 감독 선임 임박"]

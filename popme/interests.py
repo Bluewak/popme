@@ -219,10 +219,11 @@ def check_options(questions, scope="world"):
     return questions
 
 
-def questions(cfg, field, lens):
-    """보는 방식 → 그 분야의 질문: {type, questions, headlines}. 최근 헤드라인을 근거로 주고, 받은 질문을 검사한다."""
+def questions(cfg, field, lens, heads=None):
+    """보는 방식 → 그 분야의 질문: {type, questions, headlines}. 최근 헤드라인을 근거로 주고, 받은 질문을 검사한다.
+    heads: 화면이 먼저 받아 둔 헤드라인 (기다리는 동안 「읽는 중」으로 보여 준다). 없으면 여기서 받는다."""
     lens = lens if lens in LENSES else "target"
-    heads = research(field)
+    heads = research(field) if heads is None else [str(h)[:200] for h in heads][:HEADLINES]
     words = "\n".join(f"  - {s}" for s in SLOTS[lens])
     prompt = QUESTIONS.format(field=_short(field, 40), lens=LENSES[lens], headlines="\n".join(f"- {h}" for h in heads) or "(없음)",
                               types=" / ".join(f"{k}({v['범위']}·{v['대상']})" for k, v in TYPES.items()), slots=words)

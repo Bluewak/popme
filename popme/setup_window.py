@@ -370,6 +370,8 @@ def current():
         "login_sites": {k: {"name": v["name"], "why": v["why"], "optional": v.get("optional", False)}
                         for k, v in LOGIN_SITES.items()},
         "python": sys.version.split()[0],
+        # 「생각 중」 화면의 캐릭터 그림 (개인 이미지가 있을 때만 — 없으면 화면이 기본 방울 모양을 그린다)
+        "pet_image": next((f"../../assets/{n}" for n in ("pet_busy.png", "pet.png") if (config.ROOT / "assets" / n).exists()), ""),
         **interest_choices(cfg),
     }
 
@@ -971,9 +973,13 @@ class Api:
         from popme import interests
         return interests.preset_view(pid, tomllib.loads(base_text()))
 
-    def interest_questions(self, field, lens, provider):
+    def interest_research(self, field):
         from popme import interests
-        return interests.questions(self._cfg(provider), field, lens)
+        return interests.research(field)
+
+    def interest_questions(self, field, lens, provider, headlines=None):
+        from popme import interests
+        return interests.questions(self._cfg(provider), field, lens, headlines)
 
     def interest_suggest(self, field, scope, provider, lens=None, answers=None, headlines=None):
         from popme import interests
