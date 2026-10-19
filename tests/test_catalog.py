@@ -39,8 +39,12 @@ def test_nothing_chosen_means_no_feeds():
 
 def test_ai_coding_keeps_todays_feeds():
     """그동안 config.example.toml의 20개 = 「AI 코딩」 관심사. 이름이 같아야 DB의 지난 글과 이어진다."""
+    old = {"Claude Code 릴리스", "Codex 릴리스", "pi 릴리스", "OpenClaw 릴리스", "Deep Agents 릴리스", "Gemini CLI 릴리스",
+           "OpenAI 뉴스", "OpenAI 개발자 블로그", "Anthropic 뉴스", "Claude 블로그", "Anthropic 엔지니어링", "Google AI 블로그",
+           "xAI 뉴스", "Hugging Face 블로그", "Mistral 뉴스", "Simon Willison 블로그", "GeekNews", "Hacker News 인기",
+           "Hacker News AI 회사", "Hacker News AI 모델"}
     got = {f["name"] for f in catalog.active(news(interests=["ai-coding"]))}
-    assert len(got) == 20 and {"Claude Code 릴리스", "GeekNews"} <= got
+    assert old <= got and "Cursor 변경내역" not in got  # 다른 코딩 도구는 켜야 받는다
 
 
 def test_shared_feed_merges_filters():
@@ -137,7 +141,7 @@ def test_migrate_moves_known_feeds_and_keeps_mine():
     assert "2곳" in note and "1곳" in note
     assert not catalog.needs_migration(cfg)
     names = {f["name"] for f in catalog.active(cfg)}
-    assert len(names) == 21 and "내 블로그" in names
+    assert len(names) == len(catalog.active(news(interests=["ai-coding"]))) + 1 and "내 블로그" in names
 
 
 def test_migrate_file_backs_up_once(tmp_path, monkeypatch):

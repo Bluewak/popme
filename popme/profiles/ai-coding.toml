@@ -7,16 +7,22 @@ order = 1
 status = "ready"
 topic = 'ai'                 # filter = true인 출처를 거를 판별 규칙 (popme/topics.py)
 criteria = """
-- 혜택과 실제 작업에 영향 있는 것 위주. 잡담·홍보는 버린다.
-- 내가 쓰는 AI 코딩 도구(Claude Code·Codex 등)의 새 기능·바뀐 기본값·요금·혜택이 최우선.
-- 목록에 없는 사람이 만든 새 오픈소스·도구도 눈에 띄면 넣는다.
+- 사용량 한도·리셋·크레딧·요금제 변경·무료 혜택이 최우선. 아래 「내 요금제」에 해당하는지, 기한·적용일을 적는다.
+- 장애(쓰는 도구가 멈춤)와 보안(코딩 에이전트·MCP·IDE 확장의 프롬프트 인젝션·취약점·악성 패키지)은 영향 범위·대응을 한 줄로 앞에.
+- 쓰는 도구(Claude Code·Codex 등)의 새 기능·바뀐 기본값·모델 교체·단종. 패치 릴리스는 동작이 바뀔 때만, 시험판(alpha·beta·rc·nightly)은 넣지 않는다.
+  같은 릴리스가 GitHub·변경내역·X·HN에 함께 나오면 카드 하나로, 버전과 바뀐 점은 body에.
+- 다른 코딩 도구(Cursor·Copilot·Cline 등)는 요금·큰 기능·모델처럼 갈아탈지 판단할 만한 것만.
+- 에이전트 하네스·사용법(서브에이전트·hooks·컨텍스트 관리·평가)은 실제로 써 본 글만. 「10배 빨라짐」 류 홍보·프롬프트 모음은 버린다.
+- 목록에 없는 사람이 만든 새 오픈소스·도구도 실제로 쓸 만하면 넣는다.
 """
 discovery = '에이전트·Claude Code·Codex·개발 도구에 실질 정보를 주는 사람'
 
 [caps]                        # 묶음별 상한 (이 관심사 몫)
-'공식 변경내역' = 40
+'공식 변경내역' = 45
 '공식 발표' = 30
-'실사용 검증' = 15
+'장애' = 5
+'보안·규제' = 4
+'실사용 검증' = 20
 '새 오픈소스·화제' = 20
 '한국 커뮤니티' = 20
 
@@ -43,6 +49,47 @@ why = 'Deep Agents 릴리스'
 [[feeds]]
 id = 'gemini-cli-releases'
 why = 'Gemini CLI 릴리스'
+
+[[feeds]]
+id = 'codex-changelog'
+why = 'Codex 앱·클라우드·모델 교체·단종 공지'
+
+[[feeds]]
+id = 'cursor-changelog'
+why = 'Cursor 새 기능·요금 (쓰면 켜기)'
+default = false
+
+[[feeds]]
+id = 'copilot-changelog'
+why = 'GitHub Copilot 새 기능·모델·단종 (쓰면 켜기)'
+default = false
+
+[[feeds]]
+id = 'cline-releases'
+why = 'Cline 릴리스 (쓰면 켜기)'
+default = false
+
+[[feeds]]
+id = 'opencode-releases'
+why = 'opencode 릴리스 (쓰면 켜기)'
+default = false
+
+[[feeds]]
+id = 'windsurf-changelog'
+why = 'Windsurf 변경내역 (쓰면 켜기)'
+default = false
+
+[[feeds]]
+id = 'claude-status'
+why = 'Claude·Claude Code 장애'
+
+[[feeds]]
+id = 'openai-status'
+why = 'OpenAI API·Codex 장애'
+
+[[feeds]]
+id = 'embrace-the-red'
+why = '코딩 에이전트·MCP 프롬프트 인젝션 실증'
 
 [[feeds]]
 id = 'openai-news'
@@ -83,6 +130,31 @@ why = 'Mistral 공식 발표'
 [[feeds]]
 id = 'simon-willison'
 why = '새 모델·도구를 써 본 실사용 평가'
+
+[[feeds]]
+id = 'armin-ronacher'
+why = '에이전트 코딩 실전기 (Flask 제작자)'
+filter = true                 # Rust·파이썬 글도 써서 AI 글만
+
+[[feeds]]
+id = 'ghuntley'
+why = '에이전트 루프 패턴'
+
+[[feeds]]
+id = 'steipete'
+why = 'OpenClaw 제작자의 에이전트 개발 글'
+
+[[feeds]]
+id = 'karpathy'
+why = '큰 흐름'
+
+[[feeds]]
+id = 'hamel'
+why = '에이전트·LLM 평가(evals) 실무'
+
+[[feeds]]
+id = 'latent-space'
+why = 'AI 엔지니어링 업계 흐름'
 
 [[feeds]]
 id = 'geeknews'
