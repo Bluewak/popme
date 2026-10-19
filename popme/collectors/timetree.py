@@ -9,6 +9,7 @@ import json
 import logging
 from datetime import datetime, timezone
 
+from popme import chrome
 from popme.collectors import NeedLogin, dump_raw
 
 log = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ def _event(e, calendar_id, calendar_name):
 
 def _session(ctx, cfg):
     """TimeTree 웹을 열고, 웹 앱이 쓰는 요청 헤더(x-timetreea, x-csrf-token)를 얻는다."""
-    page = ctx.new_page()
+    page = chrome.new_page(ctx)
     headers = {}
     page.on("request", lambda r: headers.update({k: v for k, v in r.headers.items() if k in APP_HEADERS})
             if "timetreeapp.com/api/" in r.url else None)
@@ -116,7 +117,7 @@ def collect(ctx, cfg, progress=lambda s: None):
     """반환: (일정 리스트, 전체 동기화한 calendar_id 목록)"""
     url = cfg.get("timetree", {}).get("url", "https://timetreeapp.com/calendars")
     progress("TimeTree 확인 중")
-    page = ctx.new_page()
+    page = chrome.new_page(ctx)
     headers, holidays = {}, []
 
     def on_request(r):

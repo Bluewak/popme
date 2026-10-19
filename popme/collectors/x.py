@@ -9,6 +9,7 @@ import random
 from datetime import datetime, timezone
 from urllib.parse import quote
 
+from popme import chrome
 from popme.collectors import NeedLogin, dump_raw, reached_since
 
 log = logging.getLogger(__name__)
@@ -166,7 +167,7 @@ def _visit(page, url, via, scrolls, sink, ops_seen, owner=None, since=None, user
 
 def check_profiles(ctx, handles, progress=lambda s: None, users=None):
     """발굴 후보 프로필을 한 번씩 열어 최근 글을 받는다 (꾸준함 판단용). 스크롤 2번, 사람 속도."""
-    page = ctx.new_page()
+    page = chrome.new_page(ctx)
     out, ops_seen = [], set()
     try:
         for i, h in enumerate(handles):
@@ -185,7 +186,7 @@ def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None)
     scrolls = int(xcfg.get("scrolls_per_page", 3))
     if not any(c["name"] == "auth_token" for c in ctx.cookies("https://x.com")):
         raise NeedLogin("X 로그인이 필요해요. 트레이 메뉴 > 전용 Chrome 열기에서 로그인해 주세요.")
-    page = ctx.new_page()
+    page = chrome.new_page(ctx)
     out, empty_streak, ops_seen = [], 0, set()
     try:
         targets = []

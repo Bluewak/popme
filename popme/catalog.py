@@ -81,7 +81,7 @@ def entities(cfg, p):
             keep = e["name"] in names if names is not None else e.get("default", True) is not False
             if keep:
                 out.append({**e, "kind": kind})
-    for e in pk.get("extra", []):
+    for e in pk.get("extra", []):  # 직접 더한 사람·기업 (kind가 없으면 사람)
         if e.get("name"):
             out.append({"kind": "person", **e})
     return out

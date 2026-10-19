@@ -191,3 +191,27 @@ def test_find_feed_uses_link_tag_then_paths(monkeypatch):
     seen = {"https://club.example/news.xml": old, "https://club.example/rss.xml": recent}
     monkeypatch.setattr(interests.rss, "peek", lambda url, timeout=None: seen.get(url, []))
     assert interests.find_feed("club.example") == "https://club.example/rss.xml"  # 멈춘 피드(2020)는 건너뛴다
+
+
+def test_wizard_save_writes_interests_picks_and_custom(monkeypatch):
+    """마법사 「관심사」 단계 → 저장: 새 관심사 파일, 고른 관심사(새 id 포함), 미리 만든 관심사에서 고친 칸만."""
+    from popme import setup_window as sw
+    monkeypatch.setattr(sw, "geocode_place", lambda name: {"name": name, "lat": 37.5, "lon": 127.0})
+    ch = {"provider": "claude", "plan": "", "tools": "Claude Code", "source": "timetree", "ics": [], "briefing_after": "09:00",
+          "character": "", "use_windows_location": True, "place": "", "mail": None,
+          "interests": {"chosen": ["ai-coding", "없는-관심사"],
+                        "picks": {"ai-coding": {"topics": ["장애·보안"], "extra": [{"kind": "company", "name": "Zed", "x": "zeddotdev"}]}},
+                        "customs": [{"field": "축구", "scope": "world", "topics": ["이적"],
+                                     "verified": [{"kind": "person", "name": "손흥민", "region": "kr", "news": "손흥민",
+                                                   "x_status": "", "news_count": 9}],
+                                     "final": {"name": "축구", "tag": "축구", "summary": "축구 소식",
+                                               "criteria": ["이적 먼저", "가십 빼기"], "discovery": "기자"}}]}}
+    assert sw.Api().save(ch) == {"ok": True}
+    cfg = config.load()
+    assert cfg["news"]["interests"] == ["ai-coding", "custom-축구"]
+    assert cfg["news"]["picks"]["ai-coding"] == {"topics": ["장애·보안"], "extra": [{"kind": "company", "name": "Zed", "x": "zeddotdev"}]}
+    assert "Zed" in [e["name"] for e in catalog.entities(cfg, next(p for p in catalog.profiles() if p["id"] == "ai-coding"))]
+    assert "뉴스 · 손흥민" in {f["name"] for f in catalog.active(cfg)}
+    # 관심사를 하나도 안 고르면 저장하지 않는다
+    bad = {**ch, "interests": {"chosen": [], "picks": {}, "customs": []}}
+    assert sw.Api().save(bad)["ok"] is False

@@ -77,6 +77,26 @@ def open_for_login(port: int, timetree: bool = True):
         ensure_chrome(port, urls)
 
 
+def _window_state(page):
+    cdp = page.context.new_cdp_session(page)
+    win = cdp.send("Browser.getWindowForTarget")
+    return cdp.send("Browser.getWindowBounds", {"windowId": win["windowId"]})["bounds"]["windowState"]
+
+
+def new_page(ctx):
+    """새 탭. ctx.new_page()는 최소화된 창을 다시 띄워서, 창이 최소화돼 있으면 배경 탭으로 연다.
+    (배경 탭도 렌더링 끄는 실행 옵션 덕에 스크롤·로딩이 돈다)"""
+    try:
+        if ctx.pages and _window_state(ctx.pages[0]) == "minimized":
+            with ctx.expect_page() as info:
+                ctx.browser.new_browser_cdp_session().send(
+                    "Target.createTarget", {"url": "about:blank", "background": True})
+            return info.value
+    except Exception as e:
+        log.warning("배경 탭 열기 실패: %s", e)
+    return ctx.new_page()
+
+
 def set_minimized(page, minimized: bool):
     try:
         cdp = page.context.new_cdp_session(page)
