@@ -135,6 +135,29 @@
   .nudge { font-size: 11.5px; color: #a8730f; width: 100%; }
   .nudge a { margin-left: 4px; }
   ul.crit { margin: 4px 0; padding-left: 18px; font-size: 12.5px; }
+  /* 기다리는 동안: 캐릭터가 살랑이고 생각 말풍선의 한 줄이 바뀐다 */
+  .think { display: flex; gap: 22px; align-items: flex-start; padding: 26px 4px 8px; }
+  .think-char { flex: none; width: 66px; animation: bob 1.8s ease-in-out infinite; }
+  .think-char img { width: 66px; height: 66px; object-fit: contain; }
+  .blob { width: 60px; height: 54px; margin-top: 8px; border-radius: 50% 50% 46% 46%; background: #fff; border: 2.5px solid var(--brown);
+    position: relative; box-shadow: inset -6px -5px 0 #fde9d9; }
+  .blob::before, .blob::after { content: ""; position: absolute; top: 20px; width: 6px; height: 9px; border-radius: 50%;
+    background: var(--brown); animation: blink 3.4s infinite; }
+  .blob::before { left: 17px; } .blob::after { right: 17px; }
+  .blob i { position: absolute; top: 30px; width: 9px; height: 5px; border-radius: 50%; background: #f6b9a0; }
+  .blob i:first-child { left: 8px; } .blob i:last-child { right: 8px; }
+  @keyframes bob { 50% { transform: translateY(-6px) rotate(-3deg); } }
+  @keyframes blink { 0%, 90%, 100% { transform: scaleY(1); } 94% { transform: scaleY(.1); } }
+  .think-bubble { position: relative; flex: 1; background: #fff; border: 2px solid var(--brown); border-radius: 18px; padding: 9px 14px 8px; }
+  .think-bubble::before, .think-bubble::after { content: ""; position: absolute; border: 2px solid var(--brown); border-radius: 50%; background: #fff; }
+  .think-bubble::before { left: -15px; top: 22px; width: 10px; height: 10px; }
+  .think-bubble::after { left: -24px; top: 36px; width: 6px; height: 6px; }
+  .think-bubble b { font-family: "Jua", sans-serif; font-weight: 400; font-size: 15.5px; color: var(--brown); }
+  .think-bubble b::after { content: ""; display: inline-block; width: 1.2em; text-align: left; animation: dots 1.4s steps(4) infinite; }
+  @keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+  .think-line { font-size: 12.5px; color: var(--ink); margin-top: 3px; min-height: 2.9em; transition: opacity .35s; }
+  .think-line.fade { opacity: 0; }
+  .think-time { font-size: 11px; color: var(--muted); }
   .spin { color: var(--muted); padding: 18px 4px; }
   .spin::after { content: "…"; animation: pulse 1.2s ease-in-out infinite; }
 </style>
@@ -917,11 +940,15 @@ function startLoginPoll() {
 
 // --- 관심사 (설계 4장): ① 고르기·직접 입력 → 관심사마다 범위 › 사람 › 기업 › 궁금한 것 (› 새 관심사는 확인) ---
 let INT = null;
-const ISUBS = { preset: ["scope", "people", "companies", "topics"], custom: ["scope", "people", "companies", "topics", "result"] };
-const INAME = { scope: "범위", people: "사람", companies: "기업", topics: "궁금한 것", result: "확인" };
+const ISUBS = { preset: ["scope", "people", "companies", "topics"] };  // 새 관심사는 질문을 받은 뒤 정해진다 (intSubs)
+const INAME = { scope: "범위", lens: "보는 방식", people: "사람", companies: "기업", topics: "궁금한 것", result: "확인" };
+const LENS = { overview: ["업계 흐름 전반", "큰 변화·공식 발표·전문 매체 중심, 업계를 잘 정리하는 사람 소식"],
+               target: ["특정 대상 위주", "좋아하는 기업·팀·제품과 그 사람들 소식"], both: ["둘 다", "흐름은 챙기되 꼭 볼 대상도 몇 개"] };
+const intSubs = c => c.kind === "preset" ? ISUBS.preset : (INT.data[c.key] && INT.data[c.key].subs) || ["lens"];
+const subLabel = (c, x) => x.startsWith("q") ? INT.data[c.key].qs[+x.slice(1)].slot : INAME[x];
 function intInit() { INT = { chosen: new Set(D.interests_on), customs: [], qi: -1, sub: 0, data: {}, queue: [], busy: "" }; }
 const intCur = () => INT.qi >= 0 ? INT.queue[INT.qi] : null;
-const intSubName = () => ISUBS[intCur().kind][INT.sub];
+const intSubName = () => intSubs(intCur())[INT.sub];
 const krName = s => /[가-힣]/.test(s);
 
 const intTop = () => { document.querySelector("main").scrollTop = 0; };
@@ -929,14 +956,48 @@ function intRender() {
   const c = intCur(), body = $("#int-body"), bar = $("#int-sub");
   $("#int-skip").classList.toggle("hidden", !(c && c.kind === "preset"));
   if (!c) { bar.classList.add("hidden"); intPick(body); return nav(); }
-  const d = INT.data[c.key], subs = ISUBS[c.kind];
+  const d = INT.data[c.key], subs = intSubs(c);
   bar.classList.remove("hidden");
   bar.innerHTML = `<span class="tg">${esc(c.tag)}</span>` + subs.map((x, i) =>
-    `<span class="${i === INT.sub ? "on" : i < INT.sub ? "done" : ""}">${INAME[x]}</span>`).join(" › ");
-  if (INT.busy || !d) { body.innerHTML = `<div class="spin">${esc(INT.busy || "불러오는 중")}</div>`; return nav(); }
-  ({ scope: intScope, people: intList, companies: intList, topics: intTopics, result: intResult })[intSubName()](body, c, d);
+    `<span class="${i === INT.sub ? "on" : i < INT.sub ? "done" : ""}">${subLabel(c, x)}</span>`).join(" › ");
+  if (INT.busy || !d) { body.innerHTML = thinkHtml(); thinkStart(); return nav(); }
+  thinkStop();
+  const name = intSubName();
+  if (/^q\d+$/.test(name)) intQuestion(body, c, d, +name.slice(1));
+  else ({ scope: intScope, lens: intLens, people: intList, companies: intList, topics: intTopics, result: intResult })[name](body, c, d);
   nav();
 }
+
+
+// --- 「생각 중」: 기다리는 동안 캐릭터가 살랑이고, 생각 말풍선의 한 줄이 바뀐다 (실제로 읽는 헤드라인도) ---
+let thinkTimer = null;
+const josa = (w, a, b) => { const c = (w || "").charCodeAt(w.length - 1) - 0xAC00; return c >= 0 && c <= 11171 && c % 28 ? a : b; };
+const cut = (t, n) => t.length > n ? t.slice(0, n - 1) + "…" : t;
+function think(title, lines, expect) { INT.busy = title; INT.think = { lines: lines.filter(Boolean), i: 0, start: Date.now(), expect }; }
+function charName() { return (D.characters.find(c => c.file === D.character) || {}).name || "POPME"; }
+function thinkHtml() {
+  const t = INT.think || { lines: [], start: Date.now() }, name = charName();
+  const face = D.pet_image ? `<img src="${esc(D.pet_image)}" alt="" onerror="this.outerHTML='<div class=blob><i></i><i></i></div>'">`
+                           : `<div class="blob"><i></i><i></i></div>`;
+  return `<div class="think"><div class="think-char">${face}</div>
+    <div class="think-bubble"><b>${esc(name)}${josa(name, "이", "가")} ${esc(INT.busy || "준비하는 중")}</b>
+      <div class="think-line" id="think-line">${esc(t.lines[t.i % Math.max(1, t.lines.length)] || "")}</div>
+      <div class="think-time" id="think-time"></div></div></div>`;
+}
+function thinkStart() {
+  if (thinkTimer) return;
+  let tick = 0;
+  thinkTimer = setInterval(() => {
+    const t = INT.think, line = $("#think-line"), time = $("#think-time");
+    if (!INT.busy || !line) return thinkStop();
+    const sec = Math.round((Date.now() - t.start) / 1000);
+    time.textContent = sec >= 3 ? `${sec}초째${t.expect ? ` · 보통 ${t.expect}` : ""}` : "";
+    if (++tick % 3 || t.lines.length < 2) return;  // 2.4초마다 다음 줄
+    line.classList.add("fade");
+    setTimeout(() => { t.i++; line.textContent = t.lines[t.i % t.lines.length]; line.classList.remove("fade"); }, 350);
+  }, 800);
+}
+function thinkStop() { clearInterval(thinkTimer); thinkTimer = null; }
 
 function intPick(body) {
   const cards = D.interests.map(i => `<label class="card icard"><input type="checkbox" data-id="${i.id}" ${INT.chosen.has(i.id) ? "checked" : ""}>
@@ -977,17 +1038,17 @@ function intScope(body, c, d) {
 function intList(body, c, d) {
   const key = intSubName(), people = key === "people", rows = d[key];
   const groups = [["kr", people ? "국내" : "국내"], ["world", people ? "해외" : "세계"]];
-  const order = d.scope === "kr" ? groups : [groups[1], groups[0]];
+  const order = [...(people ? [] : [["media", "전문 매체 (공식 RSS가 있으면 받아요)"]]), ...(d.scope === "kr" ? groups : [groups[1], groups[0]])];
   const st = e => e.checked === undefined ? "" : [e.x_status === "ok" ? "X ✓" : "", e.news_count ? `뉴스 ${e.news_count}건` : "",
     e.x_status !== "ok" && !e.news_count ? "받을 소식을 못 찾았어요" : ""].filter(Boolean).join(" · ");
   const box = order.map(([r, label]) => {
-    const xs = rows.map((e, i) => [e, i]).filter(([e]) => (e.region || "world") === r);
+    const xs = rows.map((e, i) => [e, i]).filter(([e]) => r === "media" ? e.kind === "media" : e.kind !== "media" && (e.region || "world") === r);
     return xs.length ? `<div class="grp">${label}</div>` + xs.map(([e, i]) => `<label class="who"><input type="checkbox" data-i="${i}" ${e.on ? "checked" : ""}>
       <span><b>${esc(e.name)}</b><small>${esc([e.why, st(e)].filter(Boolean).join(" · "))}</small></span></label>`).join("") : "";
   }).join("");
   const note = c.kind === "preset" ? "POPME가 골라 둔 후보예요. 그대로 두셔도 돼요."
     : d.error ? `${d.error}. 받고 싶은 ${people ? "사람" : "기업·단체"}을 직접 적어 주세요.`
-    : `AI가 「${c.tag} · ${d.scope === "kr" ? "한국어만" : "해외도"}」로 고른 후보예요. 계정은 마지막에 실제로 열어서 확인해요.`;
+    : `AI가 「${c.tag} · ${d.lens ? LENS[d.lens][0] : d.scope === "kr" ? "한국어만" : "해외도"}」${d.answers && Object.keys(d.answers).length ? "와 고른 답" : ""}으로 고른 후보예요. 계정은 마지막에 실제로 열어서 확인해요.`;
   body.innerHTML = `<h1>소식 받고 싶은 ${people ? "사람은" : "기업·단체는"}?</h1>
     <div class="ai-note">${esc(note)}</div>
     ${box ? `<div class="box">${box}</div>` : ""}
@@ -1010,6 +1071,54 @@ function intList(body, c, d) {
   $("#int-ent").onkeydown = ev => { if (ev.key === "Enter") add(); };
 }
 
+
+function intLens(body, c, d) {
+  body.innerHTML = `<h1>「${esc(c.field)}」 소식을 어떻게 보고 싶으세요?</h1>
+    <p class="lead">고르면 최근 소식을 살펴보고 「${esc(c.field)}」에 맞는 질문을 몇 개 드려요.</p>
+    <div class="cards">${Object.entries(LENS).map(([k, [t, sub]]) =>
+      `<label class="card"><input type="radio" name="int-lens" value="${k}"><b>${t}</b><small>${sub}</small></label>`).join("")}</div>`;
+  setRadio("int-lens", d.lens);
+  body.querySelectorAll("input[name=int-lens]").forEach(r => r.onchange = () => { d.lens = r.value; nav(); });
+}
+
+function intQuestion(body, c, d, i) {  // AI가 분야 말로 만든 질문 (칸: 범위·변화·대상). 「대상」 보기는 「범위」 답에 따라 바뀐다
+  const q = d.qs[i], ans = d.answers[q.slot] || (d.answers[q.slot] = []);
+  let opts = q.options;
+  const parent = d.answers["범위"] || [];
+  if (q.slot === "대상" && Object.keys(q.options_by).length && parent.length) {  // 고른 범위마다의 보기 (갈래가 없는 범위면 기본 보기도)
+    opts = [...parent.flatMap(a => q.options_by[a] || []), ...(parent.some(a => !q.options_by[a]) ? q.options : [])];
+  }
+  const seen = new Set(), list = [...opts, ...ans.filter(a => !opts.some(o => o.label === a)).map(a => ({ label: a, region: d.extraRegion?.[a] || "world" }))]
+    .filter(o => !seen.has(o.label) && seen.add(o.label));
+  body.innerHTML = `<h1>${esc(q.text)}</h1>
+    <p class="lead">여러 개 골라도 돼요. ${q.slot === "대상" ? "고른 대상 소식을 먼저 챙겨요." : "고른 것 위주로 소식을 골라요."}</p>
+    <div class="chips">${list.map(o => `<label class="chip"><input type="checkbox" data-o="${esc(o.label)}" ${ans.includes(o.label) ? "checked" : ""}>${esc(o.label)}</label>`).join("")}
+      <label class="chip"><input type="checkbox" data-any ${!ans.length ? "checked" : ""}>상관없어요</label></div>
+    <div class="mine"><input type="text" id="int-opt" maxlength="20" placeholder="보기에 없으면 직접 적어 주세요"><button id="int-opt-add">더하기</button></div>
+    ${d.qerror ? `<p class="hint">${esc(d.qerror)} — 직접 적어 주셔도 돼요.</p>` : ""}`;
+  d.optRegion = d.optRegion || {};
+  list.forEach(o => d.optRegion[o.label] = o.region);
+  body.querySelectorAll("input[data-o]").forEach(b => b.onchange = () => {
+    const k = ans.indexOf(b.dataset.o);
+    if (b.checked && k < 0) ans.push(b.dataset.o); else if (!b.checked && k >= 0) ans.splice(k, 1);
+    body.querySelector("input[data-any]").checked = !ans.length;
+  });
+  body.querySelector("input[data-any]").onchange = e => { if (e.target.checked) { ans.length = 0; intRender(); } };
+  const add = () => {
+    const v = $("#int-opt").value.trim();
+    if (!v || ans.includes(v)) return;
+    ans.push(v); (d.extraRegion = d.extraRegion || {})[v] = krName(v) ? "kr" : "world";
+    intRender(); setTimeout(() => $("#int-opt")?.focus());
+  };
+  $("#int-opt-add").onclick = add;
+  $("#int-opt").onkeydown = e => { if (e.key === "Enter") add(); };
+}
+
+function intScopeFrom(d) {  // 한국어/해외는 묻지 않고: 고른 보기 중 해외가 하나라도 있으면 해외도
+  const picked = Object.values(d.answers || {}).flat().map(a => (d.optRegion || {})[a]).filter(Boolean);
+  return picked.length && picked.every(r => r === "kr") ? "kr" : "world";
+}
+
 function intTopics(body, c, d) {
   body.innerHTML = `<h1>특히 궁금한 건 뭐예요?</h1>
     <p class="lead">고른 것 위주로 브리핑에 넣어요. 안 골라도 돼요.</p>
@@ -1022,10 +1131,12 @@ function intTopics(body, c, d) {
 function intResult(body, c, d) {
   const on = xs => xs.filter(e => e.on);
   if (!d.verified) {
-    INT.busy = "사람·기업마다 받을 수 있는 소식을 확인하는 중 (X 계정·공식 사이트·뉴스)";
-    const ents = [...on(d.people), ...on(d.companies)];
+    const ents = [...on(d.people), ...on(d.companies), ...(d.searches || []).map(q => ({ kind: "search", name: q, news: q, region: "kr" }))];
+    think("열어서 확인하는 중", ["X 계정이 정말 있는지 열어 보는 중", "공식 사이트에 RSS가 있나 찾는 중", "이름으로 뉴스를 검색해 보는 중",
+           ...ents.slice(0, 6).map(e => `「${cut(e.name, 20)}」 확인하는 중`), "고르는 기준 쓰는 중"], "10~20초");
     Promise.all([api().interest_verify(ents, d.scope),
-                 api().interest_finalize(d.field, d.scope, on(d.people), on(d.companies), on(d.topics).map(t => t.name), radio("ai"))])
+                 api().interest_finalize(d.field, d.scope, on(d.people), on(d.companies).filter(e => e.kind !== "media"),
+                                         on(d.topics).map(t => t.name), radio("ai"), d.lens, d.answers)])
       .then(([v, f]) => { d.verified = v; d.final = f; INT.busy = ""; if (intCur() === c) intRender(); });
     return intRender();
   }
@@ -1039,15 +1150,22 @@ function intResult(body, c, d) {
     return `<div class="res"><span class="nm">${esc(e.name)}</span><span class="ways">${w.join("")}</span></div>`;
   };
   const ppl = d.verified.filter(e => e.kind === "person"), cos = d.verified.filter(e => e.kind === "company");
+  const media = d.verified.filter(e => e.kind === "media"), searches = d.verified.filter(e => e.kind === "search");
+  const mrow = e => `<div class="res"><span class="nm">${esc(e.name)}</span><span class="ways">${e.feed ? `<span class="w ok">공식 RSS ✓</span>`
+    : `<span class="w no">RSS 없음</span><span class="nudge">RSS가 없어서 빼고 만들어요</span>`}</span></div>`;
+  const srow = e => `<div class="res"><span class="nm">${esc(e.name)}</span><span class="ways">${e.news_count ? `<span class="w ok">뉴스 ✓</span>`
+    : `<span class="w no">기사 없음</span><span class="nudge">기사가 안 나와서 빼고 만들어요</span>`}</span></div>`;
   body.innerHTML = `<h1>이렇게 만들까요?</h1>
     <p class="lead">「${esc(d.final.name)}」 · 열어서 확인된 것만 받아요.</p>
     ${!xLogin && d.verified.some(e => e.x_status === "ok") ? `<div class="howto">X에 로그인하면 이 사람·기업들 소식을 더 잘 받을 수 있어요.
       지금은 뉴스로 받고, 로그인하면 본인이 올리는 글도 받아요. <a data-xlogin>X 로그인하기</a></div>` : ""}
     ${ppl.length ? `<h2>사람</h2><div class="box">${ppl.map(row).join("")}</div>` : ""}
     ${cos.length ? `<h2>기업·단체</h2><div class="box">${cos.map(row).join("")}</div>` : ""}
+    ${media.length ? `<h2>전문 매체</h2><div class="box">${media.map(mrow).join("")}</div>` : ""}
+    ${searches.length ? `<h2>분야 뉴스</h2><div class="box">${searches.map(srow).join("")}</div>` : ""}
     <details open><summary>이런 소식을 골라요</summary><ul class="crit">${d.final.criteria.map(x => `<li>${esc(x)}</li>`).join("")}</ul></details>
     <div class="row"><button id="int-redo">다시 고르기</button></div>`;
-  $("#int-redo").onclick = () => { d.verified = null; d.final = null; INT.sub = 1; intRender(); };
+  $("#int-redo").onclick = () => { d.verified = null; d.final = null; INT.sub = d.subs.indexOf("people"); intRender(); };
   body.querySelectorAll("[data-xlogin]").forEach(a => a.onclick = async () => {
     await api().open_login("x"); say($("#msg"), "열린 Chrome 창에서 X에 로그인해 주세요. 로그인은 나중에 해도 돼요.");
     startLoginPoll(); });
@@ -1057,13 +1175,14 @@ async function intEnter() {  // 지금 관심사의 자료를 처음 준비
   const c = intCur();
   if (INT.data[c.key]) return;
   if (c.kind === "preset") {
-    INT.busy = "불러오는 중"; intRender();
+    think("후보를 꺼내는 중", ["골라 둔 사람·기업 꺼내는 중"]); intRender();
     const v = await api().interest_preset(c.id);
     const names = xs => xs.filter(e => e.on && !e.added).map(e => e.name);
     INT.data[c.key] = { ...v, base: { scope: v.scope, people: names(v.people), companies: names(v.companies),
                                      topics: v.topics.filter(t => t.on).map(t => t.name), extra: v.people.some(e => e.added) } };
     INT.busy = "";
-  } else INT.data[c.key] = { field: c.field, scope: "world", people: [], companies: [], topics: [], suggested: false };
+  } else INT.data[c.key] = { field: c.field, scope: "world", lens: "", subs: ["lens"], answers: {}, people: [], companies: [], topics: [],
+                              suggested: false };
 }
 
 function intCanNext() {
@@ -1071,6 +1190,7 @@ function intCanNext() {
   if (!c) return INT.chosen.size + INT.customs.length > 0;
   if (INT.busy) return false;
   if (intSubName() === "result") return !!(INT.data[c.key] && INT.data[c.key].final);
+  if (intSubName() === "lens") return !!(INT.data[c.key] && INT.data[c.key].lens);
   return true;
 }
 
@@ -1083,17 +1203,40 @@ async function intNext() {  // 반환: 이 단계를 다 끝냈나
     await intEnter(); intRender(); intTop(); return false;
   }
   const c = intCur(), d = INT.data[c.key];
-  if (c.kind === "custom" && intSubName() === "scope" && !d.suggested) {  // 범위를 정하면 AI가 사람·기업·궁금한 것 후보를 고른다
-    INT.busy = `AI가 「${c.field}」 사람·기업 후보를 고르는 중 (20초쯤 걸려요)`; INT.sub = 1; intRender();
-    const s = await api().interest_suggest(c.field, d.scope, radio("ai"));
-    const keep = xs => xs.filter(e => e.added);
-    d.people = [...s.people.map(e => ({ ...e, on: true })), ...keep(d.people)];
-    d.companies = [...s.companies.map(e => ({ ...e, on: true })), ...keep(d.companies)];
-    d.topics = s.topics.map(t => ({ name: t, on: false }));
-    d.error = s.error || ""; d.suggested = true; d.verified = null; INT.busy = "";
+  if (c.kind === "custom" && intSubName() === "lens" && d.qsLens !== d.lens) {  // 보는 방식 → 최근 소식을 근거로 분야별 질문
+    think(`최근 소식을 살펴보는 중`, [`요즘 「${c.field}」 뉴스를 모으는 중`], "20~30초"); intRender();
+    const heads = await api().interest_research(c.field) || [];
+    think("질문을 고르는 중", [heads.length ? `「${c.field}」 최근 뉴스 ${heads.length}개를 읽었어요` : "",
+      ...heads.slice(0, 10).map(h => `「${cut(h, 34)}」`), `${LENS[d.lens][0]}에 맞는 질문 고르는 중`, "보기가 실제로 있는지 뉴스로 확인하는 중"],
+      "20~30초");
+    intRender();
+    const r = await api().interest_questions(c.field, d.lens, radio("ai"), heads);
+    d.qs = r.questions; d.type = r.type; d.headlines = r.headlines || []; d.qerror = r.error || "";
+    d.qsLens = d.lens; d.answers = {}; d.suggested = false;
+    d.subs = ["lens", ...d.qs.map((_, i) => "q" + i), "people", "companies", ...(d.lens === "target" ? ["topics"] : []), "result"];
+    INT.busy = ""; INT.sub = 1;
     return intRender(), intTop(), false;
   }
-  if (INT.sub < ISUBS[c.kind].length - 1) { INT.sub++; intRender(); intTop(); return false; }
+  const nextSub = intSubs(c)[INT.sub + 1];
+  const sig = JSON.stringify([d.lens, d.answers]);
+  if (c.kind === "custom" && nextSub === "people" && d.suggested !== sig) {  // 답을 다 하면 AI가 사람·기업(·전문 매체) 후보를 고른다
+    d.scope = intScopeFrom(d);
+    const picked = Object.values(d.answers).flat();
+    think("사람·기업을 찾는 중", [picked.length ? `고른 것: ${cut(picked.join("·"), 30)}` : "고른 답 다시 보는 중",
+      d.lens === "target" ? "고른 대상의 사람들 찾는 중" : "업계를 잘 정리하는 사람 찾는 중", "기업·단체 찾는 중",
+      d.lens !== "target" ? "전문 매체 찾는 중" : "", ...(d.headlines || []).slice(0, 4).map(h => `「${cut(h, 34)}」`),
+      "계정이 맞는지는 마지막에 열어 볼게요"], "20초쯤");
+    INT.sub++; intRender();
+    const s = await api().interest_suggest(c.field, d.scope, radio("ai"), d.lens, d.answers, d.headlines);
+    const keep = xs => xs.filter(e => e.added);
+    d.people = [...s.people.map(e => ({ ...e, on: true })), ...keep(d.people)];
+    d.companies = [...s.media.map(e => ({ ...e, on: true })), ...s.companies.map(e => ({ ...e, on: true })), ...keep(d.companies)];
+    d.topics = s.topics.map(t => ({ name: t, on: false }));
+    d.searches = s.searches || [];
+    d.error = s.error || ""; d.suggested = sig; d.verified = null; INT.busy = "";
+    return intRender(), intTop(), false;
+  }
+  if (INT.sub < intSubs(c).length - 1) { INT.sub++; intRender(); intTop(); return false; }
   return intAdvance();
 }
 
@@ -1113,7 +1256,7 @@ async function intSkipPresets() {  // 「이대로 모두」: 남은 미리 만�
 function intPrev() {  // 반환: 관심사 단계 안에서 처리했나
   if (!INT || !intCur()) return false;
   if (INT.sub > 0) INT.sub--;
-  else if (INT.qi > 0) { INT.qi--; INT.sub = ISUBS[intCur().kind].length - 1; if (INT.data[intCur().key]?.skipped) delete INT.data[intCur().key]; }
+  else if (INT.qi > 0) { INT.qi--; INT.sub = intSubs(intCur()).length - 1; if (INT.data[intCur().key]?.skipped) delete INT.data[intCur().key]; }
   else INT.qi = -1;
   INT.busy = ""; intRender(); intTop();
   return true;
@@ -1138,6 +1281,7 @@ function intPayload() {  // 저장할 값: 고른 관심사, 미리 만든 관�
       if (Object.keys(pk).length) picks[c.id] = pk;
     } else if (d.final) {
       customs.push({ field: d.field, scope: d.scope, final: d.final, topics: d.topics.filter(t => t.on).map(t => t.name),
+                     lens: d.lens, type: d.type, answers: d.answers,
                      verified: d.verified.filter(e => e.news_count || e.feed || e.x_status === "ok") });
     }
   }

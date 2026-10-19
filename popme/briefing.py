@@ -124,7 +124,9 @@ def rules_for(cfg):
 
     def crit(p):  # 관심사 설정 ⑤에서 고른 「특히 궁금한 것」이 있으면 덧붙인다
         topics_ = catalog.picks(cfg, p["id"]).get("topics") or (p.get("topics") if p.get("custom") else None)
-        return p["criteria"].strip() + (f"\n- 특히 궁금한 것: {'·'.join(topics_)} — 이 주제를 먼저 고른다." if topics_ else "")
+        picked = " / ".join(f"{k}: {'·'.join(v)}" for k, v in (p.get("answers") or {}).items() if v)  # 관심사 설정에서 고른 것
+        return (p["criteria"].strip() + (f"\n- 특히 궁금한 것: {'·'.join(topics_)} — 이 주제를 먼저 고른다." if topics_ else "")
+                + (f"\n- 고른 것: {picked} — 이것과 관련된 소식을 먼저 고른다." if picked else ""))
     if len(profs) == 1:
         criteria = crit(profs[0])
     else:

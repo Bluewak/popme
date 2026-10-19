@@ -75,7 +75,7 @@ def entities(cfg, p):
     """그 관심사에서 받을 사람·기업 [{kind, name, why, x, region, news, feeds}]. 고친 적이 없으면 기본 체크된 것."""
     pk = picks(cfg, p["id"])
     out = []
-    for kind, key in (("person", "people"), ("company", "companies")):
+    for kind, key in (("person", "people"), ("company", "companies"), ("media", "media"), ("search", "searches")):
         names = pk.get(key)
         for e in p.get(key, []):
             keep = e["name"] in names if names is not None else e.get("default", True) is not False
@@ -106,8 +106,10 @@ def entity_feeds(cfg, p):
     for e in entities(cfg, p):
         if e.get("news"):
             yield news_feed(e, sc)
-        for url in e.get("feeds", []):
-            yield {"id": f"site:{url}", "name": f"{e['name']} 공식", "url": url, "group": "공식 발표", "max_chars": 600}
+        for url in e.get("feeds", []):  # 기업 공식 소식은 「공식 발표」, 전문 매체는 「실사용 검증」(분석·해설) 묶음
+            media = e.get("kind") == "media"
+            yield {"id": f"site:{url}", "name": e["name"] if media else f"{e['name']} 공식", "url": url,
+                   "group": "실사용 검증" if media else "공식 발표", "max_chars": 600}
 
 
 def x_accounts(cfg):

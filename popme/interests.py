@@ -1,8 +1,9 @@
-"""관심사 설정 (docs/INTERESTS-DESIGN.md 4장): 고르기·입력 → 범위·사람·기업·궁금한 것 → 묶음 만들기.
+"""관심사 설정 (docs/INTERESTS-DESIGN.md 4장): 고르기·입력 → (새 관심사) 보는 방식·분야별 질문 → 사람·기업 → 묶음 만들기.
 
 AI(설정의 브리핑 AI, 도구 끔)는 후보와 기준 문장만 만든다. AI가 말한 X 계정·사이트 주소는 그대로 믿지 않고
 여기서 실제로 열어 확인한 것만 저장한다 (X는 oEmbed로 있는지, 공식 RSS는 정해진 규칙으로 찾아 열어 보고, 뉴스는 검색해 본다).
 """
+import json
 import logging
 import re
 import tomllib
@@ -23,20 +24,59 @@ FEED_PATHS = ["/feed", "/rss.xml", "/rss", "/feed.xml"]
 TIMEOUT = 6  # 공식 사이트 RSS 찾기 — 대부분 없거나 막아서, 오래 기다리지 않는다
 RECENT_DAYS = 90  # 공식 RSS는 이 안에 글이 있어야 받는다 (멈춘 피드 거르기)
 
+# 보는 방식 (고정 질문 — AI가 만들지 않음) → 칸 순서. 칸의 순서·종류는 코드가 정하고 AI는 그 분야 말로 문장·보기만 만든다 (일관성)
+LENSES = {"overview": "업계 흐름 전반", "target": "특정 대상 위주", "both": "둘 다"}
+SLOTS = {"overview": ["범위", "변화"], "target": ["범위", "대상"], "both": ["범위", "변화", "대상"]}
+# 분야 유형 → 칸 이름 (AI가 유형을 고르고, 질문을 이 말에 맞춰 만든다)
+TYPES = {
+    "스포츠": {"범위": "리그·대회", "대상": "응원하는 팀", "변화": "관심 있는 소식(이적·전술·규정 …)", "사람": "선수·감독·전문 기자"},
+    "산업·기업": {"범위": "세부 산업", "대상": "관심 기업", "변화": "관심 있는 변화(규제·신제품·투자·공급망 …)", "사람": "경영진·분석가·전문 기자"},
+    "엔터·문화": {"범위": "장르", "대상": "좋아하는 그룹·작품", "변화": "관심 있는 소식(컴백·공연·흥행 …)", "사람": "아티스트·제작자·평론가"},
+    "투자·시장": {"범위": "시장", "대상": "관심 종목·자산", "변화": "관심 있는 변화(실적·금리·정책 …)", "사람": "분석가·운용역·경제 기자"},
+    "기술·제품": {"범위": "제품군", "대상": "관심 브랜드·제품", "변화": "관심 있는 변화(신제품·업데이트·가격 …)", "사람": "개발자·리뷰어·전문 기자"},
+    "취미·생활": {"범위": "세부 분야", "대상": "관심 대상", "변화": "관심 있는 소식", "사람": "전문가·크리에이터"},
+    "기타": {"범위": "세부 분야", "대상": "관심 대상", "변화": "관심 있는 변화", "사람": "전문가·기자"},
+}
+NO_ASK = re.compile(r"정치|성향|지지\s*정당|종교|건강|질병|병력|주소|사는\s*곳|거주|나이|연령|소득|연봉|재산|성별|성적\s*지향")
+HEADLINES = 30  # 질문을 만들 때 근거로 주는 최근 1주 헤드라인 수 (AI 지식은 오래됐을 수 있다 — 이적·감독 교체 등)
+QUESTIONS = """분야: {field}
+보는 방식: {lens}
+아래는 이 분야의 최근 1주 뉴스 헤드라인이다 (지금 상황의 근거):
+{headlines}
+
+이 분야 소식을 받으려는 사람에게 할 질문을 만들어라.
+1) type: 이 분야의 유형 하나 — {types}
+2) questions: 아래 칸을 이 순서대로 하나씩 (칸 이름은 유형별 말로 바꿔 묻는다)
+{slots}
+각 질문: {{"slot": "칸 이름(범위·변화·대상 중 하나)", "text": "질문 문장 25자 이내", "multi": true,
+  "options": [{{"label": "보기 20자 이내", "region": "kr 또는 world", "en": "영어(원어) 이름 — 해외만, 없으면 빈 문자열"}}],
+  "options_by": {{"범위 보기 label": [보기 …]}}  ← 「대상」 칸만: 「범위」에서 고른 것마다 다른 보기 (없으면 생략)}}
+- 보기는 4~8개, 실존하는 것만, 지금 기준으로 (헤드라인을 참고). 「상관없어요」·「직접 입력」은 넣지 마라 (코드가 붙인다).
+- 정치 성향·종교·건강·사는 곳·나이·소득은 묻지 마라.
+출력: {{"type": "...", "questions": [...]}}"""
 SYSTEM = "너는 소식 출처를 고르는 도우미다. 요청한 JSON 하나만 출력한다. 실존하는 사람·기업만 쓰고, 모르면 적게 쓴다."
 SUGGEST = """분야: {field}
 범위: {scope}
-이 분야 소식을 꾸준히 받고 싶은 사람에게 권할 것을 골라라.
-- people: 이 분야 소식을 직접 전하거나 영향력이 큰 사람 6~8명. {mix}
-- companies: 기업·단체·구단·기관 5~7곳. {mix}
-- topics: 이 분야 사람들이 특히 궁금해하는 세부 주제 5~8개, 각 8자 이내.
+{context}이 분야 소식을 꾸준히 받고 싶은 사람에게 권할 것을 골라라.
+- people: {who} 6~8명. {mix}
+- companies: {what} 5~7곳. {mix}
+- topics: 이 분야 사람들이 특히 궁금해하는 세부 주제 5~8개, 각 8자 이내.{extra}
 people·companies 각 항목:
   {{"name": "한국어 표기", "why": "15자 이내 한 줄", "region": "kr" 또는 "world",
    "x": "X 계정 handle (확실하지 않으면 빈 문자열)", "site": "공식 사이트 도메인 (기업만, 모르면 빈 문자열)",
    "news": "한국어 뉴스 검색어 — 이름 (동명이인이 있으면 분야 단어를 붙여)",
    "news_en": "영어(원어) 뉴스 검색어 — 해외 사람·기업만, 국내면 빈 문자열"}}
-출력: {{"people": [...], "companies": [...], "topics": ["..."]}}"""
-FINAL = """분야: {field} / 범위: {scope}
+출력: {{"people": [...], "companies": [...], "topics": ["..."]{extra_out}}}"""
+WHO = {"overview": "이 분야 흐름을 잘 정리해 전하는 사람 (전문 기자·분석가·업계 리더)",
+       "target": "고른 대상의 당사자 (선수·감독, 창업자·경영진 등)와 그 소식을 잘 전하는 기자",
+       "both": "고른 대상의 당사자와, 이 분야 흐름을 잘 정리하는 기자·분석가를 섞어서"}
+WHAT = {"overview": "이 분야를 대표하는 기업·단체·협회·기관", "target": "고른 대상(기업·팀·브랜드)과 관련 단체", "both": "고른 대상과 이 분야 대표 기업·단체"}
+EXTRA = """
+- media: 이 분야 전문 매체·뉴스레터 3~5곳 {{"name": "...", "why": "15자 이내", "region": "kr 또는 world", "site": "도메인"}}
+- searches: 이 분야 흐름을 받을 뉴스 검색어 2~3개 (예: "반도체 업계", "HBM"). 너무 넓은 한 단어는 피한다"""
+
+FINAL = """분야: {field} / 범위: {scope} / 보는 방식: {lens}
+고른 것: {answers}
 고른 사람: {people}
 고른 기업·단체: {companies}
 특히 궁금한 것: {topics}
@@ -62,28 +102,157 @@ def _entity(e, kind):
     name = _short(e["name"], 30)
     return {"kind": kind, "name": name, "why": _short(e.get("why"), 24),
             "region": "kr" if e.get("region") == "kr" else "world",
-            "x": x if HANDLE_RE.match(x) else "", "site": site if kind == "company" and SITE_RE.match(site) else "",
+            "x": x if HANDLE_RE.match(x) else "", "site": site if kind in ("company", "media") and SITE_RE.match(site) else "",
             "news": _short(e.get("news"), 40) or name, "news_en": _short(e.get("news_en"), 40)}
 
 
-def suggest(cfg, field, scope):
-    """③④⑤의 보기: {"people": [...], "companies": [...], "topics": [...]}. AI가 실패하면 빈 목록 (직접 입력만)."""
-    prompt = SUGGEST.format(field=_short(field, 40), scope=SCOPES.get(scope, SCOPES["world"]), mix=MIX.get(scope, MIX["world"]))
+def answers_text(answers):
+    """{칸: [보기 …]} → "범위: 해외축구·국가대표 / 대상: 토트넘" (AI 지시문·브리핑 기준에 쓴다)."""
+    return " / ".join(f"{k}: {'·'.join(v)}" for k, v in (answers or {}).items() if v) or "(없음)"
+
+
+def suggest(cfg, field, scope, lens=None, answers=None, headlines=None):
+    """사람·기업·궁금한 것 보기: {"people", "companies", "topics", "media", "searches"}. AI가 실패하면 빈 목록 (직접 입력만).
+    lens(보기 방식)가 업계 흐름이면 정리하는 사람·대표 기업 + 전문 매체·분야 검색어, 대상 위주면 고른 대상의 당사자."""
+    lens = lens if lens in LENSES else "target"
+    context = ""
+    if answers:
+        context += f"보는 방식: {LENSES[lens]} / 고른 것: {answers_text(answers)}\n"
+    if headlines:
+        context += "최근 1주 헤드라인 (지금 상황의 근거):\n" + "\n".join(f"- {h}" for h in headlines[:15]) + "\n"
+    flow = lens in ("overview", "both")
+    prompt = SUGGEST.format(field=_short(field, 40), scope=SCOPES.get(scope, SCOPES["world"]), mix=MIX.get(scope, MIX["world"]),
+                            context=context, who=WHO[lens], what=WHAT[lens], extra=EXTRA if flow else "",
+                            extra_out=', "media": [...], "searches": ["..."]' if flow else "")
+    empty = {"people": [], "companies": [], "topics": [], "media": [], "searches": []}
     try:
         raw = briefing.parse_json(llm.ask(cfg, SYSTEM, prompt, timeout=180))
     except Exception:
         log.exception("관심사 후보 받기 실패")
-        return {"people": [], "companies": [], "topics": [], "error": "AI가 지금 답하지 못했어요"}
+        return {**empty, "error": "AI가 지금 답하지 못했어요"}
     out = {k: [x for x in (_entity(e, kind) for e in (raw.get(k) or [])[:8]) if x]
-           for k, kind in (("people", "person"), ("companies", "company"))}
+           for k, kind in (("people", "person"), ("companies", "company"), ("media", "media"))}
+    out["media"] = [m for m in out["media"] if m["site"]][:5]  # 매체는 사이트가 있어야 RSS를 찾는다
     out["topics"] = list(dict.fromkeys(_short(t, 10) for t in (raw.get("topics") or [])[:8] if _short(t, 10)))
+    out["searches"] = list(dict.fromkeys(_short(q, 30) for q in (raw.get("searches") or [])[:3] if _short(q, 30))) if flow else []
     return out
 
 
-def finalize(cfg, field, scope, people, companies, topics):
+# ---------------------------------------------------------------- 보는 방식 → 분야별 질문 (설계 4-6)
+
+def research(field, limit=HEADLINES):
+    """최근 1주 헤드라인 (구글 뉴스, 키 없음). 질문·후보를 지금 상황에 맞추는 근거. 실패하면 []."""
+    loc = "world" if re.fullmatch(r"[\x00-\x7f]+", field.strip()) else "kr"
+    url = catalog.NEWS_URL.replace("when:2d", "when:7d").format(q=urllib.parse.quote_plus(field.strip()), loc=catalog.NEWS_LOC[loc])
+    try:
+        return [i["title"] for i in rss.peek(url, limit=limit)]
+    except Exception:
+        log.warning("최근 소식 조사 실패: %s", field, exc_info=True)
+        return []
+
+
+def _option(o):
+    if isinstance(o, str):
+        o = {"label": o}
+    if not isinstance(o, dict):
+        return None
+    label = _short(o.get("label"), 20)
+    if not label or label in ("상관없어요", "직접 입력", "기타"):
+        return None
+    return {"label": label, "region": "kr" if o.get("region") == "kr" else "world", "en": _short(o.get("en"), 40)}
+
+
+def _options(xs):
+    out, seen = [], set()
+    for o in (xs or [])[:12]:
+        o = _option(o)
+        if o and o["label"] not in seen:
+            seen.add(o["label"])
+            out.append(o)
+    return out[:8]
+
+
+def fixed_questions(lens, kind="기타"):
+    """AI가 실패하거나 형식이 깨졌을 때: 칸 이름만 있는 질문 (직접 입력만)."""
+    words = TYPES.get(kind, TYPES["기타"])
+    return [{"slot": s, "text": f"{words[s]}이 있나요?" if s == "대상" else f"어떤 {words[s].split('(')[0]}?",
+             "multi": True, "options": [], "options_by": {}} for s in SLOTS[lens]]
+
+
+def clean_questions(raw, lens):
+    """AI가 준 질문 검사: 유형, 칸 순서는 틀대로(빠지면 고정 질문으로 채움), 보기 정리, 묻지 않는 것 버리기."""
+    kind = raw.get("type") if raw.get("type") in TYPES else "기타"
+    got = {}
+    for q in raw.get("questions") or []:
+        if not isinstance(q, dict) or q.get("slot") not in SLOTS[lens] or q["slot"] in got:
+            continue
+        text = _short(q.get("text"), 30)
+        if not text or NO_ASK.search(text):
+            continue
+        opts = _options(q.get("options"))
+        if NO_ASK.search(" ".join(o["label"] for o in opts)):
+            continue
+        by = {}
+        if q["slot"] == "대상" and isinstance(q.get("options_by"), dict):
+            by = {_short(k, 20): _options(v) for k, v in list(q["options_by"].items())[:8] if _short(k, 20)}
+            by = {k: v for k, v in by.items() if v}
+        got[q["slot"]] = {"slot": q["slot"], "text": text, "multi": q.get("multi") is not False, "options": opts, "options_by": by}
+    fixed = {q["slot"]: q for q in fixed_questions(lens, kind)}
+    return {"type": kind, "questions": [got.get(s) or fixed[s] for s in SLOTS[lens]]}
+
+
+def check_options(questions, scope="world"):
+    """「대상」 보기는 뉴스 검색으로 기사가 나오는 것만 남긴다 (지어낸 팀·기업 거르기). 한국어로 없으면 원어 이름으로."""
+    def alive(o):
+        e = {"name": o["label"], "news": o["label"], "news_en": o.get("en"), "region": o["region"]}
+        return news_count({**e, "region": "kr"}, "kr") > 0 or (bool(o.get("en")) and news_count(e, "world") > 0)
+    for q in questions:
+        if q["slot"] != "대상":
+            continue
+        groups = [q["options"], *q["options_by"].values()]
+        flat = [o for g in groups for o in g]
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            ok = {o["label"] for o, good in zip(flat, pool.map(alive, flat)) if good}
+        q["options"] = [o for o in q["options"] if o["label"] in ok]
+        q["options_by"] = {k: [o for o in v if o["label"] in ok] for k, v in q["options_by"].items()}
+        q["options_by"] = {k: v for k, v in q["options_by"].items() if v}
+    return questions
+
+
+def questions(cfg, field, lens, heads=None):
+    """보는 방식 → 그 분야의 질문: {type, questions, headlines}. 최근 헤드라인을 근거로 주고, 받은 질문을 검사한다.
+    heads: 화면이 먼저 받아 둔 헤드라인 (기다리는 동안 「읽는 중」으로 보여 준다). 없으면 여기서 받는다."""
+    lens = lens if lens in LENSES else "target"
+    heads = research(field) if heads is None else [str(h)[:200] for h in heads][:HEADLINES]
+    words = "\n".join(f"  - {s}" for s in SLOTS[lens])
+    prompt = QUESTIONS.format(field=_short(field, 40), lens=LENSES[lens], headlines="\n".join(f"- {h}" for h in heads) or "(없음)",
+                              types=" / ".join(f"{k}({v['범위']}·{v['대상']})" for k, v in TYPES.items()), slots=words)
+    try:
+        raw = briefing.parse_json(llm.ask(cfg, SYSTEM, prompt, timeout=180))
+        out = clean_questions(raw, lens)
+    except Exception:
+        log.exception("관심사 질문 만들기 실패 (고정 질문으로)")
+        out = {"type": "기타", "questions": fixed_questions(lens), "error": "AI가 지금 답하지 못했어요"}
+    out["questions"] = check_options(out["questions"])
+    out["headlines"] = heads
+    return out
+
+
+def scope_from(questions_, answers):
+    """한국어/해외는 묻지 않고 고른 보기의 region으로: 해외 보기를 하나라도 고르면 해외도, 아무것도 안 골랐으면 해외도."""
+    regions = {}
+    for q in questions_ or []:
+        for o in q.get("options", []) + [o for v in q.get("options_by", {}).values() for o in v]:
+            regions[o["label"]] = o["region"]
+    picked = [regions.get(a) for v in (answers or {}).values() for a in v if a in regions]
+    return "kr" if picked and all(r == "kr" for r in picked) else "world"
+
+
+def finalize(cfg, field, scope, people, companies, topics, lens=None, answers=None):
     """⑥의 이름·태그·기준 문장. AI가 실패하면 정해진 문장으로."""
     names = lambda xs: ", ".join(x["name"] for x in xs) or "(없음)"
     prompt = FINAL.format(field=_short(field, 40), scope=SCOPES.get(scope, SCOPES["world"]), people=names(people),
+                          lens=LENSES.get(lens, "특정 대상 위주"), answers=answers_text(answers),
                           companies=names(companies), topics="·".join(topics) or "(없음)")
     base = {"name": _short(field, 12), "tag": _short(field, 6), "summary": f"{_short(field, 20)} 소식",
             "criteria": [f"{_short(field, 20)}에서 고른 사람·기업의 공식 발표와 중요한 변화를 먼저 고른다.",
@@ -159,6 +328,10 @@ def news_count(e, scope):
 def verify(entities, scope):
     """사람·기업마다 실제로 받을 수 있는 것: {name, kind, x: "ok"|"none"|"unknown"|"", feed: 주소|None, news: 건수}."""
     def one(e):
+        if e.get("kind") == "media":  # 전문 매체: 공식 RSS가 있어야 받는다
+            return {**e, "x_status": "", "feed": find_feed(e["site"]) if e.get("site") else None, "news_count": 0}
+        if e.get("kind") == "search":  # 분야 검색어
+            return {**e, "x_status": "", "feed": None, "news_count": news_count(e, scope)}
         x = ""
         if e.get("x"):
             ok = x_exists(e["x"])
@@ -180,15 +353,25 @@ def _q(v):
     return _literal(v)
 
 
-def save_custom(field, scope, verified, topics, final):
+def save_custom(field, scope, verified, topics, final, lens=None, kind=None, answers=None):
     """새 관심사 → DATA_DIR/profiles/custom-<이름>.toml. 확인된 것만 담는다. 반환: 관심사 id."""
     pid = f"custom-{_slug(field)}"
     lines = [f"# 관심사 설정에서 만든 관심사 ({datetime.now():%Y-%m-%d}). 「{field}」",
              f"id = {_q(pid)}", f"name = {_q(final['name'])}", f"tag = {_q(final['tag'])}",
              f"summary = {_q(final['summary'])}", 'status = "ready"', f"scope = {_q(scope)}",
              "criteria = " + _q("\n".join(f"- {c}" for c in final["criteria"])),
-             f"discovery = {_q(final['discovery'])}", f"topics = {_q(list(topics))}", "", "[caps]",
-             f'"{catalog.NEWS_GROUP}" = 20', '"공식 발표" = 10', ""]
+             f"discovery = {_q(final['discovery'])}", f"topics = {_q(list(topics))}",
+             f"lens = {_q(lens if lens in LENSES else 'target')}", f"type = {_q(kind if kind in TYPES else '기타')}",
+             "", "[answers]                     # 관심사 설정에서 고른 것 (칸 → 보기)"]
+    lines += [f"{json.dumps(k, ensure_ascii=False)} = {json.dumps(list(v), ensure_ascii=False)}" for k, v in (answers or {}).items() if v]
+    lines += ["", "[caps]",
+             f'"{catalog.NEWS_GROUP}" = 20', '"공식 발표" = 10', '"실사용 검증" = 10', ""]
+    for e in verified:  # 전문 매체 (확인된 RSS만), 분야 검색어 (기사가 나오는 것만)
+        if e.get("kind") == "media" and e.get("feed"):
+            lines += ["[[media]]", f"name = {_q(e['name'])}", f"why = {_q(e.get('why', ''))}", f"region = {_q(e['region'])}",
+                      f"feeds = {_q([e['feed']])}", ""]
+        if e.get("kind") == "search" and e.get("news_count"):
+            lines += ["[[searches]]", f"name = {_q(e['name'])}", f"region = {_q(e['region'])}", f"news = {_q(e['name'])}", ""]
     for kind, key in (("person", "people"), ("company", "companies")):
         for e in verified:
             if e["kind"] != kind:
