@@ -29,6 +29,8 @@ from popme.collectors import timetree
 from popme.jobs import CHROME_CLOSED, Jobs, calendar_source
 from popme.pet import PetWindow, icon_image, load_images, write_icon
 
+INTERESTS_OPEN = threading.Lock()  # 관심사 설정 창은 한 번에 하나
+
 log = logging.getLogger(__name__)
 UI = config.ROOT / "popme" / "ui" / "index.html"
 UI_STATE = config.DATA_DIR / "ui.json"
@@ -422,6 +424,32 @@ class Api:
         catalog.save_interests(ids)
         self._jobs.cfg["news"] = config.load().get("news", {})
         return self._news_state()
+
+    def open_interests(self, start="pick", pid=""):
+        """브리핑 탭 [+]·태그 우클릭 → 설정 창을 「관심사」 단계만 보이게 연다 (start: pick | custom | edit).
+        저장하면 POPME를 다시 켜지 않고 관심사만 다시 읽어 패널을 새로 그린다."""
+        threading.Thread(target=self._run_interests, args=(start, pid), daemon=True).start()
+        return True
+
+    def _run_interests(self, start, pid):
+        if not INTERESTS_OPEN.acquire(blocking=False):  # 이미 열려 있으면 하나만
+            return
+        try:
+            r = subprocess.run([sys.executable, "-m", "popme.setup_window", "interests", start, pid or ""], cwd=config.ROOT,
+                               stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
+        finally:
+            INTERESTS_OPEN.release()
+        if "Traceback" in (r.stderr or ""):
+            log.error("관심사 설정 창 오류:\n%s", r.stderr[-2000:])
+            self._show_chat("관심사 설정 창을 못 열었어요… popme.log에 이유를 적어 뒀어요.")
+            return
+        if r.returncode == 0:
+            catalog.reload()  # 새로 만든 관심사 파일
+            self._jobs.cfg["news"] = config.load().get("news", {})
+            try:
+                self._window.evaluate_js("loadBrief()")
+            except Exception:
+                log.warning("패널 새로 그리기 실패", exc_info=True)
 
     def set_card_tags(self, date, index, tags):
         """펼친 카드의 관심사 태그를 고친다 (그 카드에만 저장, 다음 브리핑에 배우지는 않음)."""

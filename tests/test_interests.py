@@ -319,3 +319,19 @@ def test_questions_reuses_headlines_from_screen(monkeypatch):
     monkeypatch.setattr(interests.llm, "ask", lambda *a, **k: '{"type": "스포츠", "questions": []}')
     out = interests.questions({}, "축구", "overview", ["토트넘, 새 감독 선임 임박"])
     assert out["headlines"] == ["토트넘, 새 감독 선임 임박"]
+
+
+def test_interests_only_window_saves_just_interests():
+    """브리핑 탭에서 「관심사」만 연 창의 저장: 고른 관심사·고친 칸만 쓰고 다른 설정은 그대로."""
+    from popme import setup_window as sw
+    sw.write(sw.base_text())  # 예시 설정으로 config.toml을 만들어 두고
+    before = tomllib.loads(config.CONFIG_PATH.read_text(encoding="utf-8"))
+    api = sw.Api({"start": "edit", "pid": "ai-coding"})
+    assert api.get()["mode"] == {"start": "edit", "pid": "ai-coding"}
+    r = api.save_interests({"chosen": ["ai-coding", "ml-engineering"], "picks": {"ai-coding": {"topics": ["장애·보안"]}}, "customs": []})
+    assert r == {"ok": True} and api._saved
+    after = tomllib.loads(config.CONFIG_PATH.read_text(encoding="utf-8"))
+    assert after["news"]["interests"] == ["ai-coding", "ml-engineering"]
+    assert after["news"]["picks"]["ai-coding"] == {"topics": ["장애·보안"]}
+    assert {k: v for k, v in after.items() if k != "news"} == {k: v for k, v in before.items() if k != "news"}
+    assert api.save_interests({"chosen": [], "picks": {}, "customs": []})["ok"] is False
