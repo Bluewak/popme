@@ -35,6 +35,10 @@ class Jobs:
     def _browser_collect(self, warnings):
         port = int(self.cfg.get("chrome", {}).get("port", 9333))
         chrome.ensure_chrome(port)
+        if self.cfg.get("chrome", {}).get("minimize_while_collecting"):
+            # Threads·X 스레드가 탭을 열기 전에 최소화해야 새 탭이 배경 탭으로 열린다 (chrome.new_page)
+            self._with_browser(port, lambda ctx: chrome.set_minimized(
+                ctx.pages[0] if ctx.pages else ctx.new_page(), True))
         # X와 Threads는 서로 다른 사이트라 동시에 돌린다. 각 사이트에서 보면 여전히 탭 하나가 사람 속도로 움직인다.
         # (같은 사이트를 탭 여러 개로 동시에 돌리면 요청이 몰려 봇으로 보이니 그렇게 하지 않는다)
         parts = {}
@@ -70,9 +74,6 @@ class Jobs:
                 browser.close()
 
     def _collect_calendar_x(self, ctx, warnings, progress):
-        first = ctx.pages[0] if ctx.pages else ctx.new_page()
-        if self.cfg.get("chrome", {}).get("minimize_while_collecting"):
-            chrome.set_minimized(first, True)
         source = calendar_source(self.cfg)
         try:
             if source == "ics":

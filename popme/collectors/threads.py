@@ -9,6 +9,7 @@ import re
 from datetime import datetime, timezone
 from urllib.parse import quote
 
+from popme import chrome
 from popme.collectors import NeedLogin, dump_raw, reached_since
 
 log = logging.getLogger(__name__)
@@ -104,7 +105,7 @@ def _visit(page, url, via, scrolls, sink, owner=None, since=None, users=None):
 
 def check_profiles(ctx, usernames, progress=lambda s: None, users=None):
     """발굴 후보 프로필을 한 번씩 열어 팔로워 수와 최근 글을 받는다 (태그 페이지엔 팔로워 수가 없음)."""
-    page = ctx.new_page()
+    page = chrome.new_page(ctx)
     out = []
     try:
         for i, u in enumerate(usernames):
@@ -128,7 +129,7 @@ def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None)
                 for q in tcfg.get("searches", [])]
     targets += [(f"https://www.threads.com/search?q={quote(t)}&serp_type=tags", f"th-tag:{t}")
                 for t in tcfg.get("tags", [])]
-    page = ctx.new_page()
+    page = chrome.new_page(ctx)
     out, empty = [], 0
     try:
         for i, (url, via) in enumerate(targets):
