@@ -88,8 +88,8 @@ class Jobs:
     def _browser_collect(self, warnings):
         port = int(self.cfg.get("chrome", {}).get("port", 9333))
         chrome.ensure_chrome(port)
-        if self.cfg.get("chrome", {}).get("minimize_while_collecting"):
-            # Threads·X 스레드가 탭을 열기 전에 최소화해야 새 탭이 배경 탭으로 열린다 (chrome.new_page)
+        if self._minimizing():
+            # 수집 중 창은 내려 둔다 (기본). Threads·X 스레드가 탭을 열기 전에 내려야 새 탭이 뒤에서 열린다 (chrome.new_page)
             self._with_browser(port, lambda ctx: chrome.set_minimized(
                 ctx.pages[0] if ctx.pages else ctx.new_page(), True))
         # X와 Threads는 서로 다른 사이트라 동시에 돌린다. 각 사이트에서 보면 여전히 탭 하나가 사람 속도로 움직인다.
@@ -119,6 +119,10 @@ class Jobs:
             warnings.append(self._fail("X", e))
         th.join()
 
+    def _minimizing(self):
+        """수집 중 전용 Chrome 창을 내려 둘까 (기본 켜짐 — config [chrome] minimize_while_collecting). 로그인 창은 해당 없음."""
+        return self.cfg.get("chrome", {}).get("minimize_while_collecting", True)
+
     def _with_browser(self, port, fn):
         """Playwright 동기 API는 스레드끼리 나눠 쓸 수 없어서 스레드마다 따로 붙는다."""
         from playwright.sync_api import sync_playwright
@@ -130,11 +134,10 @@ class Jobs:
                     ctx.add_init_script(BANNER_JS)
                 except Exception:
                     log.warning("수집 중 안내 띠를 못 붙였어요", exc_info=True)
-                if self is not None and self.cfg.get("chrome", {}).get("minimize_while_collecting", True):
-                    # 수집기는 사이트마다 새 탭을 여는데, 새 탭이 열리면 Chrome이 창을 다시 띄운다
-                    # → 붙어 있는 동안 새 탭마다 다시 최소화 (X·Threads가 따로 붙으니 양쪽 다)
+                if self is not None and self._minimizing():
+                    # 예비: 새 탭은 뒤에서 열리지만(chrome.new_page), 그래도 창이 다시 커지면 새 탭마다 다시 내린다
+                    # (X·Threads가 따로 붙으니 양쪽 다)
                     ctx.on("page", lambda page: chrome.set_minimized(page, True))
-                    chrome.set_minimized(ctx.pages[0] if ctx.pages else ctx.new_page(), True)
                 fn(ctx)
             finally:
                 # connect_over_cdp로 붙은 브라우저는 close()해도 Chrome 자체는 계속 떠 있다.

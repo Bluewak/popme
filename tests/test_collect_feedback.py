@@ -85,3 +85,13 @@ def test_menu_label_and_busy_line():
     assert Api.collect_label(me).startswith("모으는 중… X 수집 중 3/33") and len(Api.collect_label(me)) <= 37
     assert Api.collect_now(me) is False  # 두 번 돌지 않고
     assert said == ["지금 모으는 중이에요… X 수집 중 3/33 · Threads 수집 중 5/47"]  # 진행 상황을 말한다
+
+
+def test_minimize_while_collecting_is_on_by_default():
+    """수집 중 Chrome 창 내려 두기: 설정이 없으면 켜짐, false로 끈다."""
+    from popme.jobs import Jobs
+    j = Jobs.__new__(Jobs)
+    j.cfg = {}
+    assert j._minimizing() is True
+    j.cfg = {"chrome": {"minimize_while_collecting": False}}
+    assert j._minimizing() is False
