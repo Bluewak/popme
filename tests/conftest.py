@@ -29,3 +29,19 @@ def no_feed_cache(monkeypatch, tmp_path):
     from popme.sources import rss
     monkeypatch.setattr(rss, "CACHE_PATH", tmp_path / "feed-cache.json")
     monkeypatch.setattr(rss, "_cache", None)
+
+
+@pytest.fixture(autouse=True)
+def no_custom_profiles(monkeypatch, tmp_path):
+    """새로 만든 관심사(DATA_DIR/profiles)도 내 PC 것 대신 빈 임시 폴더로."""
+    from popme import catalog
+    monkeypatch.setattr(catalog, "CUSTOM_DIR", tmp_path / "profiles")
+    catalog.reload()
+    yield
+    catalog.reload()
+
+
+@pytest.fixture(autouse=True)
+def no_x_visits(monkeypatch, tmp_path):
+    from popme import briefing
+    monkeypatch.setattr(briefing, "X_VISITS", tmp_path / "x-visits.json")

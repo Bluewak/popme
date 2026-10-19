@@ -92,7 +92,7 @@ class Jobs:
             log.exception("일정 수집 실패")
             warnings.append(f"일정 수집 실패: {e}")
         try:
-            handles = [a["handle"] for a in briefing.core_accounts(self.cfg, self.db)]
+            handles = briefing.x_to_visit(self.cfg, self.db)  # 30개가 넘으면 관심사 계정은 돌아가며
             since = briefing.window_start(self.db).isoformat()  # 이보다 오래된 글까지 내려오면 스크롤 멈춤
             users = {}  # 응답에 실려 오는 계정 규모 (발굴 인기 기준용)
             tweets = x.collect(ctx, self.cfg, handles, progress, since, users)

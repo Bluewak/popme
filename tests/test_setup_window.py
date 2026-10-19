@@ -325,3 +325,11 @@ def test_ask_help_sends_recent_conversation(monkeypatch):
     assert p.index("[지금까지 대화]") < p.index("그래도 안 돼요")
     sw.ask_help("claude", "google", "처음 질문")
     assert "[지금까지 대화]" not in seen["prompt"]
+
+
+def test_set_value_appends_after_multiline_array():
+    """여러 줄 배열 뒤에 새 키를 붙여도 배열 안에 끼워 넣지 않는다 (관심사 설정 [news.picks.*])."""
+    text = '[a]\nx = "1"\nitems = [\n  "p",\n  "q",\n]\n\n[b]\ny = 2\n'
+    out = sw.set_value(text, "a", "z", ["r"], before=("b",))
+    out = sw.set_value(out, "a", "w", 3, before=("b",))
+    assert tomllib.loads(out)["a"] == {"x": "1", "items": ["p", "q"], "z": ["r"], "w": 3}

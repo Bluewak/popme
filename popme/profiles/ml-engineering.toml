@@ -14,6 +14,7 @@ criteria = """
 - 기법·논문은 재현 가능한 수치(처리량·지연·메모리)가 있는 것 1~2개만.
 """
 discovery = 'LLM 서빙·학습·GPU 인프라에 실질 정보를 주는 사람'
+topics = ['보안 권고', '서빙·추론 프레임워크', '오픈 웨이트 모델', 'GPU·클라우드 비용', '학습·파인튜닝']   # 「특히 궁금한 것」 보기 (관심사 설정 ⑤)
 
 [caps]                        # 묶음별 상한 (이 관심사 몫)
 '공식 변경내역' = 25
@@ -227,3 +228,93 @@ filter = 'ml'
 id = 'toss-tech'
 why = '토스 GPU·ML 글'
 filter = 'ml'
+
+# --- 사람·기업 (관심사 설정 ③④의 보기, X 계정은 2026-10-19 oEmbed로 있는지 확인) — default = false면 체크 안 된 채로 보임 ---
+
+[[people]]
+name = 'Sebastian Raschka'
+why = '모델 구조·학습 해설'
+x = 'rasbt'
+region = 'world'
+
+[[people]]
+name = 'Tri Dao'
+why = 'FlashAttention'
+x = 'tri_dao'
+region = 'world'
+
+[[people]]
+name = 'Horace He'
+why = 'PyTorch 성능'
+x = 'cHHillee'
+region = 'world'
+
+[[people]]
+name = 'Nathan Lambert'
+why = '오픈 모델·후학습'
+x = 'natolambert'
+region = 'world'
+
+[[people]]
+name = 'Dylan Patel'
+why = 'GPU·반도체 분석'
+x = 'dylan522p'
+region = 'world'
+
+[[people]]
+name = 'Georgi Gerganov'
+why = 'llama.cpp'
+x = 'ggerganov'
+region = 'world'
+
+[[people]]
+name = 'Soumith Chintala'
+why = 'PyTorch'
+x = 'soumithchintala'
+region = 'world'
+default = false
+
+[[people]]
+name = 'Clem Delangue'
+why = 'Hugging Face'
+x = 'ClementDelangue'
+region = 'world'
+default = false
+
+[[companies]]
+name = 'Hugging Face'
+why = '오픈 모델·라이브러리'
+x = 'huggingface'
+region = 'world'
+
+[[companies]]
+name = 'PyTorch'
+why = 'PyTorch 공식'
+x = 'PyTorch'
+region = 'world'
+
+[[companies]]
+name = 'vLLM'
+why = '서빙 엔진'
+x = 'vllm_project'
+region = 'world'
+
+[[companies]]
+name = 'NVIDIA AI Developer'
+why = 'GPU·추론 스택'
+x = 'NVIDIAAIDev'
+region = 'world'
+
+[[companies]]
+name = 'Together AI'
+why = '오픈 모델 추론'
+x = 'togethercompute'
+region = 'world'
+default = false
+
+[[companies]]
+name = 'LMSYS'
+why = 'SGLang·Arena'
+x = 'lmsysorg'
+region = 'world'
+default = false

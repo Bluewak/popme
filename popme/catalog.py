@@ -8,14 +8,22 @@ import re
 import tomllib
 from datetime import date
 from functools import lru_cache
+from urllib.parse import quote_plus
 
 from popme import config
 
 FEEDS_PATH = config.ROOT / "popme" / "feeds.toml"
 PROFILES_DIR = config.ROOT / "popme" / "profiles"
+CUSTOM_DIR = config.DATA_DIR / "profiles"  # 관심사 설정에서 새로 만든 관심사 (custom-*.toml, 내 PC에만)
 NOTICE = config.DATA_DIR / "news-migrated.txt"  # 예전 config를 옮겼다는 알림 (한 번 보이고 지운다)
 EXTRA_CAP = 15                       # 내가 더한 출처의 묶음이 관심사 상한표에 없을 때
 TOTAL_CAP = {0: 140, 1: 140, 2: 200}  # 고른 관심사 수 → 브리핑에 넘길 RSS 전체 상한 (3개 이상은 240)
+# 사람·기업 이름으로 받는 뉴스 검색 (docs/INTERESTS-DESIGN.md 4-3). 키 없음, 지금 RSS 모듈로 받는다
+NEWS_URL = "https://news.google.com/rss/search?q={q}+when:2d&{loc}"
+NEWS_LOC = {"kr": "hl=ko&gl=KR&ceid=KR:ko", "world": "hl=en-US&gl=US&ceid=US:en"}
+NEWS_GROUP, NEWS_CAP, NEWS_PER_FEED = "뉴스", 15, 5  # 관심사 하나당 뉴스 상한, 한 사람·기업당 상한 (한 명이 다 차지하지 않게)
+# 구글 뉴스에 섞여 드는 엉뚱한 사이트 (제목 끝 「 - 언론사」). 2026-10-19 「삼성전자 HBM」 70건 중 37건이 이것
+NEWS_SPAM = ["Calgary Roughnecks"]
 # 예전 config(관심사 없음)의 묶음별 상한 — 옮기기 전까지만 쓴다
 LEGACY_CAPS = {"공식 변경내역": 40, "공식 발표": 30, "실사용 검증": 15, "새 오픈소스·화제": 20, "한국 커뮤니티": 20}
 
@@ -29,7 +37,17 @@ def feeds():
 @lru_cache(maxsize=1)
 def _profiles():
     out = [tomllib.loads(p.read_text(encoding="utf-8")) for p in sorted(PROFILES_DIR.glob("*.toml"))]
+    for p in sorted(CUSTOM_DIR.glob("custom-*.toml")):  # 새로 만든 관심사 — 깨진 파일은 건너뛴다
+        try:
+            out.append({"order": 100, **tomllib.loads(p.read_text(encoding="utf-8")), "custom": True})
+        except (OSError, tomllib.TOMLDecodeError):
+            pass
     return sorted(out, key=lambda p: p.get("order", 99))
+
+
+def reload():
+    """관심사 파일을 새로 만들거나 고친 뒤 다시 읽게."""
+    getattr(_profiles, "cache_clear", lambda: None)()  # 테스트가 _profiles를 바꿔 끼웠을 수도 있다
 
 
 def profiles(drafts=False):
@@ -46,6 +64,63 @@ def chosen(cfg):
     n = news(cfg)
     ids = set(n.get("interests", []))
     return [p for p in profiles(n.get("drafts", False)) if p["id"] in ids]
+
+
+def picks(cfg, pid):
+    """관심사 설정에서 고친 사용자 몫 [news.picks.<id>]: scope·people·companies(체크한 이름)·topics·extra(직접 더한 것)."""
+    return news(cfg).get("picks", {}).get(pid, {})
+
+
+def entities(cfg, p):
+    """그 관심사에서 받을 사람·기업 [{kind, name, why, x, region, news, feeds}]. 고친 적이 없으면 기본 체크된 것."""
+    pk = picks(cfg, p["id"])
+    out = []
+    for kind, key in (("person", "people"), ("company", "companies")):
+        names = pk.get(key)
+        for e in p.get(key, []):
+            keep = e["name"] in names if names is not None else e.get("default", True) is not False
+            if keep:
+                out.append({**e, "kind": kind})
+    for e in pk.get("extra", []):
+        if e.get("name"):
+            out.append({"kind": "person", **e})
+    return out
+
+
+def scope(cfg, p):
+    return picks(cfg, p["id"]).get("scope") or p.get("scope") or "world"
+
+
+def news_feed(e, scope_):
+    """사람·기업 하나의 뉴스 검색 출처. 범위가 「한국어만」이거나 국내 사람·기업이면 한국어 기사, 아니면 영어 기사."""
+    loc = "kr" if scope_ == "kr" or e.get("region") == "kr" else "world"
+    q = e.get("news_en") if loc == "world" and e.get("news_en") else e["news"]  # 해외 기사는 원어 이름으로 찾아야 나온다
+    return {"id": f"news:{loc}:{q}", "name": f"뉴스 · {e['name']}" + ("" if loc == "kr" else " (해외)"),
+            "url": NEWS_URL.format(q=quote_plus(q), loc=NEWS_LOC[loc]), "group": NEWS_GROUP, "max_chars": 200,
+            "cap": NEWS_PER_FEED, "skip": " - (" + "|".join(re.escape(x) for x in NEWS_SPAM) + ")$"}
+
+
+def entity_feeds(cfg, p):
+    """사람·기업에서 나오는 출처: 뉴스 검색(news) + 확인된 공식 RSS(feeds)."""
+    sc = scope(cfg, p)
+    for e in entities(cfg, p):
+        if e.get("news"):
+            yield news_feed(e, sc)
+        for url in e.get("feeds", []):
+            yield {"id": f"site:{url}", "name": f"{e['name']} 공식", "url": url, "group": "공식 발표", "max_chars": 600}
+
+
+def x_accounts(cfg):
+    """고른 관심사의 사람·기업 중 X 계정이 확인된 것 [{handle, name, group, focus, interest}]. 꺼 둔 것(off의 x:handle)은 뺀다."""
+    off = {o.lower() for o in news(cfg).get("off", [])}
+    out = {}
+    for p in chosen(cfg):
+        for e in entities(cfg, p):
+            h = (e.get("x") or "").lstrip("@")
+            if h and f"x:{h}".lower() not in off:
+                out.setdefault(h.lower(), {"handle": h, "name": e["name"], "group": f"관심사 · {p['tag']}",
+                                          "focus": e.get("why", ""), "interest": p["id"]})
+    return list(out.values())
 
 
 def active(cfg):
@@ -66,6 +141,9 @@ def active(cfg):
             f = acc.setdefault(fid, {**cat[fid], **tweak.get(fid, {}), "interests": {}})
             filt = e.get("filter")
             f["interests"][p["id"]] = p.get("topic") if filt is True else (filt or None)
+        for f in entity_feeds(cfg, p):  # 사람·기업 이름으로 받는 뉴스·공식 RSS (거르지 않음 — 검색어가 이미 좁다)
+            if f["id"] not in off:
+                acc.setdefault(f["id"], {**f, "interests": {}})["interests"][p["id"]] = None
     picked = [p["id"] for p in chosen(cfg)]
     for r in cfg.get("rss", []):  # 내가 더한 출처
         if not r.get("url"):
@@ -90,6 +168,8 @@ def caps(cfg):
     for p in picked:
         for g, n in p.get("caps", {}).items():
             total[g] = total.get(g, 0) + n
+        if NEWS_GROUP not in p.get("caps", {}) and any(e.get("news") for e in entities(cfg, p)):
+            total[NEWS_GROUP] = total.get(NEWS_GROUP, 0) + NEWS_CAP
     for f in active(cfg):
         total.setdefault(f["group"], EXTRA_CAP)
     limit = TOTAL_CAP.get(len(picked), 240)

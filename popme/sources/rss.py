@@ -88,12 +88,14 @@ def _date(s):
     return d.astimezone(timezone.utc).isoformat()
 
 
-def fetch(feed):
-    """새 글 목록. 지난번과 바뀐 게 없으면(304) [] — 그때 받은 글은 이미 DB에 있다."""
+def fetch(feed, conditional=True, timeout=20):
+    """새 글 목록. 지난번과 바뀐 게 없으면(304) [] — 그때 받은 글은 이미 DB에 있다.
+    conditional=False면 캐시를 쓰지도 남기지도 않는다 (peek — 저장 안 하는 확인용 받기가 ETag를 남기면 첫 수집이 304로 비어 버린다)."""
     url = feed["url"]
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept-Encoding": "gzip", **_validators(url)})
+    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept-Encoding": "gzip",
+                                               **(_validators(url) if conditional else {})})
     try:
-        with urllib.request.urlopen(req, timeout=20) as r:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
             data, headers = r.read(), r.headers
     except urllib.error.HTTPError as e:
         if e.code == 304:
@@ -122,8 +124,14 @@ def fetch(feed):
             items.append({**base, "url": link, "title": _clean(e.findtext(f"{ATOM}title"), 200),
                           "summary": _clean(body, limit),
                           "published": _date(e.findtext(f"{ATOM}published") or e.findtext(f"{ATOM}updated"))})
-    _remember(url, headers)  # 읽어서 저장까지 된 다음에만 (중간에 깨지면 다음에 처음부터 다시 받게)
+    if conditional:
+        _remember(url, headers)  # 읽어서 저장까지 된 다음에만 (중간에 깨지면 다음에 처음부터 다시 받게)
     return [i for i in items if not (skip and skip.search(i["title"]))]
+
+
+def peek(url, limit=5, timeout=12):
+    """열어서 최근 글 몇 개만 본다 (관심사 설정에서 출처 확인용, 캐시 안 씀)."""
+    return fetch({"name": "", "url": url, "max_chars": 200}, conditional=False, timeout=timeout)[:limit]
 
 
 def describe(feed):

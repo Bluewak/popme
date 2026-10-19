@@ -16,6 +16,7 @@ criteria = """
 - 목록에 없는 사람이 만든 새 오픈소스·도구도 실제로 쓸 만하면 넣는다.
 """
 discovery = '에이전트·Claude Code·Codex·개발 도구에 실질 정보를 주는 사람'
+topics = ['요금·한도·혜택', '장애·보안', '새 기능·바뀐 기본값', '에이전트 사용법', '새 도구·오픈소스']   # 「특히 궁금한 것」 보기 (관심사 설정 ⑤)
 
 [caps]                        # 묶음별 상한 (이 관심사 몫)
 '공식 변경내역' = 45
@@ -173,3 +174,127 @@ why = '100점 넘은 AI 회사 글'
 [[feeds]]
 id = 'hn-ai-model'
 why = '100점 넘은 AI 모델 글'
+
+# --- 사람·기업 (관심사 설정 ③④의 보기, X 계정은 2026-10-19 oEmbed로 있는지 확인) — default = false면 체크 안 된 채로 보임 ---
+
+[[people]]
+name = 'Tibo'
+why = 'Codex 업데이트·사용량 공지'
+x = 'thsottiaux'
+region = 'world'
+
+[[people]]
+name = 'Boris Cherny'
+why = 'Claude Code 기능·사용법'
+x = 'bcherny'
+region = 'world'
+
+[[people]]
+name = 'Thariq Shihipar'
+why = 'Claude Code 기능·사용법'
+x = 'trq212'
+region = 'world'
+
+[[people]]
+name = 'Cat Wu'
+why = 'Claude Code 제품 방향·출시'
+x = '_catwu'
+region = 'world'
+
+[[people]]
+name = 'Alexander Embiricos'
+why = 'Codex 제품 방향·출시'
+x = 'embirico'
+region = 'world'
+
+[[people]]
+name = 'Mario Zechner'
+why = 'pi 하네스 설계·구현'
+x = 'badlogicgames'
+region = 'world'
+
+[[people]]
+name = 'Peter Steinberger'
+why = 'OpenClaw·에이전트 개발 도구'
+x = 'steipete'
+region = 'world'
+
+[[people]]
+name = 'Harrison Chase'
+why = 'LangChain·Deep Agents·메모리·평가'
+x = 'hwchase17'
+region = 'world'
+
+[[people]]
+name = 'Armin Ronacher'
+why = '에이전트 코딩 실전기'
+x = 'mitsuhiko'
+region = 'world'
+
+[[people]]
+name = 'Geoffrey Huntley'
+why = '에이전트 루프 패턴'
+x = 'GeoffreyHuntley'
+region = 'world'
+
+[[people]]
+name = 'Hamel Husain'
+why = '평가(evals) 실무'
+x = 'HamelHusain'
+region = 'world'
+
+[[people]]
+name = 'Simon Willison'
+why = '실험·활용법·비용/보안 함정'
+x = 'simonw'
+region = 'world'
+
+[[people]]
+name = 'swyx'
+why = 'AI 엔지니어링 업계 흐름'
+x = 'swyx'
+region = 'world'
+
+[[people]]
+name = 'Andrej Karpathy'
+why = '큰 흐름'
+x = 'karpathy'
+region = 'world'
+
+[[companies]]
+name = 'Anthropic'
+why = 'Claude·Claude Code 공식'
+x = 'AnthropicAI'
+region = 'world'
+
+[[companies]]
+name = 'Claude'
+why = 'Claude 앱·제품 공지'
+x = 'claudeai'
+region = 'world'
+
+[[companies]]
+name = 'OpenAI'
+why = 'ChatGPT·Codex 공식'
+x = 'OpenAI'
+region = 'world'
+
+[[companies]]
+name = 'OpenAI Developers'
+why = 'API·Codex 개발자 공지'
+x = 'OpenAIDevs'
+region = 'world'
+
+[[companies]]
+name = 'Google DeepMind'
+why = 'Gemini 모델'
+x = 'GoogleDeepMind'
+region = 'world'
+default = false
+
+[[companies]]
+name = 'Cursor'
+why = 'Cursor 공지'
+x = 'cursor_ai'
+region = 'world'
+default = false

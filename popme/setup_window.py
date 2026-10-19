@@ -299,9 +299,15 @@ def set_value(text, section, key, value, before=()):
         lines[i:j + 1] = (m.group(1) + new + rest).split("\n")
         return "\n".join(lines)
     last = s  # 표의 마지막 값 줄 뒤 (표 뒤의 빈 줄·다음 표 설명 주석 앞)
-    for i in range(s + 1, e):
-        if lines[i].strip() and not lines[i].lstrip().startswith("#"):
-            last = _value_end(lines, i, 0)[0]
+    i = s + 1
+    while i < e:
+        if lines[i].strip() and not lines[i].lstrip().startswith("#") and "=" in lines[i]:
+            rest = lines[i][lines[i].index("=") + 1:]
+            col = len(lines[i]) - len(rest.lstrip())
+            last = _value_end(lines, i, col)[0]  # 여러 줄 배열이면 닫는 줄까지 (안에 끼워 넣지 않게)
+            i = last + 1
+        else:
+            i += 1
     lines[last + 1:last + 1] = f"{key} = {new}".split("\n")
     return "\n".join(lines)
 
