@@ -1,6 +1,7 @@
 """수집 → 브리핑 파이프라인과 아침 스케줄."""
 import json
 import logging
+import socket
 import threading
 import time
 from datetime import datetime
@@ -28,6 +29,24 @@ BANNER_JS = """(() => {
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", add); else add();
 })()"""
+
+
+# 인터넷 확인: 이름을 찾고(DNS) 연결까지 되는지 — 2026-10-20 아침 09:00에 인터넷이 끊겨 있었는데 그대로 모아서
+# 출처 176곳 실패·X 「응답 구조가 바뀐 것 같아요」(오진)·묵은 자료로 만든 브리핑이 나왔다
+NET_HOSTS = [("www.gstatic.com", 443), ("github.com", 443), ("www.naver.com", 443)]
+OFFLINE = "인터넷이 끊겨서"
+RETRY_OFFLINE = 3  # 하루에 「연결되면 다시 모으기」를 몇 번까지
+
+
+def online(timeout=4):
+    """인터넷이 되나: 알려진 곳 중 하나라도 이름을 찾고 연결되면 참."""
+    for host, port in NET_HOSTS:
+        try:
+            socket.create_connection((host, port), timeout=timeout).close()
+            return True
+        except OSError:
+            continue
+    return False
 
 
 def missed(names):
@@ -79,6 +98,8 @@ class Jobs:
         self.lock = threading.Lock()
         self.state = {"running": False, "status": "대기 중", "warnings": [], "last_run": None}
         self._tried = None
+        self.offline_retry = False  # 인터넷이 끊겨 멈춤 → 연결되면 아침 자동 수집을 다시
+        self._retries = 0
 
     def _progress(self, s):
         self.state["status"] = s
@@ -205,7 +226,10 @@ class Jobs:
         return save
 
     def _fail(self, what, e):
-        """수집 경고 한 줄 (사람 말). Chrome이 닫힌 거면 CHROME_CLOSED로 시작 — 끝나고 「다시 모으기」를 띄운다."""
+        """수집 경고 한 줄 (사람 말). Chrome이 닫힌 거면 CHROME_CLOSED로 시작 — 끝나고 「다시 모으기」를 띄운다.
+        인터넷이 끊긴 거면 그렇게 말한다 (빈 응답을 「X 응답 구조가 바뀐 것 같아요」로 오진하지 않게)."""
+        if not online():
+            return f"{OFFLINE} {missed([what])} 이번에 못 모았어요"
         if chrome_closed(e):
             if self is not None:
                 self._closed.append(what)
@@ -236,12 +260,17 @@ class Jobs:
         warnings, self._closed = [], []  # _closed: Chrome이 닫혀 못 모은 것 (X·Threads·일정)
         try:
             self.state.update(running=True, warnings=[])
+            if collect and not online():  # 처음부터 끊겨 있으면 모으지도, 묵은 자료로 브리핑을 만들지도 않는다
+                return self._offline(warnings, "인터넷이 연결돼 있지 않아서 모으지 않았어요. 연결되면 다시 모을게요")
             if collect:
                 self._browser_collect(warnings)
                 self._progress("RSS 수집 중")
-                items, errs = sources.collect(catalog.active(self.cfg), self._progress)
+                feeds = catalog.active(self.cfg)
+                items, errs = sources.collect(feeds, self._progress)
                 self.db.upsert_items(items)
                 warnings += [f"RSS 실패 — {e}" for e in errs]
+                if len(errs) >= max(5, len(feeds) // 2) and not online():  # 모으는 도중에 끊김
+                    return self._offline(warnings, "인터넷이 끊겨서 이번엔 거의 못 모았어요. 연결되면 다시 모을게요")
             if make_brief:
                 self._progress(f"브리핑 작성 중 ({llm.provider_name(self.cfg)})")
                 date, md, payload = briefing.make_briefing(self.cfg, self.db)
@@ -264,6 +293,14 @@ class Jobs:
             self.state.update(running=False, warnings=warnings, last_run=datetime.now().strftime("%H:%M"))
             self.lock.release()
 
+    def _offline(self, warnings, text):
+        """인터넷이 없어서 멈춤: 경고는 한 줄로, 브리핑은 만들지 않고, 아침 자동 수집이면 연결되면 다시 (morning_loop)."""
+        log.warning(text)
+        warnings[:] = [text]
+        self.offline_retry = True
+        self._progress("인터넷 연결을 기다리는 중")
+        self.notify("offline", text)
+
     def run_full(self, force=False, blocking=False, make_brief=True, collect=True):
         """collect=False면 수집 없이 저장된 데이터로 브리핑만 다시 만든다."""
         if not self.lock.acquire(blocking=False):
@@ -274,16 +311,29 @@ class Jobs:
             threading.Thread(target=self._run, args=(make_brief, collect), daemon=True).start()
         return True
 
+    def morning_tick(self, now):
+        """지정 시각이 지났는데 오늘 브리핑이 없으면 실행. 인터넷이 없으면 연결될 때까지 기다렸다가 (몇 분이 걸려도) 그때 모은다.
+        모으다 끊겼으면 연결되면 다시 (하루 RETRY_OFFLINE번까지). 반환: 실행했나."""
+        after = self.cfg.get("schedule", {}).get("briefing_after", "09:00")
+        if now.strftime("%H:%M") < after or self.db.briefing_for(now.strftime("%Y-%m-%d")) or self.state["running"]:
+            return False
+        retry = self.offline_retry and self._retries < RETRY_OFFLINE
+        if self._tried == now.date() and not retry:
+            return False  # 실패해도 자동 실행은 하루 한 번만 (인터넷이 끊겨 멈춘 건 빼고)
+        if not online():
+            if self.state["status"] != "인터넷 연결을 기다리는 중":
+                self._progress("인터넷 연결을 기다리는 중")
+            return False
+        self._retries = self._retries + 1 if self._tried == now.date() else 0
+        self._tried = now.date()
+        self.offline_retry = False
+        return self.run_full()
+
     def morning_loop(self):
-        """앱이 켜져 있는 동안 1분마다: 지정 시각이 지났는데 오늘 브리핑이 없으면 실행."""
+        """앱이 켜져 있는 동안 1분마다 morning_tick."""
         while True:
             try:
-                after = self.cfg.get("schedule", {}).get("briefing_after", "09:00")
-                now = datetime.now()
-                if now.strftime("%H:%M") >= after and not self.db.briefing_for(now.strftime("%Y-%m-%d")):
-                    if not self.state["running"] and self._tried != now.date():
-                        self._tried = now.date()   # 실패해도 자동 실행은 하루 한 번만
-                        self.run_full()
+                self.morning_tick(datetime.now())
             except Exception:
                 log.exception("스케줄 확인 실패")
             time.sleep(60)

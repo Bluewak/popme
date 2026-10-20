@@ -45,3 +45,10 @@ def no_custom_profiles(monkeypatch, tmp_path):
 def no_x_visits(monkeypatch, tmp_path):
     from popme import briefing
     monkeypatch.setattr(briefing, "X_VISITS", tmp_path / "x-visits.json")
+
+
+@pytest.fixture(autouse=True)
+def assume_online(monkeypatch):
+    """테스트는 인터넷 확인을 하지 않는다 (있다고 놓음). 끊긴 경우는 test_offline.py에서 바꿔 끼운다."""
+    from popme import jobs
+    monkeypatch.setattr(jobs, "online", lambda timeout=4: True)
