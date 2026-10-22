@@ -115,3 +115,58 @@ def test_rss_broken_body_is_not_remembered(monkeypatch):
     with pytest.raises(Exception):
         rss.fetch({"name": "x", "url": "https://e/x"})
     assert "https://e/x" not in rss._load()
+
+
+def test_transient_errors_are_retried_once(monkeypatch):
+    """502·429·403·시간 초과면 몇 초 뒤 한 번 더 (2026-10 hnrss 502·r/Rag 429·OWASP 403이 매번 경고로 쌓였다). 404는 바로 실패."""
+    import urllib.error
+    calls = {}
+
+    def fetch(feed):
+        n = calls[feed["name"]] = calls.get(feed["name"], 0) + 1
+        code = feed["code"]
+        if code and (n == 1 or code == 404):
+            raise urllib.error.HTTPError(feed["url"], code, "x", {}, None)
+        return [{"source": feed["name"], "grp": "g", "url": feed["url"], "title": "t", "summary": "", "published": None}]
+    monkeypatch.setattr(sources.rss, "fetch", fetch)
+    waits = []
+    monkeypatch.setattr(sources.time, "sleep", waits.append)
+    feeds = [{"name": n, "url": f"https://{n}.example/feed", "code": c} for n, c in [("a", 502), ("b", 429), ("c", 404), ("d", None)]]
+    items, errs = sources.collect(feeds)
+    assert sorted(i["source"] for i in items) == ["a", "b", "d"]
+    assert len(errs) == 1 and errs[0].startswith("c:")
+    assert calls == {"a": 2, "b": 2, "c": 1, "d": 1} and sorted(waits) == [3, 8]
+
+
+def test_hn_module_reads_algolia(monkeypatch):
+    """Hacker News는 Algolia를 직접 (hnrss보다 빠르고 502가 없다). 글 모양은 hnrss와 같게."""
+    import json
+    from popme.sources import hn
+    seen = {}
+    body = {"hits": [
+        {"objectID": "1", "title": "Claude Duet", "url": "https://a.example/x", "points": 334, "num_comments": 120, "created_at_i": 1760000000},
+        {"objectID": "2", "title": "Ask HN: Emacs and MCP?", "url": None, "points": 150, "num_comments": 3, "story_text": "<p>hi</p>", "created_at_i": 1760000000},
+        {"objectID": "3", "title": "low", "url": "https://b.example", "points": 50, "created_at_i": 1760000000}]}
+
+    class R:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+        def read(self):
+            return json.dumps(body).encode()
+
+    def urlopen(req, timeout=20):
+        seen["url"] = req.full_url
+        return R()
+    monkeypatch.setattr(hn.urllib.request, "urlopen", urlopen)
+    feed = {"name": "Hacker News AI 회사", "type": "hn", "words": "Claude OpenAI", "points": 100, "group": "새 오픈소스·화제", "skip": "Emacs"}
+    items = sources.module(feed).fetch(feed)
+    assert "optionalWords=Claude+OpenAI" in seen["url"] and "points%3E%3D100" in seen["url"]
+    assert [i["url"] for i in items] == ["https://a.example/x"]  # 점수 미달·skip은 뺀다
+    assert "Comments URL: https://news.ycombinator.com/item?id=1" in items[0]["summary"] and "Points: 334" in items[0]["summary"]
+    front = {"name": "Hacker News 인기", "type": "hn", "front": True, "points": 300}
+    hn.fetch(front)
+    assert "tags=front_page" in seen["url"]
