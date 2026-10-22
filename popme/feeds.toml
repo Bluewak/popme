@@ -2,6 +2,7 @@
 # id는 절대 바꾸지 않는다 (config의 off·on·tweak이 id로 가리킨다). 같은 출처의 주소만 바뀌면 url만 고친다.
 # name을 바꾸면 old_names에 예전 이름을 남긴다 (DB에 저장된 글이 이름으로 이어져 있다).
 # group = 묶음(브리핑에 넘길 때 상한 단위·화면에서 접히는 그룹), type = 출처 모듈 (없으면 rss — popme/sources/)
+# type = 'hn': Hacker News 검색(Algolia 직접, popme/sources/hn.py) — words(이 중 하나라도)·points·front
 # skip = 빼고 싶은 제목(정규식). via = "mirror"면 공식 RSS가 없어 github.com/Olshansk/rss-feeds 미러를 쓴다 (멈추기 쉬움)
 # 2026-10 직군별 조사(AI 코딩·데이터 사이언스·ML 엔지니어링·엔터프라이즈 도입·LLM 앱)에서 실제로 열어 확인한 것들
 
@@ -118,19 +119,28 @@ max_chars = 300
 
 [feed.hn-front]
 name = 'Hacker News 인기'
-url = 'https://hnrss.org/frontpage?points=300'
+url = 'https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=50'
+type = 'hn'
+front = true
+points = 300
 group = '새 오픈소스·화제'
 max_chars = 200
 
 [feed.hn-ai-company]
 name = 'Hacker News AI 회사'
-url = 'https://hnrss.org/newest?q=Claude+OR+OpenAI+OR+Anthropic+OR+Codex&points=100'
+url = 'https://hn.algolia.com/api/v1/search_by_date?query=Claude+OpenAI+Anthropic+Codex&optionalWords=Claude+OpenAI+Anthropic+Codex&tags=story&numericFilters=points%3E%3D100&hitsPerPage=20'
+type = 'hn'
+words = 'Claude OpenAI Anthropic Codex'
+points = 100
 group = '새 오픈소스·화제'
 max_chars = 200
 
 [feed.hn-ai-model]
 name = 'Hacker News AI 모델'
-url = 'https://hnrss.org/newest?q=LLM+OR+Gemini+OR+Grok+OR+xAI+OR+Llama&points=100'
+url = 'https://hn.algolia.com/api/v1/search_by_date?query=LLM+Gemini+Grok+xAI+Llama&optionalWords=LLM+Gemini+Grok+xAI+Llama&tags=story&numericFilters=points%3E%3D100&hitsPerPage=20'
+type = 'hn'
+words = 'LLM Gemini Grok xAI Llama'
+points = 100
 group = '새 오픈소스·화제'
 max_chars = 200
 
@@ -424,7 +434,10 @@ max_chars = 300
 
 [feed.hn-data]
 name = 'Hacker News 데이터'
-url = 'https://hnrss.org/newest?q=DuckDB+OR+Polars+OR+pandas+OR+Jupyter+OR+statistics+OR+Bayesian&points=50'
+url = 'https://hn.algolia.com/api/v1/search_by_date?query=DuckDB+Polars+pandas+Jupyter+statistics+Bayesian&optionalWords=DuckDB+Polars+pandas+Jupyter+statistics+Bayesian&tags=story&numericFilters=points%3E%3D50&hitsPerPage=20'
+type = 'hn'
+words = 'DuckDB Polars pandas Jupyter statistics Bayesian'
+points = 50
 group = '새 오픈소스·화제'
 max_chars = 200
 
@@ -676,13 +689,19 @@ note = '[AINews] 일간 요약 포함'
 
 [feed.hn-open-models]
 name = 'Hacker News 오픈 모델'
-url = 'https://hnrss.org/newest?q=Qwen+OR+DeepSeek&points=100'
+url = 'https://hn.algolia.com/api/v1/search_by_date?query=Qwen+DeepSeek&optionalWords=Qwen+DeepSeek&tags=story&numericFilters=points%3E%3D100&hitsPerPage=20'
+type = 'hn'
+words = 'Qwen DeepSeek'
+points = 100
 group = '새 오픈소스·화제'
 max_chars = 200
 
 [feed.hn-open-weight]
 name = 'Hacker News 오픈 웨이트'
-url = 'https://hnrss.org/newest?q=open-weight&points=100'
+url = 'https://hn.algolia.com/api/v1/search_by_date?query=open-weight&optionalWords=open-weight&tags=story&numericFilters=points%3E%3D100&hitsPerPage=20'
+type = 'hn'
+words = 'open-weight'
+points = 100
 group = '새 오픈소스·화제'
 max_chars = 200
 
@@ -859,7 +878,10 @@ max_chars = 300
 
 [feed.hn-enterprise]
 name = 'Hacker News 엔터프라이즈'
-url = 'https://hnrss.org/newest?q=Bedrock+OR+Azure+OR+Vertex+OR+MCP&points=100'
+url = 'https://hn.algolia.com/api/v1/search_by_date?query=Bedrock+Azure+Vertex+MCP&optionalWords=Bedrock+Azure+Vertex+MCP&tags=story&numericFilters=points%3E%3D100&hitsPerPage=20'
+type = 'hn'
+words = 'Bedrock Azure Vertex MCP'
+points = 100
 group = '새 오픈소스·화제'
 max_chars = 200
 skip = 'Emacs'
@@ -1025,7 +1047,10 @@ max_chars = 400
 
 [feed.hn-rag]
 name = 'Hacker News RAG'
-url = 'https://hnrss.org/newest?q=RAG+OR+embeddings+OR+reranker+OR+LangChain&points=40'
+url = 'https://hn.algolia.com/api/v1/search_by_date?query=RAG+embeddings+reranker+LangChain&optionalWords=RAG+embeddings+reranker+LangChain&tags=story&numericFilters=points%3E%3D40&hitsPerPage=20'
+type = 'hn'
+words = 'RAG embeddings reranker LangChain'
+points = 40
 group = '새 오픈소스·화제'
 max_chars = 200
 
