@@ -335,3 +335,57 @@ def test_interests_only_window_saves_just_interests():
     assert after["news"]["picks"]["ai-coding"] == {"topics": ["장애·보안"]}
     assert {k: v for k, v in after.items() if k != "news"} == {k: v for k, v in before.items() if k != "news"}
     assert api.save_interests({"chosen": [], "picks": {}, "customs": []})["ok"] is False
+
+
+# ---------------------------------------------------------------- 미리 만든 관심사의 「대상」 질문 (쓰는 도구 등)
+
+def test_target_options_point_to_real_feeds_and_companies():
+    feeds = catalog.feeds()
+    for p in catalog.profiles():
+        if p.get("custom"):
+            continue
+        assert p.get("target", {}).get("options"), p["id"]
+        used = {e["id"] for e in p["feeds"]}
+        names = {e["name"] for e in p.get("companies", [])}
+        for o in p["target"]["options"]:
+            assert set(o.get("feeds", [])) <= used & set(feeds), (p["id"], o["label"])
+            assert set(o.get("companies", [])) <= names, (p["id"], o["label"])
+
+
+def test_uses_default_from_my_tools_then_picks():
+    ai = next(p for p in catalog.profiles() if p["id"] == "ai-coding")
+    cfg = {**news(interests=["ai-coding"]), "user": {"tools": "Claude Code, Copilot"}}
+    assert catalog.uses(cfg, ai) == ["Claude Code"]  # 「pi」가 「Copilot」에서 걸리지 않는다, 「GitHub Copilot」은 단어가 달라 안 걸림
+    cfg["user"]["tools"] = "Claude Code, GitHub Copilot, pi"
+    assert catalog.uses(cfg, ai) == ["Claude Code", "GitHub Copilot", "pi"]
+    cfg["news"]["picks"] = {"ai-coding": {"uses": ["Cursor"]}}
+    assert catalog.uses(cfg, ai) == ["Cursor"]
+
+
+def test_chosen_tool_turns_on_its_feeds_and_company_but_keeps_others():
+    cfg = {**news(interests=["ai-coding"], picks={"ai-coding": {"uses": ["Claude Code", "Cursor"]}}), "user": {"tools": "Claude Code"}}
+    names = {f["name"] for f in catalog.active(cfg)}
+    assert "Cursor 변경내역" in names  # 기본 꺼짐이어도 켠다
+    assert "Gemini CLI 릴리스" in names  # 안 고른 도구도 그대로 받는다 (사용자 결정)
+    assert "Windsurf 변경내역" not in names  # 기본 꺼짐 + 안 고름 → 그대로 꺼짐
+    ai = next(p for p in catalog.profiles() if p["id"] == "ai-coding")
+    assert "Cursor" in [e["name"] for e in catalog.entities(cfg, ai)]
+    assert "cursor_ai" in [a["handle"] for a in catalog.x_accounts(cfg)]
+    assert catalog.user_tools(cfg) == "Claude Code, Cursor"
+    assert "내가 쓰는 것: Claude Code·Cursor" in briefing.rules_for(cfg)["criteria"]
+
+
+def test_preset_view_and_save_uses():
+    from popme import setup_window as sw
+    cfg = {**news(interests=["ai-coding"]), "user": {"tools": "Claude Code"}}
+    view = interests.preset_view("ai-coding", cfg)
+    assert view["target"]["text"] == "쓰는 코딩 도구는?"
+    assert [o["label"] for o in view["target"]["options"] if o["on"]] == ["Claude Code"]
+    sw.write(sw.base_text())
+    r = sw.Api({"start": "edit", "pid": "ai-coding"}).save_interests(
+        {"chosen": ["ai-coding"], "picks": {"ai-coding": {"uses": ["Claude Code", "Codex", "Zed"]}}, "customs": []})
+    assert r == {"ok": True}
+    saved = config.load()
+    assert saved["news"]["picks"]["ai-coding"]["uses"] == ["Claude Code", "Codex", "Zed"]
+    view = interests.preset_view("ai-coding", saved)
+    assert [o["label"] for o in view["target"]["options"] if o["on"]] == ["Claude Code", "Codex", "Zed"]  # 직접 적은 것도

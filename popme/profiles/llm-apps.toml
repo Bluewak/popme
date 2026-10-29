@@ -308,3 +308,70 @@ why = '임베딩·리랭커'
 x = 'cohere'
 region = 'world'
 default = false
+
+# --- 「대상」 질문 (관심사 설정 첫 질문): 고른 보기의 출처는 기본 꺼짐이어도 켜고, 회사도 체크한다.
+#     안 고른 보기의 출처도 그대로 받는다 (업계 흐름은 놓치지 않게). 「주로 쓰는 도구」·브리핑 기준에도 쓴다 ---
+[target]
+text = '쓰는 프레임워크·벡터 DB는?'
+
+[[target.options]]
+label = 'LangChain·LangGraph'
+feeds = ['langchain-changelog', 'langgraph-releases', 'langsmith-changelog', 'langchain-blog']
+companies = ['LangChain']
+
+[[target.options]]
+label = 'LlamaIndex'
+feeds = ['llamaindex-releases']
+companies = ['LlamaIndex']
+
+[[target.options]]
+label = 'DSPy'
+feeds = ['dspy-releases']
+
+[[target.options]]
+label = 'Haystack'
+feeds = ['haystack-releases']
+
+[[target.options]]
+label = 'Qdrant'
+feeds = ['qdrant-releases', 'qdrant-blog']
+companies = ['Qdrant']
+
+[[target.options]]
+label = 'Milvus'
+feeds = ['milvus-releases']
+
+[[target.options]]
+label = 'Weaviate'
+feeds = ['weaviate-releases', 'weaviate-blog']
+companies = ['Weaviate']
+
+[[target.options]]
+label = 'pgvector'
+feeds = ['pgvector-tags']
+
+[[target.options]]
+label = 'Chroma'
+feeds = ['chroma-releases']
+
+[[target.options]]
+label = 'Pinecone'
+feeds = ['pinecone-blog']
+companies = ['Pinecone']
+
+[[target.options]]
+label = 'Langfuse'
+feeds = ['langfuse-releases']
+
+[[target.options]]
+label = 'Arize Phoenix'
+feeds = ['phoenix-releases']
+
+[[target.options]]
+label = 'Docling·Unstructured'
+feeds = ['docling-releases', 'unstructured-releases']
+
+[[target.options]]
+label = 'Cohere·Voyage (임베딩)'
+feeds = ['cohere-blog', 'voyage-blog']
+companies = ['Cohere']

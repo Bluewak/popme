@@ -282,3 +282,64 @@ name = '네이버클라우드'
 why = 'HyperCLOVA X·공공 클라우드'
 region = 'kr'
 news = '"네이버클라우드"'
+
+# --- 「대상」 질문 (관심사 설정 첫 질문): 고른 보기의 출처는 기본 꺼짐이어도 켜고, 회사도 체크한다.
+#     안 고른 보기의 출처도 그대로 받는다 (업계 흐름은 놓치지 않게). 「주로 쓰는 도구」·브리핑 기준에도 쓴다 ---
+[target]
+text = '고객사가 주로 쓰는 클라우드·AI는?'
+
+[[target.options]]
+label = 'AWS'
+feeds = ['aws-whatsnew', 'aws-korea']
+companies = ['AWS']
+
+[[target.options]]
+label = 'Azure'
+feeds = ['azure-updates', 'foundry-blog']
+companies = ['Microsoft Azure']
+
+[[target.options]]
+label = 'Google Cloud'
+feeds = ['google-cloud-ai', 'geap-rn']
+companies = ['Google Cloud']
+
+[[target.options]]
+label = 'Microsoft 365 Copilot'
+feeds = ['m365-roadmap']
+
+[[target.options]]
+label = 'OpenAI'
+feeds = ['openai-news', 'openai-dev-blog']
+companies = ['OpenAI']
+
+[[target.options]]
+label = 'Anthropic'
+feeds = ['anthropic-news', 'claude-blog']
+companies = ['Anthropic']
+
+[[target.options]]
+label = 'Cohere'
+feeds = ['cohere-blog']
+
+[[target.options]]
+label = '네이버클라우드'
+feeds = ['naver-cloud']
+companies = ['네이버클라우드']
+
+[[target.options]]
+label = 'KT Cloud'
+feeds = ['kt-cloud']
+
+[[target.options]]
+label = 'NHN Cloud'
+feeds = ['nhn-cloud']
+
+[[target.options]]
+label = '업스테이지'
+feeds = []
+companies = ['업스테이지']
+
+[[target.options]]
+label = 'LG EXAONE'
+feeds = []
+companies = ['LG AI연구원']

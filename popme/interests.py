@@ -412,7 +412,13 @@ def preset_view(pid, cfg):
     pk = catalog.picks(cfg, pid)
     chosen = {e["name"] for e in catalog.entities(cfg, p)}
     view = lambda key, kind: [{**e, "kind": kind, "on": e["name"] in chosen} for e in p.get(key, [])]
+    used = set(catalog.uses(cfg, p))
+    target = p.get("target")
     return {"id": pid, "name": p["name"], "tag": p["tag"], "scope": catalog.scope(cfg, p),
+            "target": {"text": target["text"], "options": [{"label": o["label"], "on": o["label"] in used} for o in target.get("options", [])]
+                                                 + [{"label": u, "on": True, "added": True} for u in used
+                                                    if u not in {o["label"] for o in target.get("options", [])}]}
+            if target else None,
             "people": view("people", "person") + [{"kind": "person", **e, "on": True, "added": True}
                                                   for e in pk.get("extra", []) if e.get("kind", "person") == "person"],
             "companies": view("companies", "company") + [{**e, "on": True, "added": True}
