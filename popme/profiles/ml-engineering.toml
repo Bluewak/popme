@@ -318,3 +318,58 @@ why = 'SGLang·Arena'
 x = 'lmsysorg'
 region = 'world'
 default = false
+
+# --- 「대상」 질문 (관심사 설정 첫 질문): 고른 보기의 출처는 기본 꺼짐이어도 켜고, 회사도 체크한다.
+#     안 고른 보기의 출처도 그대로 받는다 (업계 흐름은 놓치지 않게). 「주로 쓰는 도구」·브리핑 기준에도 쓴다 ---
+[target]
+text = '쓰는 학습·서빙 스택은?'
+
+[[target.options]]
+label = 'PyTorch'
+feeds = ['pytorch-releases', 'pytorch-blog']
+companies = ['PyTorch']
+
+[[target.options]]
+label = 'Hugging Face'
+feeds = ['transformers-releases', 'hf-hub-releases', 'trl-releases', 'peft-releases']
+companies = ['Hugging Face']
+
+[[target.options]]
+label = 'vLLM'
+feeds = ['vllm-releases', 'vllm-blog']
+companies = ['vLLM']
+
+[[target.options]]
+label = 'SGLang'
+feeds = ['sglang-releases']
+companies = ['LMSYS']
+
+[[target.options]]
+label = 'TensorRT-LLM·Triton'
+feeds = ['trtllm-releases', 'triton-server-releases', 'dynamo-releases']
+companies = ['NVIDIA AI Developer']
+
+[[target.options]]
+label = 'Ollama·llama.cpp'
+feeds = ['ollama-releases', 'ollama-blog', 'llama-cpp-releases']
+
+[[target.options]]
+label = 'Ray'
+feeds = ['ray-releases']
+
+[[target.options]]
+label = 'DeepSpeed·Megatron'
+feeds = ['deepspeed-releases', 'megatron-releases', 'transformer-engine-releases']
+
+[[target.options]]
+label = 'Unsloth'
+feeds = ['unsloth-releases']
+
+[[target.options]]
+label = 'KServe'
+feeds = ['kserve-releases']
+
+[[target.options]]
+label = 'Together AI'
+feeds = ['together-blog']
+companies = ['Together AI']

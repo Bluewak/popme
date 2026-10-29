@@ -298,3 +298,52 @@ why = 'Cursor 공지'
 x = 'cursor_ai'
 region = 'world'
 default = false
+
+# --- 「대상」 질문 (관심사 설정 첫 질문): 고른 보기의 출처는 기본 꺼짐이어도 켜고, 회사도 체크한다.
+#     안 고른 보기의 출처도 그대로 받는다 (업계 흐름은 놓치지 않게). 「주로 쓰는 도구」·브리핑 기준에도 쓴다 ---
+[target]
+text = '쓰는 코딩 도구는?'
+
+[[target.options]]
+label = 'Claude Code'
+feeds = ['claude-code-releases']
+companies = ['Anthropic', 'Claude']
+
+[[target.options]]
+label = 'Codex'
+feeds = ['codex-releases', 'codex-changelog']
+companies = ['OpenAI', 'OpenAI Developers']
+
+[[target.options]]
+label = 'Gemini CLI'
+feeds = ['gemini-cli-releases']
+companies = ['Google DeepMind']
+
+[[target.options]]
+label = 'Cursor'
+feeds = ['cursor-changelog']
+companies = ['Cursor']
+
+[[target.options]]
+label = 'GitHub Copilot'
+feeds = ['copilot-changelog']
+
+[[target.options]]
+label = 'Windsurf'
+feeds = ['windsurf-changelog']
+
+[[target.options]]
+label = 'Cline'
+feeds = ['cline-releases']
+
+[[target.options]]
+label = 'opencode'
+feeds = ['opencode-releases']
+
+[[target.options]]
+label = 'pi'
+feeds = ['pi-releases']
+
+[[target.options]]
+label = 'OpenClaw'
+feeds = ['openclaw-releases']

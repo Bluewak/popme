@@ -340,3 +340,61 @@ why = 'RStudio·Python 도구'
 x = 'posit_pbc'
 region = 'world'
 default = false
+
+# --- 「대상」 질문 (관심사 설정 첫 질문): 고른 보기의 출처는 기본 꺼짐이어도 켜고, 회사도 체크한다.
+#     안 고른 보기의 출처도 그대로 받는다 (업계 흐름은 놓치지 않게). 「주로 쓰는 도구」·브리핑 기준에도 쓴다 ---
+[target]
+text = '쓰는 도구·플랫폼은?'
+
+[[target.options]]
+label = 'pandas'
+feeds = ['pandas-releases']
+
+[[target.options]]
+label = 'Polars'
+feeds = ['polars-releases']
+
+[[target.options]]
+label = 'scikit-learn'
+feeds = ['sklearn-releases', 'sklearn-blog']
+
+[[target.options]]
+label = 'DuckDB'
+feeds = ['duckdb-releases', 'duckdb-blog']
+companies = ['DuckDB']
+
+[[target.options]]
+label = 'dbt'
+feeds = ['dbt-core-releases', 'dbt-blog']
+companies = ['dbt Labs']
+
+[[target.options]]
+label = 'Snowflake'
+feeds = ['snowflake-blog']
+companies = ['Snowflake']
+
+[[target.options]]
+label = 'Databricks'
+feeds = ['databricks-rn']
+companies = ['Databricks']
+
+[[target.options]]
+label = 'BigQuery·Looker'
+feeds = ['bigquery-rn', 'looker-rn']
+
+[[target.options]]
+label = 'Power BI·Fabric'
+feeds = ['powerbi-blog', 'fabric-blog']
+
+[[target.options]]
+label = 'R·Posit'
+feeds = ['posit-blog']
+companies = ['Posit']
+
+[[target.options]]
+label = 'Jupyter·marimo'
+feeds = ['jupyterlab-releases', 'marimo-releases']
+
+[[target.options]]
+label = 'MLflow'
+feeds = ['mlflow-releases']

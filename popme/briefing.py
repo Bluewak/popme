@@ -125,8 +125,11 @@ def rules_for(cfg):
     def crit(p):  # 관심사 설정 ⑤에서 고른 「특히 궁금한 것」이 있으면 덧붙인다
         topics_ = catalog.picks(cfg, p["id"]).get("topics") or (p.get("topics") if p.get("custom") else None)
         picked = " / ".join(f"{k}: {'·'.join(v)}" for k, v in (p.get("answers") or {}).items() if v)  # 관심사 설정에서 고른 것
+        used = catalog.uses(cfg, p)
         return (p["criteria"].strip() + (f"\n- 특히 궁금한 것: {'·'.join(topics_)} — 이 주제를 먼저 고른다." if topics_ else "")
-                + (f"\n- 고른 것: {picked} — 이것과 관련된 소식을 먼저 고른다." if picked else ""))
+                + (f"\n- 고른 것: {picked} — 이것과 관련된 소식을 먼저 고른다." if picked else "")
+                + (f"\n- 내가 쓰는 것: {'·'.join(used)} — 이것의 변화(새 기능·기본값·요금·단종)를 먼저 고른다. 다른 것은 큰 소식만."
+                   if used else ""))
     if len(profs) == 1:
         criteria = crit(profs[0])
     else:
@@ -481,7 +484,7 @@ def make_briefing(cfg, db):
     ch = Character()
     user = cfg.get("user", {})
     prompt = _fill(BRIEFING_RULES, **rules_for(cfg), title_rules=TITLE_RULES, plan=user.get("plan", ""),
-                   tools=user.get("tools", "Claude Code"), persona=ch.cfg["persona"]["prompt"],
+                   tools=catalog.user_tools(cfg), persona=ch.cfg["persona"]["prompt"],
                    name=ch.name, n_lines=ch.beh["daily_generated_lines"]) + f"\n<data>\n{data}\n</data>"
     text = llm.ask(cfg, SYSTEM, prompt)
     try:

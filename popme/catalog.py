@@ -71,14 +71,43 @@ def picks(cfg, pid):
     return news(cfg).get("picks", {}).get(pid, {})
 
 
-def entities(cfg, p):
-    """그 관심사에서 받을 사람·기업 [{kind, name, why, x, region, news, feeds}]. 고친 적이 없으면 기본 체크된 것."""
+def uses(cfg, p):
+    """「대상」 질문(쓰는 도구 등)에서 고른 보기 label들. 고친 적이 없으면 설정의 「주로 쓰는 도구」에 이름이 들어 있는 보기."""
     pk = picks(cfg, p["id"])
+    if "uses" in pk:
+        return list(pk["uses"])
+    mine = (cfg.get("user", {}).get("tools") or "").lower()
+
+    def named(part):  # 단어로: 「pi」가 「Copilot」 안에서 걸리지 않게
+        return bool(re.search(rf"(?<![a-z0-9]){re.escape(part.strip().lower())}(?![a-z0-9])", mine))
+    return [o["label"] for o in p.get("target", {}).get("options", [])
+            if any(named(part) for part in o["label"].replace("·", "/").split("/") if part.strip())]
+
+
+def used_options(cfg, p):
+    want = set(uses(cfg, p))
+    return [o for o in p.get("target", {}).get("options", []) if o["label"] in want]
+
+
+def user_tools(cfg):
+    """브리핑의 「주로 쓰는 도구」: 설정 값 + 관심사 「대상」 질문에서 고른 것 (같은 이름은 한 번)."""
+    names = [t.strip() for t in (cfg.get("user", {}).get("tools") or "").split(",") if t.strip()]
+    for p in chosen(cfg):
+        names += uses(cfg, p)
+    out = list(dict.fromkeys(names))
+    return ", ".join(out) or "Claude Code"
+
+
+def entities(cfg, p):
+    """그 관심사에서 받을 사람·기업 [{kind, name, why, x, region, news, feeds}]. 고친 적이 없으면 기본 체크된 것.
+    「대상」 질문에서 고른 보기의 회사(예: Cursor를 쓰면 Cursor)는 기본 꺼짐이어도 넣는다."""
+    pk = picks(cfg, p["id"])
+    by_target = {c for o in used_options(cfg, p) for c in o.get("companies", [])}
     out = []
     for kind, key in (("person", "people"), ("company", "companies"), ("media", "media"), ("search", "searches")):
         names = pk.get(key)
         for e in p.get(key, []):
-            keep = e["name"] in names if names is not None else e.get("default", True) is not False
+            keep = (e["name"] in names if names is not None else e.get("default", True) is not False) or e["name"] in by_target
             if keep:
                 out.append({**e, "kind": kind})
     for e in pk.get("extra", []):  # 직접 더한 사람·기업 (kind가 없으면 사람)
@@ -136,9 +165,10 @@ def active(cfg):
     off, on, tweak = set(n.get("off", [])), set(n.get("on", [])), n.get("tweak", {})
     cat, acc = feeds(), {}
     for p in chosen(cfg):
+        turned = {fid for o in used_options(cfg, p) for fid in o.get("feeds", [])}  # 「대상」에서 고른 도구의 출처는 켠다
         for e in p.get("feeds", []):
             fid = e["id"]
-            if fid in off or (e.get("default", True) is False and fid not in on) or fid not in cat:
+            if fid in off or (e.get("default", True) is False and fid not in on and fid not in turned) or fid not in cat:
                 continue
             f = acc.setdefault(fid, {**cat[fid], **tweak.get(fid, {}), "interests": {}})
             filt = e.get("filter")

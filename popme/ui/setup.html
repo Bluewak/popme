@@ -945,10 +945,11 @@ function startLoginPoll() {
 // --- 관심사 (설계 4장): ① 고르기·직접 입력 → 관심사마다 범위 › 사람 › 기업 › 궁금한 것 (› 새 관심사는 확인) ---
 let INT = null;
 const ISUBS = { preset: ["scope", "people", "companies", "topics"] };  // 새 관심사는 질문을 받은 뒤 정해진다 (intSubs)
-const INAME = { scope: "범위", lens: "보는 방식", people: "사람", companies: "기업", topics: "궁금한 것", result: "확인" };
+const INAME = { uses: "쓰는 것", scope: "범위", lens: "보는 방식", people: "사람", companies: "기업", topics: "궁금한 것", result: "확인" };
 const LENS = { overview: ["업계 흐름 전반", "큰 변화·공식 발표·전문 매체 중심, 업계를 잘 정리하는 사람 소식"],
                target: ["특정 대상 위주", "좋아하는 기업·팀·제품과 그 사람들 소식"], both: ["둘 다", "흐름은 챙기되 꼭 볼 대상도 몇 개"] };
-const intSubs = c => c.kind === "preset" ? ISUBS.preset : (INT.data[c.key] && INT.data[c.key].subs) || ["lens"];
+const intSubs = c => c.kind === "preset" ? ((INT.data[c.key] || {}).target ? ["uses", ...ISUBS.preset] : ISUBS.preset)
+                                         : (INT.data[c.key] && INT.data[c.key].subs) || ["lens"];
 const subLabel = (c, x) => x.startsWith("q") ? INT.data[c.key].qs[+x.slice(1)].slot : INAME[x];
 function intInit() {
   INT = { chosen: new Set(D.interests_on), customs: [], qi: -1, sub: 0, data: {}, queue: [], busy: "",
@@ -971,7 +972,7 @@ function intRender() {
   thinkStop();
   const name = intSubName();
   if (/^q\d+$/.test(name)) intQuestion(body, c, d, +name.slice(1));
-  else ({ scope: intScope, lens: intLens, people: intList, companies: intList, topics: intTopics, result: intResult })[name](body, c, d);
+  else ({ uses: intUses, scope: intScope, lens: intLens, people: intList, companies: intList, topics: intTopics, result: intResult })[name](body, c, d);
   nav();
 }
 
@@ -1126,6 +1127,22 @@ function intScopeFrom(d) {  // 한국어/해외는 묻지 않고: 고른 보기 
   return picked.length && picked.every(r => r === "kr") ? "kr" : "world";
 }
 
+function intUses(body, c, d) {  // 미리 만든 관심사의 「대상」 질문 (AI 없이 정해 둔 보기): 고른 것의 출처를 켜고 「주로 쓰는 도구」에도
+  const t = d.target;
+  body.innerHTML = `<h1>${esc(t.text)}</h1>
+    <p class="lead">고른 것의 소식을 먼저 챙기고, 따로 꺼져 있던 출처도 켜요. 안 고른 것도 큰 소식은 계속 받아요.</p>
+    <div class="chips">${t.options.map((o, i) => `<label class="chip"><input type="checkbox" data-u="${i}" ${o.on ? "checked" : ""}>${esc(o.label)}</label>`).join("")}</div>
+    <div class="mine"><input type="text" id="int-use" maxlength="30" placeholder="목록에 없으면 직접 적어 주세요"><button id="int-use-add">더하기</button></div>`;
+  body.querySelectorAll("input[data-u]").forEach(b => b.onchange = () => t.options[+b.dataset.u].on = b.checked);
+  const add = () => {
+    const v = $("#int-use").value.trim();
+    if (v && !t.options.some(o => o.label === v)) t.options.push({ label: v, on: true, added: true });
+    intRender(); setTimeout(() => $("#int-use")?.focus());
+  };
+  $("#int-use-add").onclick = add;
+  $("#int-use").onkeydown = e => { if (e.key === "Enter") add(); };
+}
+
 function intTopics(body, c, d) {
   body.innerHTML = `<h1>특히 궁금한 건 뭐예요?</h1>
     <p class="lead">고른 것 위주로 브리핑에 넣어요. 안 골라도 돼요.</p>
@@ -1185,7 +1202,8 @@ async function intEnter() {  // 지금 관심사의 자료를 처음 준비
     think("후보를 꺼내는 중", ["골라 둔 사람·기업 꺼내는 중"]); intRender();
     const v = await api().interest_preset(c.id);
     const names = xs => xs.filter(e => e.on && !e.added).map(e => e.name);
-    INT.data[c.key] = { ...v, base: { scope: v.scope, people: names(v.people), companies: names(v.companies),
+    INT.data[c.key] = { ...v, base: { uses: v.target ? v.target.options.filter(o => o.on).map(o => o.label) : [],
+                                     scope: v.scope, people: names(v.people), companies: names(v.companies),
                                      topics: v.topics.filter(t => t.on).map(t => t.name), extra: v.people.some(e => e.added) } };
     INT.busy = "";
   } else INT.data[c.key] = { field: c.field, scope: "world", lens: "", subs: ["lens"], answers: {}, people: [], companies: [], topics: [],
@@ -1289,6 +1307,8 @@ function intPayload() {  // 저장할 값: 고른 관심사, 미리 만든 관�
     if (!d || d.skipped) continue;
     if (c.kind === "preset") {
       const pk = {}, b = d.base, tps = d.topics.filter(t => t.on).map(t => t.name);
+      const used = d.target ? d.target.options.filter(o => o.on).map(o => o.label) : [];
+      if (d.target && !same(used, b.uses)) pk.uses = used;
       if (d.scope !== b.scope) pk.scope = d.scope;
       if (!same(names(d.people), b.people)) pk.people = names(d.people);
       if (!same(names(d.companies), b.companies)) pk.companies = names(d.companies);
