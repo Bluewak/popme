@@ -1360,7 +1360,7 @@ function go(i) {
   if (last === "관심사") {
     if (!INT) {
       intInit();
-      if (INT.only) return intNext().then(done => { if (done) { INT.only = ""; intRender(); } nav(); });  // 태그 우클릭: 그 관심사의 문답부터
+      if (INT.only) return intNext().then(done => { if (done) { INT.only = ""; intRender(); } nav(); });  // 「편집하기」에서 태그를 누르면: 그 관심사의 문답부터
     }
     intRender();
     if (INT.onlyNew && !intCur()) setTimeout(() => $("#int-field")?.focus());

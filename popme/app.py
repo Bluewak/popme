@@ -426,7 +426,7 @@ class Api:
         return self._news_state()
 
     def open_interests(self, start="pick", pid=""):
-        """브리핑 탭 [+]·태그 우클릭 → 설정 창을 「관심사」 단계만 보이게 연다 (start: pick | custom | edit).
+        """브리핑 탭 태그 줄 「편집하기」의 [+]·태그 → 설정 창을 「관심사」 단계만 보이게 연다 (start: pick | custom | edit).
         저장하면 POPME를 다시 켜지 않고 관심사만 다시 읽어 패널을 새로 그린다."""
         threading.Thread(target=self._run_interests, args=(start, pid), daemon=True).start()
         return True
@@ -781,3 +781,9 @@ def main(restart=False):
             threading.Thread(target=target, daemon=True).start()
 
     webview.start(background)
+    # 창이 닫히면(종료, 설정 저장 후 다시 켜기) 바로 끝낸다. 수집 스레드는 daemon이어도 RSS 작업 풀(ThreadPoolExecutor)은
+    # 파이썬이 끝날 때 남은 출처를 다 받을 때까지 기다려서, 수집 중엔 「종료」를 눌러도 몇 분씩 안 꺼졌다.
+    # X·Threads는 페이지마다 DB에 저장해 둬서 그 앞까지는 남고, 받다 만 RSS는 다음 수집 때 다시 받는다
+    log.info("종료")
+    logging.shutdown()
+    os._exit(0)
