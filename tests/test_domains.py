@@ -56,3 +56,32 @@ def test_saved_with_custom_interest(monkeypatch):
     pid = interests.save_custom("보드게임", "kr", [], [], final, "target", "취미·생활", {}, RAW)
     assert domains.load(pid)["persona"]["name"] == "윤서진"
     assert pid in {p["id"] for p in catalog.profiles()}
+
+
+def test_card_info_and_half_life():
+    raw = {**RAW, "categories": [{"name": "신작·펀딩", "desc": "새 게임", "half_life": "하루"}, {"name": "행사", "desc": "박람회", "half_life": "곧"}],
+           "info": {"x_share": "1.5", "login_nudge": "아주 강", "must_have": ["BGG RSS", ""],
+                    "seasonality": [{"when": "10월", "intensity": "최고", "what": "에센"}, {"what": "때 없음"}]}}
+    d = domains.clean(raw, "custom-board")
+    assert [c["half_life"] for c in d["categories"]] == ["하루", ""]  # 정해진 값만
+    i = d["info"]
+    assert i["x_share"] == 1.0 and i["login_nudge"] == "weak" and i["must_have"] == ["BGG RSS"]
+    assert i["seasonality"] == [{"when": "10월", "intensity": "보통", "what": "에센"}]
+    assert domains.max_age(d, "신작·펀딩") == 1 and domains.max_age(d, "행사") == domains.DEFAULT_AGE == domains.max_age(None)
+    assert "info" not in domains.clean(RAW)  # 카드가 아닌 페르소나엔 없음
+
+
+def test_packs_ship_cards():
+    for f in domains.REPO_DIR.glob("*.json"):
+        d = json.loads(f.read_text(encoding="utf-8"))
+        assert d == domains.clean(d, d["id"]), f.name  # 저장된 모양 = 정리한 모양
+        assert d["info"]["checked"] and all(c["half_life"] for c in d["categories"]), f.name
+
+
+def test_build_card_parses_research_hints():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("build_card", domains.config.ROOT / "tools/build_card.py")
+    bc = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(bc)
+    assert bc.share("25% (해외축구 이적만)") == (0.25, "해외축구 이적만") and bc.share("5~10%") == (0.075, "")
+    assert bc.nudge("약 — 해외 팬에게만") == ("weak", "해외 팬에게만") and bc.nudge("중")[0] == "medium"

@@ -15,6 +15,10 @@ REPO_DIR = config.ROOT / "popme" / "domains"
 LOCAL_DIR = config.DATA_DIR / "domains"
 KEYS = ["persona", "fan_types", "categories", "cares", "dislikes", "sensitive", "vocabulary", "calendar", "must_know",
         "personal", "question_ideas"]
+# 소식 종류별 유통기한(설계 4-9) → 며칠. 루머·장중 소식은 「시간」, 정책·주간 순위는 「일주일」.
+HALF_LIFE = {"시간": 0.25, "하루": 1, "며칠": 3, "일주일": 7, "한 달": 30}
+DEFAULT_AGE = 2
+NUDGE = ("strong", "medium", "weak")  # X 로그인 권유 세기
 
 
 def load(pid):
@@ -35,7 +39,7 @@ def save_local(pid, data):
 
 
 def _s(v, n):
-    return " ".join(str(v or "").split())[:n]
+    return " ".join(str(v or "").split())[:n].rstrip()  # 자른 끝이 빈칸이면 다시 정리해도 같게
 
 
 def clean(raw, pid=""):
@@ -46,7 +50,8 @@ def clean(raw, pid=""):
            "persona": {k: _s(p.get(k), 200) for k in ("name", "born", "home", "career", "entry_story", "personality", "voice")},
            "fan_types": [{"name": _s(x.get("name"), 20), "desc": _s(x.get("desc"), 80), "wants": [_s(w, 30) for w in (x.get("wants") or [])][:4]}
                          for x in lst("fan_types", 6) if isinstance(x, dict) and x.get("name")],
-           "categories": [{"name": _s(x.get("name"), 12), "desc": _s(x.get("desc"), 60), "example": _s(x.get("example"), 80)}
+           "categories": [{"name": _s(x.get("name"), 12), "desc": _s(x.get("desc"), 60), "example": _s(x.get("example"), 80),
+                           "half_life": x.get("half_life") if x.get("half_life") in HALF_LIFE else ""}
                           for x in lst("categories", 12) if isinstance(x, dict) and x.get("name")],
            "cares": [_s(x, 60) for x in lst("cares")], "dislikes": [_s(x, 60) for x in lst("dislikes", 8)],
            "sensitive": [_s(x, 60) for x in lst("sensitive", 6)],
@@ -59,7 +64,32 @@ def clean(raw, pid=""):
            "personal": {k: _s((raw.get("personal") or {}).get(k), 80) for k in ("favorite", "rival", "memorable", "taste")}
            if isinstance(raw.get("personal"), dict) else {},
            "question_ideas": [_s(x, 60) for x in lst("question_ideas", 8)]}
+    if isinstance(raw.get("info"), dict):
+        out["info"] = clean_info(raw["info"])
     return out
+
+
+def clean_info(i):
+    """분야 카드의 정보 지형 칸 (설계 4-9): X 몫·로그인 권유·꼭 필요한 X 밖 출처·페이지 감시·놓치면 안 되는 날짜·시기별 세기."""
+    try:
+        share = min(max(float(i.get("x_share") or 0), 0.0), 1.0)
+    except (TypeError, ValueError):
+        share = 0.0
+    strs = lambda k, n=10, m=60: [_s(x, m) for x in (i.get(k) or []) if x][:n]
+    return {"checked": _s(i.get("checked"), 10), "x_share": share, "x_note": _s(i.get("x_note"), 80),
+            "login_nudge": i.get("login_nudge") if i.get("login_nudge") in NUDGE else "weak",
+            "nudge_note": _s(i.get("nudge_note"), 100), "must_have": strs("must_have"), "page_watch": strs("page_watch"),
+            "deadline_kinds": strs("deadline_kinds", 6, 30),
+            "seasonality": [{"when": _s(x.get("when"), 20), "intensity": x.get("intensity") if x.get("intensity") in ("높음", "보통", "낮음") else "보통",
+                             "what": _s(x.get("what"), 60)} for x in (i.get("seasonality") or [])[:10] if isinstance(x, dict) and x.get("when")]}
+
+
+def max_age(d, category=""):
+    """그 소식 종류가 브리핑 가치를 잃기까지 며칠 (유통기한). 모르면 DEFAULT_AGE."""
+    for x in (d or {}).get("categories", []):
+        if x["name"] == category and x.get("half_life"):
+            return HALF_LIFE[x["half_life"]]
+    return DEFAULT_AGE
 
 
 def brief(d, for_task=""):
