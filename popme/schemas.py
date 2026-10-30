@@ -50,7 +50,7 @@ class Pick(BaseModel):
     id: int
     category: str = ""
 
-    _cat = field_validator("category", mode="before")(_text(12))
+    _cat = field_validator("category", mode="before")(_text(16))  # 분야 카드의 종류 이름(14자)보다 짧게 자르지 않게
 
 
 class EditorPicks(BaseModel):
@@ -71,7 +71,7 @@ class Taste(BaseModel):
     @field_validator("likes", "less", mode="before")
     @classmethod
     def _names(cls, v):
-        return [" ".join(str(x).split())[:12] for x in (v or []) if str(x).strip()][:6]
+        return [" ".join(str(x).split())[:16] for x in (v or []) if str(x).strip()][:6]
 
 
 class FactCheck(BaseModel):

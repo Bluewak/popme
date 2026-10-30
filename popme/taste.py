@@ -23,7 +23,7 @@ log = logging.getLogger(__name__)
 COUNT = 10        # 보여 줄 헤드라인
 POOL = 50         # 편집자에게 줄 헤드라인
 DAYS = 7          # 최근 며칠
-TARGETS, SUBS = 3, 4                                     # 검색할 대상·세부 수
+TARGETS, SUBS = 5, 6                                     # 검색할 대상·세부 수 (넘치면 버려져 「골랐는데 0건」이 된다)
 PER_TARGET, PER_SUB, PER_EN, PER_FIELD = 8, 10, 6, 15    # 검색 하나에서 받을 수
 PER_OUTLET = 3    # 한 매체 몫
 MAX_TRIES = 2
@@ -32,8 +32,11 @@ OTHER = "기타"    # 맞는 소식 종류가 없을 때 — 되도록 고르지
 SPAM = re.compile(
     r"\[(광고|AD|PR|협찬|이벤트|설명|해명)\]|협찬|매수\s*신호|프리미엄\s*콘텐츠|리딩방|급등\s*임박|무료\s*(추천|리딩)|할인\s*쿠폰|최저가"
     r"|주가\s*전망|목표\s*주가|저가\s*매수|초고수|늘려(라|야)|\d[\d,]*원으로\s*\d*%?\S*\s*(상승|하락)|(오름|내림)세\b|애프터마켓\s*\d"
-    r"|생중계.*(무료|채널)|기념\s.*이벤트|\bto buy\b|\boutperform|stock quote|press release|price prediction", re.I)
-SKIP_OUTLETS = re.compile(r"mitrade|tradingkey|motley fool|fool\.com|investing\.com|vantage data|stocktwits|naver blog|브런치|티스토리", re.I)
+    r"|생중계.*(무료|채널)|기념\s.*이벤트|\bto buy\b|\boutperform|stock quote|press release|price prediction"
+    r"|\[(인사|포토|부고|동정|게시판)\]", re.I)
+SKIP_OUTLETS = re.compile(r"mitrade|tradingkey|motley fool|fool\.com|investing\.com|vantage data|stocktwits|naver blog|브런치|티스토리"
+                          r"|vietnam\.vn|foro3d|martin cid|voi\.id|mezha|letem světem|britannica|presbyterian|facebook|instagram|youtube", re.I)  # 기계번역 콘텐츠 농장·기사 아닌 글
+GENERIC = re.compile(r"\s*(소식|변화|동향|시즌|정보|이야기|관련|뉴스|소개|팁|등)$")
 STEM = re.compile(r"(으로|에서|에게|까지|부터|이며|이다|했다|한다|하고|하는|하며|된다|됐다|에는|에도|은|는|이|가|을|를|에|의|로|와|과|도|만)$")
 
 
@@ -41,8 +44,8 @@ def term(x):
     """세부·대상 하나 → {label, news, en, region} (화면이 이름만 넘겨도)."""
     x = x if isinstance(x, dict) else {"label": str(x)}
     label = " ".join(str(x.get("label") or "").split())[:30]
-    return {"label": label, "news": str(x.get("news") or "").strip()[:40], "en": str(x.get("en") or "").strip()[:60],
-            "region": x.get("region") or ""}
+    return {"label": label, "news": str(x.get("news") or x.get("q") or "").strip()[:40],  # 묶음은 news, 새 분야는 질문 때 AI가 낸 q
+            "en": str(x.get("en") or "").strip()[:60], "region": x.get("region") or ""}
 
 
 def _core(label):
@@ -50,21 +53,33 @@ def _core(label):
     return " ".join(re.sub(r"[()·/]", " ", label).split())
 
 
-def queries(field, subs=(), targets=(), scope="world"):
+def queries(field, subs=(), targets=(), scope="world", names=None):
     """→ [(group, 검색어, loc)] 대상 → 세부 → 분야.
-    - 묶음이 정해 둔 검색어(news)가 있으면 그대로 (「○○ 주가」·「○○ 집값」의 꼬리는 뗀다 — 시세 자동기사만 온다).
-    - 없으면(새 분야 보기·직접 적은 것) 분야를 붙인다. 영어 기사는 대상(사람·팀) 또는 묶음이 정해 둔 세부만 (일반 문구 영어는 엉뚱)."""
+    - 검색어가 정해져 있으면 그대로: 묶음은 news, 새 분야는 질문 때 AI가 보기마다 낸 q (「○○ 주가」·「○○ 집값」 꼬리는 뗀다 — 시세 자동기사만 온다).
+    - 없으면(직접 적은 것) 일반어(소식·변화 …)를 떼고, 이름에 분야가 없으면 분야를 붙인다 (「낚시면허제 규제 변화 낚시」로 찾으면 0건이었다).
+    - 해외도(world)면 영어 이름(고유명사만 받는다)으로도, 분야 영어 이름을 붙여 (「Sassicaia」만 찾으면 경주마).
+    names: {ko, en, aliases} 분야의 한국어·영어 이름·다른 말 (영어 이름 분야를 한국어 기사로, 「홈베이킹」은 「베이킹」·「제빵」으로도)."""
+    names = names or {}
+    ko = names.get("ko") or field
+    en_field = names.get("en") or (field if re.fullmatch(r"[\x00-\x7f]+", field.strip()) else "")
     out = []
     for kind, xs, n in (("대상", targets, TARGETS), ("세부", subs, SUBS)):
         for x in [term(x) for x in xs if x][:n]:
             if not x["label"]:
                 continue
-            curated = bool(x["news"])
-            q = re.sub(r"\s*(주가|집값)$", "", x["news"]) if curated else f"{_core(x['label'])} {field}"
+            if x["news"]:
+                q = re.sub(r"\s*(주가|집값)$", "", x["news"])
+            else:
+                core = GENERIC.sub("", _core(x["label"])) or _core(x["label"])
+                q = core if ko in core or field in core else f"{core} {ko}"
             out.append((f"{kind}:{x['label']}", _core(q), None))
-            if scope == "world" and x["en"] and (kind == "대상" or curated):
-                out.append((f"{kind}:{x['label']}", x["en"], "world"))
-    out.append(("분야", field, None))
+            if scope == "world" and x["en"]:
+                en = x["en"] if not en_field or en_field.lower() in x["en"].lower() else f"{x['en']} {en_field}"
+                out.append((f"{kind}:{x['label']}", en, "world"))
+    out.append(("분야", ko, None))
+    out += [("분야", a, None) for a in names.get("aliases", [])[:3] if a and a != ko]
+    if scope == "world" and en_field:
+        out.append(("분야", en_field, "world"))
     return out
 
 
@@ -96,28 +111,39 @@ def same_event(a, b):
     (wa, ba), (wb, bb) = a, b
     if not wa or not wb:
         return False
-    common = len(wa & wb)
+    shared = wa & wb
+    common = len(shared)
     if common / len(wa | wb) >= 0.5 or (common >= 3 and common >= 0.5 * min(len(wa), len(wb))):
+        return True
+    if common >= 2 and any(re.search(r"\d", w) for w in shared):  # 숫자(34.5대1·40%·6200억)와 이름이 같이 겹치면 같은 사건
         return True
     return bool(ba and bb) and len(ba & bb) / len(ba | bb) >= 0.45
 
 
-def _on_target(item, group):
-    """대상 검색 결과가 정말 그 대상 이야기인가 — 제목에 이름(의 한 낱말)이 있어야 (「마포구」로 찾은 「서울 아파트 매물」은 분야로)."""
-    names = [w for w in _core(group.split(":", 1)[1]).split() if len(w) >= 2]
-    return not names or any(n.lower() in item["title"].lower() or n.rstrip("구시군").lower() in item["title"].lower() for n in names)
+def _on_target(item, group, en=""):
+    """대상 검색 결과가 정말 그 대상 이야기인가 — 제목에 이름(의 한 낱말)이 있어야 (「마포구」로 찾은 「서울 아파트 매물」은 분야로).
+    영어 기사는 영어 이름으로도 본다 (「스타십」으로는 「SpaceX Starship Flight 15」를 못 알아봤다)."""
+    names = [w for w in (_core(group.split(":", 1)[1]) + " " + _core(en)).split() if len(w) >= 2]
+    t = item["title"].lower()
+    return not names or any(n.lower() in t or n.rstrip("구시군").lower() in t for n in names)
 
 
-def pool(field, subs=(), targets=(), scope="world", extra=(), exclude=()):
+def pool(field, subs=(), targets=(), scope="world", extra=(), exclude=(), names=None):
     """편집자에게 줄 헤드라인 [{title, group, published}]: 묶음(대상·세부·분야)마다 최근순, 번갈아 넣고 같은 사건·광고·한 매체 몰림을 거른다."""
-    qs = queries(field, subs, targets, scope)
+    qs = queries(field, subs, targets, scope, names)
+    ens = {f"대상:{term(x)['label']}": term(x)["en"] for x in targets if x}
     per = lambda g, loc: PER_EN if loc == "world" and g != "분야" else PER_TARGET if g.startswith("대상") else PER_SUB if g.startswith("세부") else PER_FIELD
     with ThreadPoolExecutor(max_workers=8) as ex:
         found = list(ex.map(lambda q: interests.research_items(q[1], per(q[0], q[2]), DAYS, q[2]), qs))
+    # 새 분야(names가 있음): 검색어에 분야 낱말이 없었으면 제목에 분야 낱말이 있어야 받는다 (「메리 베리」로 찾은 드라마 「메리 베리 러브」)
+    words = [w.lower() for w in [(names or {}).get("ko"), (names or {}).get("en"), *(names or {}).get("aliases", [])] if w] if names else []
+    off_field = lambda q, title: bool(words) and not any(w in q.lower() for w in words) and not any(w in title.lower() for w in words)
     groups = {}
-    for (g, _, _), items in zip(qs, found):
+    for (g, q, _), items in zip(qs, found):
         for it in items:
-            groups.setdefault(g if not g.startswith("대상") or _on_target(it, g) else "분야", []).append(it)
+            if g != "분야" and off_field(q, it["title"]):
+                continue
+            groups.setdefault(g if not g.startswith("대상") or _on_target(it, g, ens.get(g, "")) else "분야", []).append(it)
     groups.setdefault("분야", []).extend({"title": h, "published": "", "outlet": ""} for h in extra)
     for g in groups:
         groups[g].sort(key=lambda i: i.get("published") or "", reverse=True)
@@ -131,7 +157,9 @@ def pool(field, subs=(), targets=(), scope="world", extra=(), exclude=()):
                 it = q.pop(0)
                 title, outlet = tidy(it["title"]), it.get("outlet") or ""
                 toks = _tokens(title)
-                if not title or SPAM.search(title) or SKIP_OUTLETS.search(outlet) or any(same_event(toks, s) for s in seen):
+                bare = title.rpartition(" - ")[0] or title
+                if (not title or SPAM.search(title) or SKIP_OUTLETS.search(outlet) or re.search(r"니다\.?$", bare)  # 기계번역 문장 제목
+                        or any(same_event(toks, s) for s in seen)):
                     continue
                 if outlet and outlets.get(outlet, 0) >= PER_OUTLET:
                     continue
@@ -232,10 +260,10 @@ def fill(picked, heads, count):
     return picked
 
 
-def headlines(cfg, field, domain=None, scope="world", subs=(), targets=(), extra=(), exclude=(), count=COUNT):
+def headlines(cfg, field, domain=None, scope="world", subs=(), targets=(), extra=(), exclude=(), count=COUNT, names=None):
     """→ [{title, category, group}] 서로 다른 종류의 헤드라인 count개.
     편집자가 실패하면 모은 순서(대상·세부·분야를 번갈아, 같은 사건·광고는 이미 거름)대로."""
-    heads = pool(field, subs, targets, scope, extra, exclude)
+    heads = pool(field, subs, targets, scope, extra, exclude, names)
     if not heads:
         return []
     try:
@@ -243,12 +271,17 @@ def headlines(cfg, field, domain=None, scope="world", subs=(), targets=(), extra
     except Exception:
         log.exception("편집자 실패: %s (모은 순서대로 보여 줌)", field)
         return [{"title": h["title"], "category": "", "group": h["group"]} for h in heads[:count]]
-    seen, picked = set(), []
-    for p in out.get("best") or out["picks"]:  # 둘 중 나은 답. 남은 문제(없는 번호·같은 번호)는 여기서 거른다
-        if 0 <= p["id"] < len(heads) and p["id"] not in seen:
-            seen.add(p["id"])
-            picked.append({"title": heads[p["id"]]["title"], "category": "" if p["category"] == OTHER else p["category"],
-                           "group": heads[p["id"]]["group"]})
+    seen, picked, events = set(), [], []
+    for p in out.get("best") or out["picks"]:  # 둘 중 나은 답. 남은 문제(없는 번호·같은 번호·같은 사건)는 여기서 거른다
+        if not 0 <= p["id"] < len(heads) or p["id"] in seen:
+            continue
+        toks = _tokens(heads[p["id"]]["title"])
+        if any(same_event(toks, e) for e in events):
+            continue
+        seen.add(p["id"])
+        events.append(toks)
+        picked.append({"title": heads[p["id"]]["title"], "category": "" if p["category"] == OTHER else p["category"],
+                       "group": heads[p["id"]]["group"]})
     return fill(picked[:count], heads, count)
 
 
@@ -293,7 +326,9 @@ def analyze(cfg, field, domain, shown, liked, answers=()):
     out["less"] = [c for c in out["less"] if keep(c)]  # 근거가 모자란 「줄이기」는 코드가 지운다
     if not out["less"]:  # 줄일 게 없는데 요약이 다른 걸 줄이라고 하면 그 말은 뺀다
         parts = [p for p in re.split(r",\s*|\s*—\s*", out["summary"]) if not REDUCE.search(p)]
-        out["summary"] = ", ".join(parts).strip(" ,") or GENERAL
+        out["summary"] = ", ".join(parts).strip(" ,")
+    if not out["summary"]:  # 다 지워졌으면 누른 종류로 (「전반을 고르게」 + 우선 종류는 서로 어긋난다)
+        out["summary"] = f"{'·'.join(out['likes'][:2])} 소식을 먼저" if out["likes"] else GENERAL
     return out
 
 
@@ -302,7 +337,7 @@ def line(t):
     if not t or not (t.get("summary") or t.get("likes")):
         return ""
     parts = [f"취향: {t['summary'].strip().rstrip('.')}." if t.get("summary") else "취향:"]
-    if t.get("likes"):
+    if t.get("likes") and t.get("summary") != GENERAL:  # 「전반을 고르게」면 우선 종류를 붙이지 않는다
         parts.append(f"우선 종류: {', '.join(t['likes'])}.")
     if t.get("less"):
         parts.append(f"줄일 종류(큰 소식만): {', '.join(t['less'])}.")
