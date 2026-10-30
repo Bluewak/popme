@@ -37,7 +37,8 @@ TYPES = {
     "취미·생활": {"범위": "세부 분야", "대상": "관심 대상", "변화": "관심 있는 소식", "사람": "전문가·크리에이터"},
     "기타": {"범위": "세부 분야", "대상": "관심 대상", "변화": "관심 있는 변화", "사람": "전문가·기자"},
 }
-NO_ASK = re.compile(r"정치|성향|지지\s*정당|종교|건강|질병|병력|주소|사는\s*곳|거주|나이|연령|소득|연봉|재산|성별|성적\s*지향")
+# 사용자 개인의 민감한 것은 묻지 않는다. 「건강」·「질병」은 분야의 소식 주제(반려견 건강·과학·건강)라 막지 않고 「병력」만
+NO_ASK = re.compile(r"정치|성향|지지\s*정당|종교|병력|주소|사는\s*곳|거주|나이|연령|소득|연봉|재산|성별|성적\s*지향")
 HEADLINES = 30  # 질문을 만들 때 근거로 주는 최근 1주 헤드라인 수 (AI 지식은 오래됐을 수 있다 — 이적·감독 교체 등)
 QUESTIONS = """{persona}분야: {field}{where}
 보는 방식: {lens}
@@ -52,6 +53,8 @@ QUESTIONS = """{persona}분야: {field}{where}
   "options": [{{"label": "보기 20자 이내", "region": "kr 또는 world", "en": "영어(원어) 이름 — 해외만, 없으면 빈 문자열"}}],
   "options_by": {{"범위 보기 label": [보기 …]}}  ← 「대상」 칸만: 「범위」에서 고른 것마다 다른 보기 (없으면 생략)}}
 - 보기는 4~8개, 실존하는 것만, 지금 기준으로 (헤드라인을 참고). 「상관없어요」·「직접 입력」은 넣지 마라 (코드가 붙인다).
+- 「대상」 보기는 이 분야 팬이 실제로 응원·관심 두는 대표 팀·사람·작품·브랜드 (이 분야를 대표하는 것부터). 헤드라인은 지금 상황 확인용일 뿐 —
+  이번 주 보도자료·광고에 나온 다른 업종 회사(협회 홍보·식품·여행 예약 사이트 등)는 넣지 마라.
 - 정치 성향·종교·건강·사는 곳·나이·소득은 묻지 마라.
 출력: {{"type": "...", "questions": [...]}}"""
 SYSTEM = "너는 소식 출처를 고르는 도우미다. 요청한 JSON 하나만 출력한다. 실존하는 사람·기업만 쓰고, 모르면 적게 쓴다."
@@ -127,7 +130,7 @@ def suggest(cfg, field, scope, lens=None, answers=None, headlines=None, context=
     """사람·기업·궁금한 것 보기: {"people", "companies", "topics", "media", "searches"}. AI가 실패하면 빈 목록 (직접 입력만).
     lens(보기 방식)가 업계 흐름이면 정리하는 사람·대표 기업 + 전문 매체·분야 검색어, 대상 위주면 고른 대상의 당사자."""
     lens = lens if lens in LENSES else "target"
-    if domain and not domain.get("checked"):  # 질문 때 뒤에서 시작한 사실 확인을 여기서 받는다 (사람·기관 추천엔 확인된 사실이 필요)
+    if not domain or not domain.get("checked"):  # 질문 때 뒤에서 시작한 분야 카드(초안·사실 확인)를 여기서 받는다 (사람·기관 추천엔 확인된 사실이 필요)
         from popme import fieldcard
         domain = fieldcard.verified(field) or domain
     given = ""
@@ -158,13 +161,24 @@ def suggest(cfg, field, scope, lens=None, answers=None, headlines=None, context=
 
 def research(field, limit=HEADLINES, days=7):
     """최근 days일 헤드라인 (구글 뉴스, 키 없음). 질문·후보를 지금 상황에 맞추는 근거, 분야 카드 사실 확인(fieldcard)의 근거. 실패하면 []."""
-    loc = "world" if re.fullmatch(r"[\x00-\x7f]+", field.strip()) else "kr"
-    url = catalog.NEWS_URL.replace("when:2d", f"when:{int(days)}d").format(q=urllib.parse.quote_plus(field.strip()), loc=catalog.NEWS_LOC[loc])
+    return [i["title"] for i in research_items(field, limit, days)]
+
+
+def research_items(query, limit=HEADLINES, days=7, loc=None):
+    """research와 같되 [{title, published, outlet}] — 최근순 정렬·매체 몫을 따질 때 (popme/taste.py).
+    loc: "kr"(한국어 기사) | "world"(영어 기사). 없으면 검색어가 영문이면 world."""
+    loc = loc or ("world" if re.fullmatch(r"[\x00-\x7f]+", query.strip()) else "kr")
+    url = catalog.NEWS_URL.replace("when:2d", f"when:{int(days)}d").format(q=urllib.parse.quote_plus(query.strip()), loc=catalog.NEWS_LOC[loc])
     try:
-        return [i["title"] for i in rss.peek(url, limit=limit)]
+        items = rss.peek(url, limit=limit)
     except Exception:
-        log.warning("최근 소식 조사 실패: %s", field, exc_info=True)
+        log.warning("최근 소식 조사 실패: %s", query, exc_info=True)
         return []
+    out = []
+    for i in items:
+        title, _, outlet = i["title"].rpartition(" - ")  # 구글 뉴스 제목 끝 「 - 언론사」
+        out.append({"title": i["title"], "published": i.get("published") or "", "outlet": outlet.strip() if title else ""})
+    return out
 
 
 def _option(o):
@@ -175,17 +189,17 @@ def _option(o):
     label = _short(o.get("label"), 20)
     if not label or label in ("상관없어요", "직접 입력", "기타"):
         return None
-    return {"label": label, "region": "kr" if o.get("region") == "kr" else "world", "en": _short(o.get("en"), 40)}
+    return {"label": label, "region": "kr" if o.get("region") == "kr" else "world", "en": _short(o.get("en"), 60)}
 
 
-def _options(xs):
+def _options(xs, n=8):
     out, seen = [], set()
-    for o in (xs or [])[:12]:
+    for o in (xs or [])[:16]:
         o = _option(o)
         if o and o["label"] not in seen:
             seen.add(o["label"])
             out.append(o)
-    return out[:8]
+    return out[:n]
 
 
 def fixed_questions(lens, kind="기타"):
@@ -205,8 +219,9 @@ def clean_questions(raw, lens):
         text = _short(q.get("text"), 30)
         if not text or NO_ASK.search(text):
             continue
-        opts = _options(q.get("options"))
-        if NO_ASK.search(" ".join(o["label"] for o in opts)):
+        every = _options(q.get("options"), 12 if q["slot"] == "대상" else 8)  # 대상은 넉넉히 (F1 11팀)
+        opts = [o for o in every if not NO_ASK.search(o["label"])]  # 걸린 보기만 뺀다 (「건강·노견 관리」 하나로 질문을 버리지 않게)
+        if not opts or len(opts) * 2 <= len(every):  # 보기 절반 이상이 민감하면 그 주제를 묻는 질문 → 버림
             continue
         by = {}
         if q["slot"] == "대상" and isinstance(q.get("options_by"), dict):
@@ -241,11 +256,9 @@ def questions(cfg, field, lens, heads=None, context="", domain=None):
     lens = lens if lens in LENSES else "target"
     heads = research(field) if heads is None else [str(h)[:200] for h in heads][:HEADLINES]
     words = "\n".join(f"  - {s}" for s in SLOTS[lens])
-    if domain is None:  # 새 분야: 프로필 작가가 이 분야를 오래 본 사람을 먼저 그린다 (최근 헤드라인을 사실의 근거로)
-        from popme import domains, fieldcard
-        domain = domains.write(cfg, field, context, heads)
-        if domain:  # 사실 확인은 뒤에서 — 사용자가 질문에 답하는 동안 (③ 대상 추천에서 받아 쓴다)
-            fieldcard.start(cfg, field, domain, context)
+    if domain is None:  # 새 분야: 분야 페르소나(초안 약 70초 + 사실 확인)는 뒤에서 — 질문은 바로 만들어 보여 주고 ③ 사람 추천에서 합친다
+        from popme import fieldcard
+        fieldcard.start(cfg, field, None, context, heads)
     prompt = QUESTIONS.format(persona=with_persona(domain, "questions"), field=_short(field, 40), where=where(context), lens=LENSES[lens], headlines="\n".join(f"- {h}" for h in heads) or "(없음)",
                               types=" / ".join(f"{k}({v['범위']}·{v['대상']})" for k, v in TYPES.items()), slots=words)
     try:
@@ -375,8 +388,9 @@ def _q(v):
     return _literal(v)
 
 
-def save_custom(field, scope, verified, topics, final, lens=None, kind=None, answers=None, domain=None):
-    """새 관심사 → DATA_DIR/profiles/custom-<이름>.toml. 확인된 것만 담는다. 반환: 관심사 id."""
+def save_custom(field, scope, verified, topics, final, lens=None, kind=None, answers=None, domain=None, taste=None):
+    """새 관심사 → DATA_DIR/profiles/custom-<이름>.toml. 확인된 것만 담는다. 반환: 관심사 id.
+    taste: ④ 취향 문답 결과 {summary, likes, less} → [taste] (브리핑 지시문의 「취향」 줄)."""
     pid = f"custom-{_slug(field)}"
     lines = [f"# 관심사 설정에서 만든 관심사 ({datetime.now():%Y-%m-%d}). 「{field}」",
              f"id = {_q(pid)}", f"name = {_q(final['name'])}", f"tag = {_q(final['tag'])}",
@@ -386,6 +400,10 @@ def save_custom(field, scope, verified, topics, final, lens=None, kind=None, ans
              f"lens = {_q(lens if lens in LENSES else 'target')}", f"type = {_q(kind if kind in TYPES else '기타')}",
              "", "[answers]                     # 관심사 설정에서 고른 것 (칸 → 보기)"]
     lines += [f"{json.dumps(k, ensure_ascii=False)} = {json.dumps(list(v), ensure_ascii=False)}" for k, v in (answers or {}).items() if v]
+    if taste and (taste.get("summary") or taste.get("likes")):
+        lines += ["", "[taste]                       # ④ 취향 문답: 읽고 싶다고 누른 헤드라인에서",
+                  f"summary = {_q(taste.get('summary', ''))}", f"likes = {_q(list(taste.get('likes', [])))}",
+                  f"less = {_q(list(taste.get('less', [])))}"]
     lines += ["", "[caps]",
              f'"{catalog.NEWS_GROUP}" = 20', '"공식 발표" = 10', '"실사용 검증" = 10', ""]
     for e in verified:  # 전문 매체 (확인된 RSS만), 분야 검색어 (기사가 나오는 것만)
@@ -442,7 +460,13 @@ def preset_view(pid, cfg):
     chosen_subs = set(catalog.subs(cfg, p))
     flat = {o["label"] for o in catalog.target_options(p)}
     opt = lambda o: {"label": o["label"], "on": o["label"] in used}
-    return {"id": pid, "name": p["name"], "tag": p["tag"], "scope": catalog.scope(cfg, p),
+    from popme import domains
+    # 분야 페르소나가 있으면(묶음, 또는 만들 때 PC에 저장된 새 관심사) ①전반 ②국내외 ③대상 ④취향. 없으면(AI 관심사) 예전 흐름
+    domain = domains.load(pid)
+    taste_ = ({"summary": pk.get("taste", ""), "likes": pk.get("likes", []), "less": pk.get("less", [])} if "taste" in pk
+              else p.get("taste") if p.get("custom") else None)  # 새 관심사는 파일의 [taste]
+    return {"id": pid, "name": p["name"], "tag": p["tag"], "scope": catalog.scope(cfg, p), "domain": domain, "taste": taste_,
+            "answers": p.get("answers") if p.get("custom") else None,  # 새 관심사를 고칠 때 ④가 만들 때 고른 대상을 쓰게
             "subs": [{**s, "on": s["label"] in chosen_subs} for s in p.get("subs", [])],
             "target": {"text": target["text"], "options": [opt(o) for o in target.get("options", [])]
                                                  + [{"label": u, "on": True, "added": True} for u in used if u not in flat],

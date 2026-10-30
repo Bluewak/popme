@@ -244,10 +244,12 @@ def test_clean_questions_follows_template():
 
 def test_questions_never_ask_private_things():
     raw = {"type": "기타", "questions": [{"slot": "범위", "text": "지지 정당은?", "options": ["가", "나"]},
-                                        {"slot": "대상", "text": "관심 대상은?", "options": ["종교 단체 A", "B"]}]}
+                                        {"slot": "대상", "text": "관심 대상은?", "options": ["종교 단체 A", "B", "C"]}]}
     out = interests.clean_questions(raw, "target")
     assert all("정당" not in q["text"] for q in out["questions"])
-    assert out["questions"][1]["options"] == []  # 묻지 않는 것이 섞인 질문은 버리고 고정 질문으로
+    assert [o["label"] for o in out["questions"][1]["options"]] == ["B", "C"]  # 묻지 않는 보기만 빼고
+    raw["questions"][1]["options"] = ["종교 단체 A", "B"]
+    assert interests.clean_questions(raw, "target")["questions"][1]["options"] == []  # 절반 이상이 그런 보기면 질문을 버리고 고정 질문으로
 
 
 def test_questions_uses_headlines_and_checks_targets(monkeypatch):

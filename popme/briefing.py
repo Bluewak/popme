@@ -120,6 +120,7 @@ def interests_for_brief(cfg):
 
 def rules_for(cfg):
     """관심사 → 지시문 조각 {criteria, discovery, tags_rule, tags_example}. 태그는 관심사를 2개 이상 골랐을 때만 묻는다."""
+    from popme import taste  # taste → interests → briefing 순으로 불러서 여기서
     profs = interests_for_brief(cfg)
 
     def crit(p):  # 관심사 설정 ⑤에서 고른 「특히 궁금한 것」이 있으면 덧붙인다
@@ -130,10 +131,13 @@ def rules_for(cfg):
         word = p.get("target", {}).get("brief")  # 묶음마다: 「응원하는 팀」 등. 없으면 도구 (AI 관심사)
         used_line = (f"\n- {word}: {'·'.join(used)} — 이 소식을 먼저, 작은 소식도 고른다." if word else
                      f"\n- 내가 쓰는 것: {'·'.join(used)} — 이것의 변화(새 기능·기본값·요금·단종)를 먼저 고른다. 다른 것은 큰 소식만.")
+        pk = catalog.picks(cfg, p["id"])  # ④ 취향 문답: 묶음은 config picks, 새 관심사는 파일의 [taste]
+        liked = ({"summary": pk.get("taste", ""), "likes": pk.get("likes", []), "less": pk.get("less", [])}
+                 if "taste" in pk or "likes" in pk else p.get("taste"))
         return (p["criteria"].strip() + (f"\n- 특히 궁금한 것: {'·'.join(topics_)} — 이 주제를 먼저 고른다." if topics_ else "")
                 + (f"\n- 고른 것: {picked} — 이것과 관련된 소식을 먼저 고른다." if picked else "")
                 + (f"\n- 보는 범위: {'·'.join(chosen_subs)}만." if chosen_subs else "")
-                + (used_line if used else ""))
+                + (used_line if used else "") + taste.line(liked))
     if len(profs) == 1:
         criteria = crit(profs[0])
     else:

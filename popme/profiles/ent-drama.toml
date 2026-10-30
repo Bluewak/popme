@@ -22,22 +22,30 @@ topics = ["새 드라마", "캐스팅", "시청률", "화제성 순위", "OTT �
 
 [[subs]]
 label = "한국 드라마"
+news = "드라마 첫방송"
 region = "kr"
 
 [[subs]]
 label = "OTT 오리지널"
+news = "넷플릭스 시리즈 공개"
+en = "Netflix Korean series"
 region = "kr"
 
 [[subs]]
 label = "일본 드라마"
+news = "일본 드라마"
+en = "Japanese drama"
 region = "world"
 
 [[subs]]
 label = "중국 드라마"
+news = "중국 드라마"
+en = "Chinese drama"
 region = "world"
 
 [[subs]]
 label = "시청률·화제성"
+news = "드라마 시청률"
 region = "kr"
 
 [[feeds]]

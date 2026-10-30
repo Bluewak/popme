@@ -25,7 +25,7 @@ def test_check_drops_contradicted_and_marks_unknown(monkeypatch):
     d = fieldcard.build({}, "보드게임", domain=DRAFT)
     assert [(x["name"], x["ok"]) for x in d["must_know"]] == [("보드게임긱", True), ("별빛상회", False)]  # 한별보드는 빠짐
     assert d["calendar"][0]["ok"] is False and d["checked"]  # 답이 없던 c0 → 모름
-    assert ("보드게임긱", fieldcard.DAYS) in queries and ("보드게임 보드게임콘", fieldcard.YEAR) in queries
+    assert ("보드게임긱 보드게임", fieldcard.DAYS) in queries and ("보드게임 보드게임콘", fieldcard.YEAR) in queries  # 이름 + 분야
     assert fieldcard.key_words("PGA 챔피언십·US오픈·디오픈 등 남자 메이저") == "PGA 챔피언십"
     assert fieldcard.key_words("마스터스 (남자 메이저 첫 대회)") == "마스터스"
     assert fieldcard.key_words("가을 성수기와 단풍 라운드 수요") == "가을 성수기"

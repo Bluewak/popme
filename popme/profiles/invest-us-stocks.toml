@@ -22,22 +22,32 @@ topics = ["실적·가이던스", "FOMC·금리", "물가·고용", "AI 투자",
 
 [[subs]]
 label = "빅테크"
+news = "빅테크 주가"
+en = "Big Tech stocks"
 region = "world"
 
 [[subs]]
 label = "반도체"
+news = "반도체주 엔비디아"
+en = "chip stocks"
 region = "world"
 
 [[subs]]
 label = "ETF·지수"
+news = "S&P500 나스닥"
+en = "S&P 500"
 region = "world"
 
 [[subs]]
 label = "실적 시즌"
+news = "미국 기업 실적 발표"
+en = "earnings report"
 region = "world"
 
 [[subs]]
 label = "금리·Fed"
+news = "연준 금리"
+en = "Federal Reserve"
 region = "world"
 
 [[feeds]]

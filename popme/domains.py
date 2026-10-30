@@ -39,7 +39,15 @@ def save_local(pid, data):
 
 
 def _s(v, n):
-    return " ".join(str(v or "").split())[:n].rstrip()  # 자른 끝이 빈칸이면 다시 정리해도 같게
+    """한 줄로 정리하고 n자까지. 넘치면 낱말 경계에서 자른다 (「…접수 시」처럼 낱말 중간에서 끊겨 검색어·지시문에 쓰이지 않게)."""
+    s = " ".join(str(v or "").split())
+    if len(s) <= n:
+        return s
+    cut = s[:n]
+    if " " in cut[n // 2:]:
+        cut = cut[:cut.rfind(" ")]
+    log.info("분야 페르소나 글을 잘랐어요 (%d자): %s", n, s)
+    return cut.rstrip(" ·,(/")
 
 
 def clean(raw, pid=""):
@@ -50,16 +58,16 @@ def clean(raw, pid=""):
            "persona": {k: _s(p.get(k), 200) for k in ("name", "born", "home", "career", "entry_story", "personality", "voice")},
            "fan_types": [{"name": _s(x.get("name"), 20), "desc": _s(x.get("desc"), 80), "wants": [_s(w, 30) for w in (x.get("wants") or [])][:4]}
                          for x in lst("fan_types", 6) if isinstance(x, dict) and x.get("name")],
-           "categories": [{"name": _s(x.get("name"), 12), "desc": _s(x.get("desc"), 60), "example": _s(x.get("example"), 80),
+           "categories": [{"name": _s(x.get("name"), 14), "desc": _s(x.get("desc"), 60), "example": _s(x.get("example"), 80),
                            "half_life": x.get("half_life") if x.get("half_life") in HALF_LIFE else ""}
                           for x in lst("categories", 12) if isinstance(x, dict) and x.get("name")],
            "cares": [_s(x, 60) for x in lst("cares")], "dislikes": [_s(x, 60) for x in lst("dislikes", 8)],
            "sensitive": [_s(x, 60) for x in lst("sensitive", 6)],
            "vocabulary": [{"word": _s(x.get("word"), 15), "meaning": _s(x.get("meaning"), 40)}
                           for x in lst("vocabulary", 15) if isinstance(x, dict) and x.get("word")],
-           "calendar": [_ok(x, {"when": _s(x.get("when"), 15), "what": _s(x.get("what"), 40)})
+           "calendar": [_ok(x, {"when": _s(x.get("when"), 15), "what": _s(x.get("what"), 60)})
                         for x in lst("calendar") if isinstance(x, dict) and x.get("what")],
-           "must_know": [_ok(x, {"name": _s(x.get("name"), 30), "why": _s(x.get("why"), 40)})
+           "must_know": [_ok(x, {"name": _s(x.get("name"), 40), "why": _s(x.get("why"), 60)})
                          for x in lst("must_know") if isinstance(x, dict) and x.get("name")],
            "personal": {k: _s((raw.get("personal") or {}).get(k), 80) for k in ("favorite", "rival", "memorable", "taste")}
            if isinstance(raw.get("personal"), dict) else {},

@@ -22,18 +22,23 @@ topics = ["경기 결과", "부상·엔트리", "FA·트레이드", "코리안 �
 
 [[subs]]
 label = "KBO"
+news = "프로야구"
 region = "kr"
 
 [[subs]]
 label = "MLB"
+news = "메이저리그 야구"
+en = "MLB"
 region = "world"
 
 [[subs]]
 label = "국가대표"
+news = "야구 대표팀"
 region = "kr"
 
 [[subs]]
 label = "고교/대학"
+news = "고교야구"
 region = "kr"
 
 [[feeds]]
