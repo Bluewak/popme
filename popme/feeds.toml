@@ -81,16 +81,9 @@ via = "mirror"
 
 [feed.google-ai-blog]
 name = 'Google AI 블로그'
-url = 'https://blog.google/technology/ai/rss/'
+url = 'https://blog.google/innovation-and-ai/models-and-research/rss/'  # 2026-10 Gemini 모델 글이 이 구역으로 (옛 주소엔 Gemini 4 Carbon이 없었음)
 group = '공식 발표'
 max_chars = 400
-
-[feed.xai-news]
-name = 'xAI 뉴스'
-url = 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_xainews.xml'
-group = '공식 발표'
-max_chars = 400
-via = "mirror"
 
 [feed.hf-blog]
 name = 'Hugging Face 블로그'
@@ -489,14 +482,6 @@ url = 'https://github.com/ollama/ollama/releases.atom'
 group = '공식 변경내역'
 max_chars = 800
 skip = '-rc'
-
-[feed.llama-cpp-releases]
-name = 'llama.cpp 릴리스'
-url = 'https://github.com/ggml-org/llama.cpp/releases.atom'
-group = '공식 변경내역'
-max_chars = 800
-skip = '^b\d+'
-note = '하루 ~10개 빌드 — 정식을 놓칠 수 있음'
 
 [feed.dynamo-releases]
 name = 'Dynamo 릴리스'
@@ -1053,13 +1038,6 @@ words = 'RAG embeddings reranker LangChain'
 points = 40
 group = '새 오픈소스·화제'
 max_chars = 200
-
-[feed.reddit-rag]
-name = 'r/Rag'
-url = 'https://www.reddit.com/r/Rag/top/.rss?t=week'
-group = '해외 커뮤니티'
-max_chars = 300
-skip = '^(can anyone|any ?one (suggest|recommend)|need help|help|beginner|how (do|can|should) i (start|learn|get started)|is it (possible|worth))'
 
 [feed.kordoc-releases]
 name = 'kordoc 릴리스'
@@ -1942,3 +1920,25 @@ url = "https://www.youtube.com/@JTBCdrama/videos"
 type = "youtube"
 group = "영상"
 max_chars = 200
+
+# 2026-10-31 AI 출처 점검(DB 23일치·큰 소식 21건)에서 더함 — 단독 보도·인수·투자처럼 공식 블로그·X 밖에서 먼저 나오는 소식
+# (캐나다 정부의 Cohere 투자를 놓쳤고, Anthropic 침투 보도는 Threads 한 계정이 유일한 당일 경로였다)
+
+[feed.theinformation]
+name = 'The Information'
+url = 'https://www.theinformation.com/feed'
+group = '업계 뉴스'
+max_chars = 300
+note = '단독 보도 (본문 유료라 제목·요약만)'
+
+[feed.techcrunch-ai]
+name = 'TechCrunch AI'
+url = 'https://techcrunch.com/category/artificial-intelligence/feed/'
+group = '업계 뉴스'
+max_chars = 300
+
+[feed.verge-ai]
+name = 'The Verge AI'
+url = 'https://www.theverge.com/rss/ai-artificial-intelligence/index.xml'
+group = '업계 뉴스'
+max_chars = 300
