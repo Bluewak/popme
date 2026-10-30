@@ -519,9 +519,11 @@ def apply_interests(text, ids, picks):
 
 def save_interest_choices(it):
     """관심사 단계 값(validate_interests 거친 것) 저장: 새 관심사 파일 → 고른 관심사·고친 칸. 반환: 고른 관심사 id."""
-    from popme import interests
+    from popme import fieldcard, interests
+    # 분야 카드가 화면에 없으면(사람 추천이 기다리다 넘어감) 뒤에서 끝난 것을 그때 받는다
     made = [interests.save_custom(c["field"], c.get("scope", "world"), c.get("verified", []), c.get("topics", []),
-                                  c["final"], c.get("lens"), c.get("type"), c.get("answers"), c.get("domain"), c.get("taste"))
+                                  c["final"], c.get("lens"), c.get("type"), c.get("answers"),
+                                  c.get("domain") or fieldcard.verified(c["field"], wait=0), c.get("taste"))
             for c in it["customs"] if c.get("field") and c.get("final")]
     return list(dict.fromkeys(it["chosen"] + made))
 

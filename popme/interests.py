@@ -466,6 +466,7 @@ def preset_view(pid, cfg):
     taste_ = ({"summary": pk.get("taste", ""), "likes": pk.get("likes", []), "less": pk.get("less", [])} if "taste" in pk
               else p.get("taste") if p.get("custom") else None)  # 새 관심사는 파일의 [taste]
     return {"id": pid, "name": p["name"], "tag": p["tag"], "scope": catalog.scope(cfg, p), "domain": domain, "taste": taste_,
+            "answers": p.get("answers") if p.get("custom") else None,  # 새 관심사를 고칠 때 ④가 만들 때 고른 대상을 쓰게
             "subs": [{**s, "on": s["label"] in chosen_subs} for s in p.get("subs", [])],
             "target": {"text": target["text"], "options": [opt(o) for o in target.get("options", [])]
                                                  + [{"label": u, "on": True, "added": True} for u in used if u not in flat],

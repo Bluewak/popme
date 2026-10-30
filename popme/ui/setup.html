@@ -1094,7 +1094,7 @@ function intScope(body, c, d) {
     </div>`;
   setRadio("int-scope", d.scope);
   body.querySelectorAll("input[name=int-scope]").forEach(r => r.onchange = () => {
-    d.scope = r.value; d.scopeSet = true; d.tasteHeads = null; if (c.kind === "custom") d.suggested = false; });
+    d.scope = r.value; d.scopeSet = true; tasteReset(d); if (c.kind === "custom") d.suggested = false; });
 }
 
 // ④ 취향: 편집자가 고른 서로 다른 종류의 헤드라인 중 끌리는 것만 → 취향 분석가가 브리핑 기준으로 (popme/taste.py)
@@ -1108,10 +1108,12 @@ function intTaste(body, c, d) {
       : `<p class="hint">지금은 헤드라인을 못 가져왔어요. 그대로 넘어가도 돼요.</p>`}
     <div class="row"><button id="int-more">다른 헤드라인 보기</button></div>
     ${d.tasteNote ? `<p class="hint">${esc(d.tasteNote)}</p>` : ""}
-    ${d.taste && d.taste.summary ? `<div class="ai-note">이렇게 이해했어요 — ${esc(d.taste.summary)}</div>` : ""}`;
+    ${d.taste && d.taste.summary ? `<div class="ai-note">이렇게 이해했어요 — ${esc(d.taste.summary)}</div>`
+      : d.base?.taste?.summary ? `<div class="ai-note">지금 취향 — ${esc(d.base.taste.summary)} (헤드라인을 누르면 새로 정리해요)</div>` : ""}`;
   body.querySelectorAll("input[data-h]").forEach(b => b.onchange = () => {
     const t = hs[+b.dataset.h].title;
     b.checked ? d.liked.add(t) : d.liked.delete(t);
+    d.tasteTouched = true; nav();  // 「취향 정리」 버튼 글자
   });
   $("#int-more").onclick = () => tasteLoad(c, d, true);
 }
@@ -1119,14 +1121,14 @@ function intTaste(body, c, d) {
 async function tasteLoad(c, d, more) {  // 헤드라인 받기 (more: 보여 준 것 빼고 새로, 고른 것은 남긴다)
   const field = c.kind === "custom" ? c.field : c.tag;
   d.tasteNote = "";
-  const ticket = d.tasteTicket = (d.tasteTicket || 0) + 1;
+  const ticket = d.tasteTicket = (d.tasteTicket || 0) + 1, ok = alive();
   think("헤드라인을 고르는 중", [`요즘 「${field}」 뉴스를 모으는 중`, d.domain ? "이 분야를 오래 본 사람의 눈으로 고르는 중" : "",
     "소식 종류가 겹치지 않게 고르는 중", "같은 사건은 하나만 남기는 중"], "30초쯤");
   intRender();
   const { subs, targets } = tasteTerms(c, d);
   const got = await api().interest_taste_heads(field, radio("ai"), d.domain || null, d.scope, subs, targets,
     more ? [] : (d.headlines || []), more ? (d.tasteShown || []).map(h => h.title) : []) || [];
-  if (ticket !== d.tasteTicket) return;  // 그사이 다시 요청했으면 (이전→다음 등) 늦게 온 답은 버린다
+  if (!ok() || ticket !== d.tasteTicket) return;  // 그사이 「이전」·다시 요청·세부 바꾸기를 했으면 늦게 온 답은 버린다
   d.liked = d.liked || new Set();
   if (more && got.length) {
     d.tasteHeads = [...(d.tasteHeads || []).filter(h => d.liked.has(h.title)), ...got];
@@ -1135,14 +1137,25 @@ async function tasteLoad(c, d, more) {  // 헤드라인 받기 (more: 보여 준
     d.tasteHeads = got; d.tasteShown = got; d.liked = new Set(); d.taste = null; d.tasteSig = "";
   }
   if (more && !got.length) d.tasteNote = "더 보여 드릴 새 헤드라인이 없어요.";
-  INT.busy = ""; if (intCur() === c) { intRender(); intTop(); }
+  if (intCur() === c) { INT.busy = ""; intRender(); intTop(); }
 }
 
 const tasteKey = d => JSON.stringify([...(d.liked || [])].sort());
+// 세부·대상·범위·질문 답이 바뀌면 ④를 새로 받는다 (받는 중이던 답도 버린다)
+const tasteReset = d => { d.tasteHeads = null; d.tasteTicket = (d.tasteTicket || 0) + 1; };
+// 「이전」·「이대로 모두」를 누르면 진행 중이던 요청의 늦은 답은 버린다 (다른 관심사의 「생각 중」을 풀지 않게)
+const alive = () => { const g = INT.gen || 0; return () => g === (INT.gen || 0); };
+const subsScope = d => { const on = (d.subs || []).filter(x => x.on);  // catalog.scope와 같게: 국내 세부만 골랐으면 kr
+  return (d.subs || []).length ? (on.length && on.every(x => x.region === "kr") ? "kr" : "world") : d.base?.scope; };
 const tastePending = d => !!(d && d.liked && d.liked.size && d.tasteSig !== tasteKey(d));
 
 // ④에 넘길 「고른 것」: 세부(묶음의 검색어·영어 이름까지)와 대상(응원 팀·아티스트 …). 새 분야는 AI 질문의 답에서
 function tasteTerms(c, d) {
+  if (c.kind !== "custom" && d.answers && !(d.subs || []).length && !d.target) {  // 고치기로 연 새 관심사: 만들 때 고른 답
+    const subs = [], targets = [];
+    for (const [slot, xs] of Object.entries(d.answers)) for (const a of xs) (slot === "대상" ? targets : subs).push({ label: a });
+    return { subs, targets };
+  }
   if (c.kind !== "custom") {
     const on = (d.subs || []).filter(x => x.on);
     const all = d.target ? [...d.target.options, ...Object.values(d.target.options_by || {}).flat()] : [];
@@ -1204,7 +1217,7 @@ function intLens(body, c, d) {
     <div class="cards">${Object.entries(LENS).map(([k, [t, sub]]) =>
       `<label class="card"><input type="radio" name="int-lens" value="${k}"><b>${t}</b><small>${sub}</small></label>`).join("")}</div>`;
   setRadio("int-lens", d.lens);
-  body.querySelectorAll("input[name=int-lens]").forEach(r => r.onchange = () => { d.lens = r.value; nav(); });
+  body.querySelectorAll("input[name=int-lens]").forEach(r => r.onchange = () => { d.lens = r.value; tasteReset(d); nav(); });
 }
 
 function intQuestion(body, c, d, i) {  // AI가 분야 말로 만든 질문 (칸: 범위·변화·대상). 「대상」 보기는 「범위」 답에 따라 바뀐다
@@ -1227,13 +1240,14 @@ function intQuestion(body, c, d, i) {  // AI가 분야 말로 만든 질문 (칸
   body.querySelectorAll("input[data-o]").forEach(b => b.onchange = () => {
     const k = ans.indexOf(b.dataset.o);
     if (b.checked && k < 0) ans.push(b.dataset.o); else if (!b.checked && k >= 0) ans.splice(k, 1);
+    tasteReset(d);
     body.querySelector("input[data-any]").checked = !ans.length;
   });
-  body.querySelector("input[data-any]").onchange = e => { if (e.target.checked) { ans.length = 0; intRender(); } };
+  body.querySelector("input[data-any]").onchange = e => { if (e.target.checked) { ans.length = 0; tasteReset(d); intRender(); } };
   const add = () => {
     const v = $("#int-opt").value.trim();
     if (!v || ans.includes(v)) return;
-    ans.push(v); (d.extraRegion = d.extraRegion || {})[v] = krName(v) ? "kr" : "world";
+    ans.push(v); (d.extraRegion = d.extraRegion || {})[v] = krName(v) ? "kr" : "world"; tasteReset(d);
     intRender(); setTimeout(() => $("#int-opt")?.focus());
   };
   $("#int-opt-add").onclick = add;
@@ -1250,8 +1264,8 @@ function intSubsView(body, c, d) {  // 묶음의 세부 (해외축구·K리그 �
     <p class="lead">여러 개 골라도 돼요. 아무것도 안 고르면 전부 받아요.</p>
     <div class="chips">${d.subs.map((x, i) => `<label class="chip"><input type="checkbox" data-s="${i}" ${x.on ? "checked" : ""}>${esc(x.label)}</label>`).join("")}</div>`;
   body.querySelectorAll("input[data-s]").forEach(b => b.onchange = () => {
-    d.subs[+b.dataset.s].on = b.checked; d.tasteHeads = null;
-    if (!d.scopeSet) { const on = d.subs.filter(x => x.on); d.scope = on.length && on.every(x => x.region === "kr") ? "kr" : "world"; }
+    d.subs[+b.dataset.s].on = b.checked; tasteReset(d);
+    if (!d.scopeSet && d.domain) d.scope = subsScope(d);  // ②를 묻는 묶음만 (AI 관심사는 저장 때 세부로 계산)
   });
 }
 
@@ -1267,10 +1281,10 @@ function intUses(body, c, d) {  // 「대상」 질문 (AI 없이 정해 둔 보
     ${groups.map(([k, xs]) => `${k ? `<div class="grp">${esc(k)}</div>` : ""}<div class="chips">${xs.map(chip).join("")}</div>`).join("")}
     <div class="mine"><input type="text" id="int-use" maxlength="30" placeholder="목록에 없으면 직접 적어 주세요"><button id="int-use-add">더하기</button></div>`;
   body.querySelectorAll("input[data-u]").forEach(b => b.onchange = () => {
-    b.checked ? d.usesOn.add(b.dataset.u) : d.usesOn.delete(b.dataset.u); d.tasteHeads = null; });
+    b.checked ? d.usesOn.add(b.dataset.u) : d.usesOn.delete(b.dataset.u); tasteReset(d); });
   const add = () => {
     const v = $("#int-use").value.trim();
-    if (v && !seen.has(v)) { t.options.push({ label: v, on: true, added: true }); d.usesOn.add(v); }
+    if (v && !seen.has(v)) { t.options.push({ label: v, on: true, added: true }); d.usesOn.add(v); tasteReset(d); }
     intRender(); setTimeout(() => $("#int-use")?.focus());
   };
   $("#int-use-add").onclick = add;
@@ -1292,10 +1306,11 @@ function intResult(body, c, d) {
     const ents = [...on(d.people), ...on(d.companies), ...(d.searches || []).map(q => ({ kind: "search", name: q, news: q, region: "kr" }))];
     think("열어서 확인하는 중", ["X 계정이 정말 있는지 열어 보는 중", "공식 사이트에 RSS가 있나 찾는 중", "이름으로 뉴스를 검색해 보는 중",
            ...ents.slice(0, 6).map(e => `「${cut(e.name, 20)}」 확인하는 중`), "고르는 기준 쓰는 중"], "10~20초");
+    const ok = alive();
     Promise.all([api().interest_verify(ents, d.scope),
                  api().interest_finalize(d.field, d.scope, on(d.people), on(d.companies).filter(e => e.kind !== "media"),
                                          on(d.topics).map(t => t.name), radio("ai"), d.lens, d.answers)])
-      .then(([v, f]) => { d.verified = v; d.final = f; INT.busy = ""; if (intCur() === c) intRender(); });
+      .then(([v, f]) => { if (!ok()) return; d.verified = v; d.final = f; INT.busy = ""; if (intCur() === c) intRender(); });
     return intRender();
   }
   const xLogin = login.x === true;
@@ -1371,15 +1386,18 @@ async function intNext() {  // 반환: 이 단계를 다 끝냈나
   if (intSubName() === "scope") d.scopeSet = true;  // 화면에 보인 범위 그대로
   if (c.kind === "custom" && intSubName() === "lens" && d.qsLens !== d.lens) {  // 보는 방식 → 최근 소식을 근거로 분야별 질문
     think(`최근 소식을 살펴보는 중`, [`요즘 「${c.field}」 뉴스를 모으는 중`], "20~30초"); intRender();
+    const ok = alive();
     const heads = await api().interest_research(c.field) || [];
+    if (!ok()) return false;
     think("질문을 고르는 중", [heads.length ? `「${c.field}」 최근 뉴스 ${heads.length}개를 읽었어요` : "",
       `「${c.field}」를 오래 본 사람을 떠올리는 중`, "그 사람이라면 무엇을 물어볼까",
       ...heads.slice(0, 10).map(h => `「${cut(h, 34)}」`), `${LENS[d.lens][0]}에 맞는 질문 고르는 중`, "보기가 실제로 있는지 뉴스로 확인하는 중"],
       "20~30초");
     intRender();
     const r = await api().interest_questions(c.field, d.lens, radio("ai"), heads, c.context || "");
+    if (!ok()) return false;
     d.qs = r.questions; d.type = r.type; d.headlines = r.headlines || []; d.qerror = r.error || ""; d.domain = r.domain || null;
-    d.qsLens = d.lens; d.answers = {}; d.suggested = false;
+    d.qsLens = d.lens; d.answers = {}; d.suggested = false; tasteReset(d);
     d.subs = ["lens", "scope", ...d.qs.map((_, i) => "q" + i), "people", "companies", "taste", "result"];
     INT.busy = ""; INT.sub = 1;
     return intRender(), intTop(), false;
@@ -1392,9 +1410,11 @@ async function intNext() {  // 반환: 이 단계를 다 끝냈나
     think("사람·기업을 찾는 중", [picked.length ? `고른 것: ${cut(picked.join("·"), 30)}` : "고른 답 다시 보는 중",
       d.lens === "target" ? "고른 대상의 사람들 찾는 중" : "업계를 잘 정리하는 사람 찾는 중", "기업·단체 찾는 중",
       d.lens !== "target" ? "전문 매체 찾는 중" : "", ...(d.headlines || []).slice(0, 4).map(h => `「${cut(h, 34)}」`),
-      "계정이 맞는지는 마지막에 열어 볼게요"], "20초쯤");
+      d.domain ? "" : "뒤에서 정리한 분야 정보를 합치는 중", "계정이 맞는지는 마지막에 열어 볼게요"], d.domain ? "20초쯤" : "1분쯤");
     INT.sub++; intRender();
+    const ok = alive();
     const s = await api().interest_suggest(c.field, d.scope, radio("ai"), d.lens, d.answers, d.headlines, c.context || "", d.domain);
+    if (!ok()) return false;
     const keep = xs => xs.filter(e => e.added);
     d.people = [...s.people.map(e => ({ ...e, on: true })), ...keep(d.people)];
     d.companies = [...s.media.map(e => ({ ...e, on: true })), ...s.companies.map(e => ({ ...e, on: true })), ...keep(d.companies)];
@@ -1410,9 +1430,12 @@ async function intNext() {  // 반환: 이 단계를 다 끝냈나
     if (!d.liked || !d.liked.size) { d.taste = null; d.tasteSig = ""; }  // 다 풀었으면 취향 없음 (묶음은 예전 취향을 지운다)
     else if (tastePending(d)) {  // 누른 게 바뀌었으면 취향을 정리해서 보여 주고, 한 번 더 누르면 다음으로
       think("취향을 정리하는 중", ["누른 헤드라인의 공통점 찾는 중", "먼저 챙길 소식 종류 고르는 중"], "10초쯤"); intRender();
-      d.taste = await api().interest_taste(c.kind === "custom" ? c.field : c.tag, radio("ai"), d.domain || null, d.tasteShown || [], [...d.liked],
+      d.tasteNote = "";
+      const ok = alive(), sig = tasteKey(d);
+      const t = await api().interest_taste(c.kind === "custom" ? c.field : c.tag, radio("ai"), d.domain || null, d.tasteShown || [], [...d.liked],
                                            tasteChosen(c, d));
-      d.tasteSig = tasteKey(d); INT.busy = "";
+      if (!ok()) return false;
+      d.taste = t; d.tasteSig = sig; INT.busy = "";
       if (!d.taste || !(d.taste.summary || (d.taste.likes || []).length)) d.tasteNote = "취향을 정리하지 못했어요. 그대로 넘어가도 돼요.";
       return intRender(), false;
     }
@@ -1437,6 +1460,7 @@ async function intSaveMode() {  // 브리핑 탭에서 「관심사」만 연 �
 
 async function intSkipPresets() {  // 「이대로 모두」: 남은 미리 만든 관심사는 골라 둔 그대로
   if (INT.busy) return;
+  INT.gen = (INT.gen || 0) + 1;
   for (let i = INT.qi; i < INT.queue.length; i++) if (INT.queue[i].kind === "preset") INT.data[INT.queue[i].key] = { skipped: true };
   const k = INT.queue.findIndex((q, i) => i >= INT.qi && q.kind === "custom");
   if (k < 0) return D.mode ? intSaveMode() : go(step + 1);
@@ -1446,8 +1470,9 @@ async function intSkipPresets() {  // 「이대로 모두」: 남은 미리 만�
 function intPrev() {  // 반환: 관심사 단계 안에서 처리했나
   if (!INT || !intCur()) return false;
   if (INT.sub > 0) INT.sub--;
-  else if (INT.qi > 0) { INT.qi--; INT.sub = intSubs(intCur()).length - 1; if (INT.data[intCur().key]?.skipped) delete INT.data[intCur().key]; }
+  else if (INT.qi > 0) { INT.qi--; INT.sub = INT.data[intCur().key]?.skipped ? 0 : intSubs(intCur()).length - 1; }
   else INT.qi = -1;
+  INT.gen = (INT.gen || 0) + 1;  // 진행 중이던 요청의 답은 버린다
   INT.busy = ""; intRender(); intTop();
   return true;
 }
@@ -1464,7 +1489,7 @@ function intPayload() {  // 저장할 값: 고른 관심사, 미리 만든 관�
       const used = d.target ? (d.usesOn ? [...d.usesOn] : b.uses) : [];
       if (d.target && !same([...used].sort(), [...b.uses].sort())) pk.uses = used;
       if ((d.subs || []).length && !same(subsOn(d), b.subs)) pk.subs = subsOn(d);
-      if (d.domain || d.scope !== b.scope) pk.scope = d.scope;  // ②를 묻는 묶음은 보인 범위 그대로 (세부로 다시 계산되지 않게)
+      if (d.scope !== b.scope || (d.domain && d.scopeSet && d.scope !== subsScope(d))) pk.scope = d.scope;  // ②에서 고른 게 세부 계산과 다를 때만 고정
       if (!same(names(d.people), b.people)) pk.people = names(d.people);
       if (!same(names(d.companies), b.companies)) pk.companies = names(d.companies);
       if (!same(tps, b.topics)) pk.topics = tps;
@@ -1472,7 +1497,7 @@ function intPayload() {  // 저장할 값: 고른 관심사, 미리 만든 관�
         x: e.x_status === "ok" ? e.x : "", news: e.news_count ? e.news : "", news_en: e.news_count ? e.news_en : "" }));
       if (extra.length || b.extra) pk.extra = extra;
       if (d.taste && !same(d.taste, b.taste)) pk.taste = d.taste;
-      else if (d.tasteVisited && !d.taste && b.taste) pk.taste = { summary: "", likes: [], less: [] };  // 다 풀었으면 예전 취향을 지운다
+      else if (d.tasteTouched && !d.taste && b.taste) pk.taste = { summary: "", likes: [], less: [] };  // 눌렀다가 다 풀었을 때만 예전 취향을 지운다
       if (Object.keys(pk).length) picks[c.id] = pk;
     } else if (d.final) {
       customs.push({ field: d.field, scope: d.scope, final: d.final, topics: d.topics.filter(t => t.on).map(t => t.name),
