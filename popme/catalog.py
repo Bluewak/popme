@@ -14,6 +14,7 @@ from popme import config
 
 FEEDS_PATH = config.ROOT / "popme" / "feeds.toml"
 PROFILES_DIR = config.ROOT / "popme" / "profiles"
+TAXONOMY_PATH = config.ROOT / "popme" / "taxonomy.toml"  # 분류표: 대분류 → 소분류 (→ 세부)
 CUSTOM_DIR = config.DATA_DIR / "profiles"  # 관심사 설정에서 새로 만든 관심사 (custom-*.toml, 내 PC에만)
 NOTICE = config.DATA_DIR / "news-migrated.txt"  # 예전 config를 옮겼다는 알림 (한 번 보이고 지운다)
 EXTRA_CAP = 15                       # 내가 더한 출처의 묶음이 관심사 상한표에 없을 때
@@ -43,6 +44,26 @@ def _profiles():
         except (OSError, tomllib.TOMLDecodeError):
             pass
     return sorted(out, key=lambda p: p.get("order", 99))
+
+
+@lru_cache(maxsize=1)
+def _taxonomy():
+    return tomllib.loads(TAXONOMY_PATH.read_text(encoding="utf-8")).get("group", [])
+
+
+def taxonomy():
+    """분류표 [{name, items: [{name, profile?, children?}]}]. 묶음(profile)이 아직 없는 id는 지우고 넘긴다
+    — 그 소분류는 「AI 질문」 방식으로 새로 만든다."""
+    have = {p["id"] for p in profiles()}
+
+    def item(x):
+        out = {"name": x["name"]}
+        if x.get("profile") in have:
+            out["profile"] = x["profile"]
+        if x.get("children"):
+            out["children"] = [item(c) for c in x["children"]]
+        return out
+    return [{"name": g["name"], "items": [item(x) for x in g.get("items", [])]} for g in _taxonomy()]
 
 
 def reload():

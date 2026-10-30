@@ -387,7 +387,7 @@ def interest_choices(cfg):
         out.append({"id": p["id"], "name": p["name"], "tag": p["tag"], "summary": p.get("summary", ""),
                     "custom": bool(p.get("custom")), "count": len(on) or n_ent,
                     "examples": [feeds[i]["name"] for i in on[:3]] or [e["name"] for e in p.get("people", [])[:3]]})
-    return {"interests": out, "interests_on": [p["id"] for p in catalog.chosen(cfg)]}
+    return {"interests": out, "interests_on": [p["id"] for p in catalog.chosen(cfg)], "taxonomy": catalog.taxonomy()}
 
 
 def _check_url(url):
@@ -1001,13 +1001,13 @@ class Api:
         from popme import interests
         return interests.research(field)
 
-    def interest_questions(self, field, lens, provider, headlines=None):
+    def interest_questions(self, field, lens, provider, headlines=None, context=""):
         from popme import interests
-        return interests.questions(self._cfg(provider), field, lens, headlines)
+        return interests.questions(self._cfg(provider), field, lens, headlines, context)
 
-    def interest_suggest(self, field, scope, provider, lens=None, answers=None, headlines=None):
+    def interest_suggest(self, field, scope, provider, lens=None, answers=None, headlines=None, context=""):
         from popme import interests
-        return interests.suggest(self._cfg(provider), field, scope, lens, answers, headlines)
+        return interests.suggest(self._cfg(provider), field, scope, lens, answers, headlines, context)
 
     def interest_verify(self, entities, scope):
         from popme import interests
