@@ -42,10 +42,11 @@ def test_ai_coding_keeps_todays_feeds():
     """그동안 config.example.toml의 20개 = 「AI 코딩」 관심사. 이름이 같아야 DB의 지난 글과 이어진다."""
     old = {"Claude Code 릴리스", "Codex 릴리스", "pi 릴리스", "OpenClaw 릴리스", "Deep Agents 릴리스", "Gemini CLI 릴리스",
            "OpenAI 뉴스", "OpenAI 개발자 블로그", "Anthropic 뉴스", "Claude 블로그", "Anthropic 엔지니어링", "Google AI 블로그",
-           "xAI 뉴스", "Hugging Face 블로그", "Mistral 뉴스", "Simon Willison 블로그", "GeekNews", "Hacker News 인기",
+           "Hugging Face 블로그", "Mistral 뉴스", "Simon Willison 블로그", "GeekNews", "Hacker News 인기",
            "Hacker News AI 회사", "Hacker News AI 모델"}
     got = {f["name"] for f in catalog.active(news(interests=["ai-coding"]))}
     assert old <= got and "Cursor 변경내역" not in got  # 다른 코딩 도구는 켜야 받는다
+    assert "xAI 뉴스" not in got and "The Information" in got  # 2026-10-31 점검: xAI 미러는 멈춰 빼고(X @xai로), 단독 보도 매체를 더함
 
 
 def test_shared_feed_merges_filters():

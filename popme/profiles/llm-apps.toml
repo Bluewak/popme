@@ -17,6 +17,7 @@ discovery = 'RAG·검색·임베딩·문서 파싱·LLM 앱 평가에 실질 정
 topics = ['프레임워크 큰 변경', '벡터 DB·검색', '임베딩·리랭커', '평가·관측', '문서 파싱(HWP·PDF)', '에이전트 보안']   # 「특히 궁금한 것」 보기 (관심사 설정 ⑤)
 
 [caps]                        # 묶음별 상한 (이 관심사 몫)
+'업계 뉴스' = 8
 '공식 변경내역' = 30
 '플랫폼 변경내역' = 3
 '공식 발표' = 15
@@ -26,6 +27,10 @@ topics = ['프레임워크 큰 변경', '벡터 DB·검색', '임베딩·리랭�
 '해외 커뮤니티' = 8
 '한국 커뮤니티' = 8
 '한국 테크블로그' = 5
+
+[[feeds]]
+id = 'theinformation'
+why = '단독 보도 — 인수·투자·내부 소식이 먼저'
 
 [[feeds]]
 id = 'langchain-changelog'
@@ -189,10 +194,6 @@ why = 'Hacker News RAG 화제'
 [[feeds]]
 id = 'kordoc-releases'
 why = 'HWP·HWPX 문서 변환기'
-
-[[feeds]]
-id = 'reddit-rag'
-why = 'RAG 커뮤니티 주간 인기'
 
 [[feeds]]
 id = 'hn-front'
