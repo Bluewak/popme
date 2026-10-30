@@ -1297,11 +1297,12 @@ async function intNext() {  // 반환: 이 단계를 다 끝냈나
     think(`최근 소식을 살펴보는 중`, [`요즘 「${c.field}」 뉴스를 모으는 중`], "20~30초"); intRender();
     const heads = await api().interest_research(c.field) || [];
     think("질문을 고르는 중", [heads.length ? `「${c.field}」 최근 뉴스 ${heads.length}개를 읽었어요` : "",
+      `「${c.field}」를 오래 본 사람을 떠올리는 중`, "그 사람이라면 무엇을 물어볼까",
       ...heads.slice(0, 10).map(h => `「${cut(h, 34)}」`), `${LENS[d.lens][0]}에 맞는 질문 고르는 중`, "보기가 실제로 있는지 뉴스로 확인하는 중"],
       "20~30초");
     intRender();
     const r = await api().interest_questions(c.field, d.lens, radio("ai"), heads, c.context || "");
-    d.qs = r.questions; d.type = r.type; d.headlines = r.headlines || []; d.qerror = r.error || "";
+    d.qs = r.questions; d.type = r.type; d.headlines = r.headlines || []; d.qerror = r.error || ""; d.domain = r.domain || null;
     d.qsLens = d.lens; d.answers = {}; d.suggested = false;
     d.subs = ["lens", ...d.qs.map((_, i) => "q" + i), "people", "companies", ...(d.lens === "target" ? ["topics"] : []), "result"];
     INT.busy = ""; INT.sub = 1;
@@ -1317,13 +1318,14 @@ async function intNext() {  // 반환: 이 단계를 다 끝냈나
       d.lens !== "target" ? "전문 매체 찾는 중" : "", ...(d.headlines || []).slice(0, 4).map(h => `「${cut(h, 34)}」`),
       "계정이 맞는지는 마지막에 열어 볼게요"], "20초쯤");
     INT.sub++; intRender();
-    const s = await api().interest_suggest(c.field, d.scope, radio("ai"), d.lens, d.answers, d.headlines, c.context || "");
+    const s = await api().interest_suggest(c.field, d.scope, radio("ai"), d.lens, d.answers, d.headlines, c.context || "", d.domain);
     const keep = xs => xs.filter(e => e.added);
     d.people = [...s.people.map(e => ({ ...e, on: true })), ...keep(d.people)];
     d.companies = [...s.media.map(e => ({ ...e, on: true })), ...s.companies.map(e => ({ ...e, on: true })), ...keep(d.companies)];
     d.topics = s.topics.map(t => ({ name: t, on: false }));
     d.searches = s.searches || [];
     d.error = s.error || ""; d.suggested = sig; d.verified = null; INT.busy = "";
+    if (s.domain) d.domain = s.domain;  // 뒤에서 사실 확인을 마친 분야 카드
     return intRender(), intTop(), false;
   }
   if (INT.sub < intSubs(c).length - 1) { INT.sub++; intRender(); intTop(); return false; }
@@ -1382,7 +1384,7 @@ function intPayload() {  // 저장할 값: 고른 관심사, 미리 만든 관�
       if (Object.keys(pk).length) picks[c.id] = pk;
     } else if (d.final) {
       customs.push({ field: d.field, scope: d.scope, final: d.final, topics: d.topics.filter(t => t.on).map(t => t.name),
-                     lens: d.lens, type: d.type, answers: d.answers,
+                     lens: d.lens, type: d.type, answers: d.answers, domain: d.domain,
                      verified: d.verified.filter(e => e.news_count || e.feed || e.x_status === "ok") });
     }
   }

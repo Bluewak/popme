@@ -484,7 +484,8 @@ def validate_interests(it):
         if not str(c.get("field") or "").strip() or not f:
             continue
         ans = c.get("answers") if isinstance(c.get("answers"), dict) else {}
-        customs.append({"field": str(c["field"]).strip()[:40], "scope": "kr" if c.get("scope") == "kr" else "world",
+        customs.append({"domain": c.get("domain") if isinstance(c.get("domain"), dict) else None,
+                        "field": str(c["field"]).strip()[:40], "scope": "kr" if c.get("scope") == "kr" else "world",
                         "lens": c.get("lens") if c.get("lens") in ("overview", "target", "both") else "target",
                         "type": str(c.get("type") or "기타")[:10],
                         "answers": {str(k)[:6]: clean(v, 20)[:10] for k, v in list(ans.items())[:3]},
@@ -510,7 +511,7 @@ def save_interest_choices(it):
     """관심사 단계 값(validate_interests 거친 것) 저장: 새 관심사 파일 → 고른 관심사·고친 칸. 반환: 고른 관심사 id."""
     from popme import interests
     made = [interests.save_custom(c["field"], c.get("scope", "world"), c.get("verified", []), c.get("topics", []),
-                                  c["final"], c.get("lens"), c.get("type"), c.get("answers"))
+                                  c["final"], c.get("lens"), c.get("type"), c.get("answers"), c.get("domain"))
             for c in it["customs"] if c.get("field") and c.get("final")]
     return list(dict.fromkeys(it["chosen"] + made))
 
@@ -1005,9 +1006,9 @@ class Api:
         from popme import interests
         return interests.questions(self._cfg(provider), field, lens, headlines, context)
 
-    def interest_suggest(self, field, scope, provider, lens=None, answers=None, headlines=None, context=""):
+    def interest_suggest(self, field, scope, provider, lens=None, answers=None, headlines=None, context="", domain=None):
         from popme import interests
-        return interests.suggest(self._cfg(provider), field, scope, lens, answers, headlines, context)
+        return interests.suggest(self._cfg(provider), field, scope, lens, answers, headlines, context, domain)
 
     def interest_verify(self, entities, scope):
         from popme import interests

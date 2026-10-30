@@ -18,6 +18,7 @@ topics = ["이적", "부상", "대표팀 명단", "경기 결과", "감독 교�
 "한국 커뮤니티" = 10
 "해외 커뮤니티" = 5
 "뉴스" = 25
+"영상" = 8
 
 [[subs]]
 label = "해외축구"
@@ -331,7 +332,7 @@ brief = "응원하는 팀"
   { label = "포항 스틸러스", region = "kr", news = "포항 스틸러스", feeds = ["sportsg-k1"] },
   { label = "FC서울", region = "kr", news = "FC서울", feeds = ["sportsg-k1"] },
   { label = "강원FC", region = "kr", news = "강원FC", feeds = ["sportsg-k1"] },
-  { label = "하나시티즌", region = "kr", news = "하나시티즌 축구", feeds = ["sportsg-k1"] },
+  { label = "대전하나시티즌", region = "kr", news = "대전하나시티즌", feeds = ["sportsg-k1"] },
   { label = "광주FC", region = "kr", news = "광주FC", feeds = ["sportsg-k1"] },
   { label = "제주SK", region = "kr", news = "제주SK", feeds = ["sportsg-k1"] },
   { label = "FC안양", region = "kr", news = "FC안양", feeds = ["sportsg-k1"] },
@@ -346,3 +347,22 @@ brief = "응원하는 팀"
 "여자축구" = [
   { label = "수원FC 위민", region = "kr", news = "수원FC 위민", feeds = ["sportsg-women"] },
 ]
+
+[[feeds]]
+id = "yt-kleague"
+why = "K리그 공식 — 하이라이트·발표"
+subs = ["K리그"]
+
+[[feeds]]
+id = "yt-coupangplaysports"
+why = "중계사 하이라이트"
+
+[[feeds]]
+id = "yt-dalsoolive"
+why = "축구 분석·해설"
+subs = ["해외축구", "국가대표"]
+
+[[feeds]]
+id = "yt-fabrizioromanoyt"
+why = "이적 속보"
+subs = ["해외축구"]

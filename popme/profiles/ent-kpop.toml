@@ -18,6 +18,7 @@ topics = ["컴백·신곡", "데뷔", "차트 성적", "투어·공연", "시상
 "한국 커뮤니티" = 10
 "해외 커뮤니티" = 5
 "뉴스" = 25
+"영상" = 8
 
 [[subs]]
 label = "보이그룹"
@@ -295,3 +296,29 @@ brief = "좋아하는 아티스트"
   { label = "태연", region = "kr", news = "소녀시대 태연" },
   { label = "화사", region = "kr", news = "마마무 화사" },
 ]
+
+[[feeds]]
+id = "yt-hybelabels"
+why = "기획사 공식 — 뮤비·티저"
+
+[[feeds]]
+id = "yt-smtown"
+why = "기획사 공식 — 뮤비·티저"
+
+[[feeds]]
+id = "yt-jypentertainment"
+why = "기획사 공식 — 뮤비·티저"
+
+[[feeds]]
+id = "yt-ygentertainment"
+why = "기획사 공식 — 뮤비·티저"
+
+[[feeds]]
+id = "yt-1thek"
+why = "음원 유통 채널"
+default = false
+
+[[feeds]]
+id = "yt-mnet"
+why = "음악 방송·시상식"
+subs = ["차트·시상식"]

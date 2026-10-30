@@ -18,6 +18,7 @@ topics = ["경기 결과", "부상·엔트리", "FA·트레이드", "코리안 �
 "한국 커뮤니티" = 10
 "해외 커뮤니티" = 5
 "뉴스" = 25
+"영상" = 8
 
 [[subs]]
 label = "KBO"
@@ -305,3 +306,20 @@ brief = "응원하는 팀"
   { label = "밀워키 브루어스", region = "world", news = "밀워키 브루어스", x = "Brewers", feeds = ["mlb-brewers"] },
   { label = "뉴욕 메츠", region = "world", news = "메츠", x = "Mets" },
 ]
+
+[[feeds]]
+id = "yt-kbo1982"
+why = "KBO 공식"
+subs = ["KBO"]
+
+[[feeds]]
+id = "yt-hanwhaeagles-official"
+why = "구단 공식 (응원 팀일 때 켜기)"
+subs = ["KBO"]
+default = false
+
+[[feeds]]
+id = "yt-lgtwinstv"
+why = "구단 공식 (응원 팀일 때 켜기)"
+subs = ["KBO"]
+default = false

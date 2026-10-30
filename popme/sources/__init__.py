@@ -12,6 +12,7 @@ from popme.sources import hn, rss
 
 log = logging.getLogger(__name__)
 KINDS = {"rss": rss, "hn": hn}
+BROWSER = {"youtube"}  # 전용 Chrome 단계에서 모으는 종류 (popme/collectors) — 여기서는 건너뛴다
 WORKERS = 8
 # 잠깐 오류면 한 번 더: 서버 과부하(5xx)·요청 많음(429)·Cloudflare 간헐 차단(403)·시간 초과. 429는 조금 더 기다린다
 RETRY_CODES = {403, 429, 500, 502, 503, 504}
@@ -30,6 +31,7 @@ def module(feed):
 def collect(feeds, progress=lambda s: None):
     """출처들을 받는다 → (글 목록, 실패 문구 목록). 서버(호스트)가 다르면 동시에, 같은 서버는 차례로
     — Reddit 등은 같은 서버에 한꺼번에 요청하면 429를 낸다. 잠깐 오류면 몇 초 뒤 한 번 더. 한 출처가 실패해도 나머지는 받는다."""
+    feeds = [f for f in feeds if f.get("type") not in BROWSER]
     by_host = defaultdict(list)
     for f in feeds:
         by_host[urlsplit(f.get("url", "")).netloc].append(f)

@@ -52,3 +52,18 @@ def assume_online(monkeypatch):
     """테스트는 인터넷 확인을 하지 않는다 (있다고 놓음). 끊긴 경우는 test_offline.py에서 바꿔 끼운다."""
     from popme import jobs
     monkeypatch.setattr(jobs, "online", lambda timeout=4: True)
+
+
+@pytest.fixture(autouse=True)
+def no_local_domains(monkeypatch, tmp_path):
+    """분야 페르소나도 내 PC 것(DATA_DIR/domains) 대신 임시 폴더로."""
+    from popme import domains
+    monkeypatch.setattr(domains, "LOCAL_DIR", tmp_path / "domains")
+
+
+@pytest.fixture(autouse=True)
+def no_background_fieldcard(monkeypatch):
+    """질문 단계가 뒤에서 띄우는 사실 확인(fieldcard)이 다른 테스트의 가짜 AI 답을 가로채지 않게 — 그 테스트에서만 켠다."""
+    from popme import fieldcard
+    monkeypatch.setattr(fieldcard, "BACKGROUND", False)
+    fieldcard._jobs.clear()
