@@ -52,3 +52,10 @@ def assume_online(monkeypatch):
     """테스트는 인터넷 확인을 하지 않는다 (있다고 놓음). 끊긴 경우는 test_offline.py에서 바꿔 끼운다."""
     from popme import jobs
     monkeypatch.setattr(jobs, "online", lambda timeout=4: True)
+
+
+@pytest.fixture(autouse=True)
+def no_local_domains(monkeypatch, tmp_path):
+    """분야 페르소나도 내 PC 것(DATA_DIR/domains) 대신 임시 폴더로."""
+    from popme import domains
+    monkeypatch.setattr(domains, "LOCAL_DIR", tmp_path / "domains")

@@ -203,4 +203,5 @@ def test_ai_prompts_get_taxonomy_context(monkeypatch):
     monkeypatch.setattr(interests.llm, "ask", lambda cfg, s, prompt, timeout=0: seen.append(prompt) or '{"type": "스포츠", "questions": []}')
     interests.questions({}, "포켓몬", "target", None, "엔터·문화 › 캐릭터·애니 › 포켓몬")
     interests.suggest({}, "포켓몬", "world", "target", {}, [], "엔터·문화 › 캐릭터·애니 › 포켓몬")
-    assert all("분류: 엔터·문화 › 캐릭터·애니 › 포켓몬" in p for p in seen)
+    asks = [p for p in seen if "분야: 포켓몬" in p]  # 질문·후보 지시문 (프로필 작가는 분류를 데이터로 받는다)
+    assert len(asks) == 2 and all("분류: 엔터·문화 › 캐릭터·애니 › 포켓몬" in p for p in asks)

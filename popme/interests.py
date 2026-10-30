@@ -39,7 +39,7 @@ TYPES = {
 }
 NO_ASK = re.compile(r"정치|성향|지지\s*정당|종교|건강|질병|병력|주소|사는\s*곳|거주|나이|연령|소득|연봉|재산|성별|성적\s*지향")
 HEADLINES = 30  # 질문을 만들 때 근거로 주는 최근 1주 헤드라인 수 (AI 지식은 오래됐을 수 있다 — 이적·감독 교체 등)
-QUESTIONS = """분야: {field}{where}
+QUESTIONS = """{persona}분야: {field}{where}
 보는 방식: {lens}
 아래는 이 분야의 최근 1주 뉴스 헤드라인이다 (지금 상황의 근거):
 {headlines}
@@ -55,7 +55,7 @@ QUESTIONS = """분야: {field}{where}
 - 정치 성향·종교·건강·사는 곳·나이·소득은 묻지 마라.
 출력: {{"type": "...", "questions": [...]}}"""
 SYSTEM = "너는 소식 출처를 고르는 도우미다. 요청한 JSON 하나만 출력한다. 실존하는 사람·기업만 쓰고, 모르면 적게 쓴다."
-SUGGEST = """분야: {field}{where}
+SUGGEST = """{persona}분야: {field}{where}
 범위: {scope}
 {context}이 분야 소식을 꾸준히 받고 싶은 사람에게 권할 것을 골라라.
 - people: {who} 6~8명. {mix}
@@ -116,7 +116,14 @@ def where(context):
     return f" (분류: {_short(context, 60)})" if context else ""
 
 
-def suggest(cfg, field, scope, lens=None, answers=None, headlines=None, context=""):
+def with_persona(domain, task):
+    """분야 페르소나(popme/domains.py)가 있으면 「이 사람의 눈으로」 블록을 지시문 앞에."""
+    from popme import domains
+    text = domains.brief(domain, task) if domain else ""
+    return f"{text}\n\n" if text else ""
+
+
+def suggest(cfg, field, scope, lens=None, answers=None, headlines=None, context="", domain=None):
     """사람·기업·궁금한 것 보기: {"people", "companies", "topics", "media", "searches"}. AI가 실패하면 빈 목록 (직접 입력만).
     lens(보기 방식)가 업계 흐름이면 정리하는 사람·대표 기업 + 전문 매체·분야 검색어, 대상 위주면 고른 대상의 당사자."""
     lens = lens if lens in LENSES else "target"
@@ -126,7 +133,7 @@ def suggest(cfg, field, scope, lens=None, answers=None, headlines=None, context=
     if headlines:
         given += "최근 1주 헤드라인 (지금 상황의 근거):\n" + "\n".join(f"- {h}" for h in headlines[:15]) + "\n"
     flow = lens in ("overview", "both")
-    prompt = SUGGEST.format(field=_short(field, 40), where=where(context), scope=SCOPES.get(scope, SCOPES["world"]), mix=MIX.get(scope, MIX["world"]),
+    prompt = SUGGEST.format(persona=with_persona(domain, "people"), field=_short(field, 40), where=where(context), scope=SCOPES.get(scope, SCOPES["world"]), mix=MIX.get(scope, MIX["world"]),
                             context=given, who=WHO[lens], what=WHAT[lens], extra=EXTRA if flow else "",
                             extra_out=', "media": [...], "searches": ["..."]' if flow else "")
     empty = {"people": [], "companies": [], "topics": [], "media": [], "searches": []}
@@ -224,13 +231,16 @@ def check_options(questions, scope="world"):
     return questions
 
 
-def questions(cfg, field, lens, heads=None, context=""):
+def questions(cfg, field, lens, heads=None, context="", domain=None):
     """보는 방식 → 그 분야의 질문: {type, questions, headlines}. 최근 헤드라인을 근거로 주고, 받은 질문을 검사한다.
     heads: 화면이 먼저 받아 둔 헤드라인 (기다리는 동안 「읽는 중」으로 보여 준다). 없으면 여기서 받는다."""
     lens = lens if lens in LENSES else "target"
     heads = research(field) if heads is None else [str(h)[:200] for h in heads][:HEADLINES]
     words = "\n".join(f"  - {s}" for s in SLOTS[lens])
-    prompt = QUESTIONS.format(field=_short(field, 40), where=where(context), lens=LENSES[lens], headlines="\n".join(f"- {h}" for h in heads) or "(없음)",
+    if domain is None:  # 새 분야: 프로필 작가가 이 분야를 오래 본 사람을 먼저 그린다 (최근 헤드라인을 사실의 근거로)
+        from popme import domains
+        domain = domains.write(cfg, field, context, heads)
+    prompt = QUESTIONS.format(persona=with_persona(domain, "questions"), field=_short(field, 40), where=where(context), lens=LENSES[lens], headlines="\n".join(f"- {h}" for h in heads) or "(없음)",
                               types=" / ".join(f"{k}({v['범위']}·{v['대상']})" for k, v in TYPES.items()), slots=words)
     try:
         raw = briefing.parse_json(llm.ask(cfg, SYSTEM, prompt, timeout=180))
@@ -240,6 +250,7 @@ def questions(cfg, field, lens, heads=None, context=""):
         out = {"type": "기타", "questions": fixed_questions(lens), "error": "AI가 지금 답하지 못했어요"}
     out["questions"] = check_options(out["questions"])
     out["headlines"] = heads
+    out["domain"] = domain  # 화면이 들고 있다가 후보 받기·저장에 넘긴다
     return out
 
 
@@ -358,7 +369,7 @@ def _q(v):
     return _literal(v)
 
 
-def save_custom(field, scope, verified, topics, final, lens=None, kind=None, answers=None):
+def save_custom(field, scope, verified, topics, final, lens=None, kind=None, answers=None, domain=None):
     """새 관심사 → DATA_DIR/profiles/custom-<이름>.toml. 확인된 것만 담는다. 반환: 관심사 id."""
     pid = f"custom-{_slug(field)}"
     lines = [f"# 관심사 설정에서 만든 관심사 ({datetime.now():%Y-%m-%d}). 「{field}」",
@@ -395,6 +406,9 @@ def save_custom(field, scope, verified, topics, final, lens=None, kind=None, ans
     tomllib.loads(text)  # 깨진 파일은 쓰지 않는다
     catalog.CUSTOM_DIR.mkdir(parents=True, exist_ok=True)
     (catalog.CUSTOM_DIR / f"{pid}.toml").write_text(text, encoding="utf-8", newline="\n")
+    if domain:  # 이 관심사의 분야 페르소나 — 다음에 고치기·취향 문답에서 다시 쓴다
+        from popme import domains
+        domains.save_local(pid, domains.clean(domain, pid))
     catalog.reload()
     return pid
 
