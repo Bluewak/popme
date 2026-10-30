@@ -1325,6 +1325,7 @@ async function intNext() {  // 반환: 이 단계를 다 끝냈나
     d.topics = s.topics.map(t => ({ name: t, on: false }));
     d.searches = s.searches || [];
     d.error = s.error || ""; d.suggested = sig; d.verified = null; INT.busy = "";
+    if (s.domain) d.domain = s.domain;  // 뒤에서 사실 확인을 마친 분야 카드
     return intRender(), intTop(), false;
   }
   if (INT.sub < intSubs(c).length - 1) { INT.sub++; intRender(); intTop(); return false; }

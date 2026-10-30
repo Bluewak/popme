@@ -57,16 +57,27 @@ def clean(raw, pid=""):
            "sensitive": [_s(x, 60) for x in lst("sensitive", 6)],
            "vocabulary": [{"word": _s(x.get("word"), 15), "meaning": _s(x.get("meaning"), 40)}
                           for x in lst("vocabulary", 15) if isinstance(x, dict) and x.get("word")],
-           "calendar": [{"when": _s(x.get("when"), 15), "what": _s(x.get("what"), 40)}
+           "calendar": [_ok(x, {"when": _s(x.get("when"), 15), "what": _s(x.get("what"), 40)})
                         for x in lst("calendar") if isinstance(x, dict) and x.get("what")],
-           "must_know": [{"name": _s(x.get("name"), 30), "why": _s(x.get("why"), 40)}
+           "must_know": [_ok(x, {"name": _s(x.get("name"), 30), "why": _s(x.get("why"), 40)})
                          for x in lst("must_know") if isinstance(x, dict) and x.get("name")],
            "personal": {k: _s((raw.get("personal") or {}).get(k), 80) for k in ("favorite", "rival", "memorable", "taste")}
            if isinstance(raw.get("personal"), dict) else {},
            "question_ideas": [_s(x, 60) for x in lst("question_ideas", 8)]}
     if isinstance(raw.get("info"), dict):
         out["info"] = clean_info(raw["info"])
+    if raw.get("checked"):  # 앱이 사실 확인(fieldcard)을 마친 날
+        out["checked"] = _s(raw["checked"], 10)
     return out
+
+
+def _ok(raw, item):
+    """앱이 사실 확인한 칸이면 ok(확인됨/미확인)를 그대로."""
+    return {**item, "ok": raw["ok"]} if isinstance(raw.get("ok"), bool) else item
+
+
+def _mark(x):
+    return " (미확인)" if x.get("ok") is False else ""
 
 
 def clean_info(i):
@@ -108,15 +119,17 @@ def brief(d, for_task=""):
     if d.get("sensitive"):
         lines.append("조심할 것: " + "; ".join(d["sensitive"]))
     if d.get("calendar") and for_task in ("questions", "editor", ""):
-        lines.append("한 해 흐름: " + "; ".join(f"{x['when']} {x['what']}" for x in d["calendar"]))
+        lines.append("한 해 흐름: " + "; ".join(f"{x['when']} {x['what']}{_mark(x)}" for x in d["calendar"]))
     if d.get("categories") and for_task in ("editor", "taste", ""):
         lines.append("소식 종류: " + "; ".join(f"{x['name']}({x['desc']})" for x in d["categories"]))
     if d.get("vocabulary") and for_task in ("questions", ""):
         lines.append("이 분야 말: " + ", ".join(f"{x['word']}={x['meaning']}" for x in d["vocabulary"]))
     if d.get("must_know") and for_task in ("people", ""):
-        lines.append("꼭 아는 사람·기관: " + ", ".join(f"{x['name']}({x['why']})" for x in d["must_know"]))
+        lines.append("꼭 아는 사람·기관: " + ", ".join(f"{x['name']}({x['why']}){_mark(x)}" for x in d["must_know"]))
     if d.get("question_ideas") and for_task == "questions":
         lines.append("이 사람이 할 법한 질문: " + " / ".join(d["question_ideas"]))
+    if any("(미확인)" in x for x in lines):
+        lines.append("(미확인) = 최근 뉴스로 확인하지 못한 사실. 지금도 맞는지 모르니 이것만 보고 추천하거나 단정하지 않는다.")
     return "\n".join(x for x in lines if not re.fullmatch(r"[^:]+: *", x))
 
 

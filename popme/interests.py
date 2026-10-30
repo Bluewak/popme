@@ -127,6 +127,9 @@ def suggest(cfg, field, scope, lens=None, answers=None, headlines=None, context=
     """사람·기업·궁금한 것 보기: {"people", "companies", "topics", "media", "searches"}. AI가 실패하면 빈 목록 (직접 입력만).
     lens(보기 방식)가 업계 흐름이면 정리하는 사람·대표 기업 + 전문 매체·분야 검색어, 대상 위주면 고른 대상의 당사자."""
     lens = lens if lens in LENSES else "target"
+    if domain and not domain.get("checked"):  # 질문 때 뒤에서 시작한 사실 확인을 여기서 받는다 (사람·기관 추천엔 확인된 사실이 필요)
+        from popme import fieldcard
+        domain = fieldcard.verified(field) or domain
     given = ""
     if answers:
         given += f"보는 방식: {LENSES[lens]} / 고른 것: {answers_text(answers)}\n"
@@ -147,15 +150,16 @@ def suggest(cfg, field, scope, lens=None, answers=None, headlines=None, context=
     out["media"] = [m for m in out["media"] if m["site"]][:5]  # 매체는 사이트가 있어야 RSS를 찾는다
     out["topics"] = list(dict.fromkeys(_short(t, 10) for t in (raw.get("topics") or [])[:8] if _short(t, 10)))
     out["searches"] = list(dict.fromkeys(_short(q, 30) for q in (raw.get("searches") or [])[:3] if _short(q, 30))) if flow else []
+    out["domain"] = domain  # 확인된 카드로 바뀌었으면 화면이 이걸 들고 있다가 저장
     return out
 
 
 # ---------------------------------------------------------------- 보는 방식 → 분야별 질문 (설계 4-6)
 
-def research(field, limit=HEADLINES):
-    """최근 1주 헤드라인 (구글 뉴스, 키 없음). 질문·후보를 지금 상황에 맞추는 근거. 실패하면 []."""
+def research(field, limit=HEADLINES, days=7):
+    """최근 days일 헤드라인 (구글 뉴스, 키 없음). 질문·후보를 지금 상황에 맞추는 근거, 분야 카드 사실 확인(fieldcard)의 근거. 실패하면 []."""
     loc = "world" if re.fullmatch(r"[\x00-\x7f]+", field.strip()) else "kr"
-    url = catalog.NEWS_URL.replace("when:2d", "when:7d").format(q=urllib.parse.quote_plus(field.strip()), loc=catalog.NEWS_LOC[loc])
+    url = catalog.NEWS_URL.replace("when:2d", f"when:{int(days)}d").format(q=urllib.parse.quote_plus(field.strip()), loc=catalog.NEWS_LOC[loc])
     try:
         return [i["title"] for i in rss.peek(url, limit=limit)]
     except Exception:
@@ -238,8 +242,10 @@ def questions(cfg, field, lens, heads=None, context="", domain=None):
     heads = research(field) if heads is None else [str(h)[:200] for h in heads][:HEADLINES]
     words = "\n".join(f"  - {s}" for s in SLOTS[lens])
     if domain is None:  # 새 분야: 프로필 작가가 이 분야를 오래 본 사람을 먼저 그린다 (최근 헤드라인을 사실의 근거로)
-        from popme import domains
+        from popme import domains, fieldcard
         domain = domains.write(cfg, field, context, heads)
+        if domain:  # 사실 확인은 뒤에서 — 사용자가 질문에 답하는 동안 (③ 대상 추천에서 받아 쓴다)
+            fieldcard.start(cfg, field, domain, context)
     prompt = QUESTIONS.format(persona=with_persona(domain, "questions"), field=_short(field, 40), where=where(context), lens=LENSES[lens], headlines="\n".join(f"- {h}" for h in heads) or "(없음)",
                               types=" / ".join(f"{k}({v['범위']}·{v['대상']})" for k, v in TYPES.items()), slots=words)
     try:

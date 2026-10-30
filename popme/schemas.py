@@ -34,3 +34,18 @@ class PrivacyVerdict(BaseModel):
     _conf = field_validator("confidence", mode="before")(_unit)
     _phrase = field_validator("phrase", mode="before")(_text(80))
     _reason = field_validator("reason", mode="before")(_text(60))
+
+
+class Verdict(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    status: Literal["supported", "contradicted", "unknown"]
+    note: str = ""
+
+    _note = field_validator("note", mode="before")(_text(30))
+
+
+class FactCheck(BaseModel):
+    """사실 확인 (popme/personas/fact_checker.toml)."""
+    model_config = ConfigDict(extra="ignore")
+    verdicts: list[Verdict] = []
