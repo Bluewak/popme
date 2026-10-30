@@ -331,7 +331,7 @@ brief = "응원하는 팀"
   { label = "포항 스틸러스", region = "kr", news = "포항 스틸러스", feeds = ["sportsg-k1"] },
   { label = "FC서울", region = "kr", news = "FC서울", feeds = ["sportsg-k1"] },
   { label = "강원FC", region = "kr", news = "강원FC", feeds = ["sportsg-k1"] },
-  { label = "하나시티즌", region = "kr", news = "하나시티즌 축구", feeds = ["sportsg-k1"] },
+  { label = "대전하나시티즌", region = "kr", news = "대전하나시티즌", feeds = ["sportsg-k1"] },
   { label = "광주FC", region = "kr", news = "광주FC", feeds = ["sportsg-k1"] },
   { label = "제주SK", region = "kr", news = "제주SK", feeds = ["sportsg-k1"] },
   { label = "FC안양", region = "kr", news = "FC안양", feeds = ["sportsg-k1"] },

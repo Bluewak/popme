@@ -7,3 +7,4 @@ pillow>=10.0,<13
 markdown>=3.5,<4
 python-dateutil>=2.8,<3
 icalendar>=6,<8
+langgraph>=1.2,<2
