@@ -1,0 +1,93 @@
+# 관심사 분류표 (docs/INTERESTS-DESIGN.md 4-7): 대분류 → 소분류 (→ 세부).
+# profile = 미리 조사해 둔 출처 묶음 (popme/profiles/<id>.toml). 없는 소분류는 고르면 「AI 질문」 방식(4-6)으로 새로 만든다 —
+# 이때 「대분류 › 소분류」를 AI에게 함께 넘겨 분야를 좁힌다. 묶음은 조사·확인한 것부터 하나씩 채운다 (시행착오).
+# 세부(children)가 있으면 소분류를 누를 때 펼친다. 사용자가 「직접 적기」로 많이 넣는 분야가 다음 소분류 후보.
+
+[[group]]
+name = "테크·IT"
+items = [
+  { name = "AI 코딩", profile = "ai-coding" },
+  { name = "데이터 사이언스", profile = "data-science" },
+  { name = "ML 엔지니어링", profile = "ml-engineering" },
+  { name = "기업 AI 도입", profile = "enterprise" },
+  { name = "LLM 앱·RAG", profile = "llm-apps" },
+  { name = "스마트폰·가젯" },
+  { name = "보안" },
+  { name = "게임 산업" },
+]
+
+[[group]]
+name = "스포츠"
+items = [
+  { name = "축구", profile = "sports-soccer" },
+  { name = "야구", profile = "sports-baseball" },
+  { name = "농구" },
+  { name = "배구" },
+  { name = "골프" },
+  { name = "e스포츠" },
+  { name = "F1" },
+  { name = "테니스" },
+]
+
+[[group]]
+name = "경제·투자"
+items = [
+  { name = "국내주식", profile = "invest-kr-stocks" },
+  { name = "미국주식", profile = "invest-us-stocks" },
+  { name = "부동산", profile = "invest-real-estate" },
+  { name = "코인" },
+  { name = "금리·환율" },
+  { name = "창업·스타트업" },
+]
+
+[[group]]
+name = "엔터·문화"
+items = [
+  { name = "K-pop", profile = "ent-kpop" },
+  { name = "드라마", profile = "ent-drama" },
+  { name = "영화" },
+  { name = "웹툰·웹소설" },
+  { name = "캐릭터·애니", children = [
+      { name = "산리오" },
+      { name = "포켓몬" },
+      { name = "짱구" },
+      { name = "일본 애니" },
+  ] },
+]
+
+[[group]]
+name = "생활·취미"
+items = [
+  { name = "여행" },
+  { name = "요리·맛집" },
+  { name = "커피" },
+  { name = "캠핑" },
+  { name = "반려동물" },
+  { name = "육아" },
+  { name = "패션·뷰티" },
+]
+
+[[group]]
+name = "사회·정책"
+items = [
+  { name = "정치" },
+  { name = "교육 정책" },
+  { name = "노동·일자리" },
+  { name = "환경·기후" },
+]
+
+[[group]]
+name = "과학·건강"
+items = [
+  { name = "우주" },
+  { name = "의학·건강" },
+  { name = "과학 일반" },
+]
+
+[[group]]
+name = "커리어·교육"
+items = [
+  { name = "취업·채용" },
+  { name = "자격증·시험" },
+  { name = "공모전·해커톤" },
+]

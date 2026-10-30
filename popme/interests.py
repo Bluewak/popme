@@ -39,7 +39,7 @@ TYPES = {
 }
 NO_ASK = re.compile(r"정치|성향|지지\s*정당|종교|건강|질병|병력|주소|사는\s*곳|거주|나이|연령|소득|연봉|재산|성별|성적\s*지향")
 HEADLINES = 30  # 질문을 만들 때 근거로 주는 최근 1주 헤드라인 수 (AI 지식은 오래됐을 수 있다 — 이적·감독 교체 등)
-QUESTIONS = """분야: {field}
+QUESTIONS = """분야: {field}{where}
 보는 방식: {lens}
 아래는 이 분야의 최근 1주 뉴스 헤드라인이다 (지금 상황의 근거):
 {headlines}
@@ -55,7 +55,7 @@ QUESTIONS = """분야: {field}
 - 정치 성향·종교·건강·사는 곳·나이·소득은 묻지 마라.
 출력: {{"type": "...", "questions": [...]}}"""
 SYSTEM = "너는 소식 출처를 고르는 도우미다. 요청한 JSON 하나만 출력한다. 실존하는 사람·기업만 쓰고, 모르면 적게 쓴다."
-SUGGEST = """분야: {field}
+SUGGEST = """분야: {field}{where}
 범위: {scope}
 {context}이 분야 소식을 꾸준히 받고 싶은 사람에게 권할 것을 골라라.
 - people: {who} 6~8명. {mix}
@@ -111,18 +111,23 @@ def answers_text(answers):
     return " / ".join(f"{k}: {'·'.join(v)}" for k, v in (answers or {}).items() if v) or "(없음)"
 
 
-def suggest(cfg, field, scope, lens=None, answers=None, headlines=None):
+def where(context):
+    """분류표에서 고른 자리 → 지시문 한 줄 (「축구」만으로는 넓으니 「스포츠 › 축구」로 좁힌다)."""
+    return f" (분류: {_short(context, 60)})" if context else ""
+
+
+def suggest(cfg, field, scope, lens=None, answers=None, headlines=None, context=""):
     """사람·기업·궁금한 것 보기: {"people", "companies", "topics", "media", "searches"}. AI가 실패하면 빈 목록 (직접 입력만).
     lens(보기 방식)가 업계 흐름이면 정리하는 사람·대표 기업 + 전문 매체·분야 검색어, 대상 위주면 고른 대상의 당사자."""
     lens = lens if lens in LENSES else "target"
-    context = ""
+    given = ""
     if answers:
-        context += f"보는 방식: {LENSES[lens]} / 고른 것: {answers_text(answers)}\n"
+        given += f"보는 방식: {LENSES[lens]} / 고른 것: {answers_text(answers)}\n"
     if headlines:
-        context += "최근 1주 헤드라인 (지금 상황의 근거):\n" + "\n".join(f"- {h}" for h in headlines[:15]) + "\n"
+        given += "최근 1주 헤드라인 (지금 상황의 근거):\n" + "\n".join(f"- {h}" for h in headlines[:15]) + "\n"
     flow = lens in ("overview", "both")
-    prompt = SUGGEST.format(field=_short(field, 40), scope=SCOPES.get(scope, SCOPES["world"]), mix=MIX.get(scope, MIX["world"]),
-                            context=context, who=WHO[lens], what=WHAT[lens], extra=EXTRA if flow else "",
+    prompt = SUGGEST.format(field=_short(field, 40), where=where(context), scope=SCOPES.get(scope, SCOPES["world"]), mix=MIX.get(scope, MIX["world"]),
+                            context=given, who=WHO[lens], what=WHAT[lens], extra=EXTRA if flow else "",
                             extra_out=', "media": [...], "searches": ["..."]' if flow else "")
     empty = {"people": [], "companies": [], "topics": [], "media": [], "searches": []}
     try:
@@ -219,13 +224,13 @@ def check_options(questions, scope="world"):
     return questions
 
 
-def questions(cfg, field, lens, heads=None):
+def questions(cfg, field, lens, heads=None, context=""):
     """보는 방식 → 그 분야의 질문: {type, questions, headlines}. 최근 헤드라인을 근거로 주고, 받은 질문을 검사한다.
     heads: 화면이 먼저 받아 둔 헤드라인 (기다리는 동안 「읽는 중」으로 보여 준다). 없으면 여기서 받는다."""
     lens = lens if lens in LENSES else "target"
     heads = research(field) if heads is None else [str(h)[:200] for h in heads][:HEADLINES]
     words = "\n".join(f"  - {s}" for s in SLOTS[lens])
-    prompt = QUESTIONS.format(field=_short(field, 40), lens=LENSES[lens], headlines="\n".join(f"- {h}" for h in heads) or "(없음)",
+    prompt = QUESTIONS.format(field=_short(field, 40), where=where(context), lens=LENSES[lens], headlines="\n".join(f"- {h}" for h in heads) or "(없음)",
                               types=" / ".join(f"{k}({v['범위']}·{v['대상']})" for k, v in TYPES.items()), slots=words)
     try:
         raw = briefing.parse_json(llm.ask(cfg, SYSTEM, prompt, timeout=180))

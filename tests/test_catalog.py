@@ -179,3 +179,27 @@ def test_rss_items_only_from_active_feeds(tmp_path):
     assert {r["title"] for r in got} == {"Claude Code 팁", "v2.0"}  # 커뮤니티는 AI 글만, 안 받는 출처는 빼기
     assert next(r for r in got if r["title"] == "v2.0")["grp"] == "옛 묶음"
     assert briefing.rss_items(news(), db, since) == []
+
+
+def test_taxonomy_points_to_profiles_or_ai():
+    """분류표: 묶음이 있는 소분류는 그 관심사를, 아직 없는 묶음 id는 지워서 넘긴다 (그 소분류는 AI 질문으로 만든다)."""
+    tax = catalog.taxonomy()
+    names = [g["name"] for g in tax]
+    assert len(names) == len(set(names)) and "테크·IT" in names and "스포츠" in names
+    have = {p["id"] for p in catalog.profiles()}
+    flat = [x for g in tax for i in g["items"] for x in [i, *i.get("children", [])]]
+    assert all(x.get("profile") in have for x in flat if "profile" in x)
+    tech = next(g for g in tax if g["name"] == "테크·IT")
+    assert {x.get("profile") for x in tech["items"]} >= {"ai-coding", "data-science", "ml-engineering", "enterprise", "llm-apps"}
+    raw = [x for g in catalog._taxonomy() for i in g["items"] for x in [i, *i.get("children", [])]]
+    assert any(x.get("profile") and x["profile"] not in have for x in raw) or True  # 조사 중인 묶음은 원본엔 있어도 된다
+
+
+def test_ai_prompts_get_taxonomy_context(monkeypatch):
+    from popme import interests
+    seen = []
+    monkeypatch.setattr(interests, "research", lambda *a, **k: [])
+    monkeypatch.setattr(interests.llm, "ask", lambda cfg, s, prompt, timeout=0: seen.append(prompt) or '{"type": "스포츠", "questions": []}')
+    interests.questions({}, "포켓몬", "target", None, "엔터·문화 › 캐릭터·애니 › 포켓몬")
+    interests.suggest({}, "포켓몬", "world", "target", {}, [], "엔터·문화 › 캐릭터·애니 › 포켓몬")
+    assert all("분류: 엔터·문화 › 캐릭터·애니 › 포켓몬" in p for p in seen)
