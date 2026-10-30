@@ -4,7 +4,7 @@
 소식 종류와 달라서 AI(구독 CLI, popme.chat)에게 짝지어 달라고 한다. 결과는 그 자리의 페르소나 파일에 info·half_life로 더한다.
 
     python tools/build_card.py sports-soccer invest-kr-stocks ...
-    python tools/build_card.py --rules sports-soccer ...   # 채널 명부로 발굴 기준(팔로워·분야 낱말)만
+    python tools/build_card.py --rules sports-soccer ...   # 「그 분야 글인가」 낱말만 (팔로워 기준은 쓰면서 그 분야 반응 관계로)
 """
 import json
 import re
@@ -77,26 +77,20 @@ def build(cfg, pid):
           "| 날짜", d["info"]["deadline_kinds"], "| 빠짐", missing)
 
 
-CHANNELS = ROOT / "local" / "research" / "channels" / "channels.json"  # 채널 명부 (조사 때 잰 팔로워)
-
-
 def rules(pid):
-    """분야 카드에 발굴 기준 (popme/fieldscale.py): 채널 명부에서 이 묶음 X 계정들의 팔로워로 AI 기준을 늘이고 줄인다."""
+    """분야 카드에 「그 분야 글인가」 낱말 (popme/fieldscale.py). 팔로워 기준은 넣지 않는다 —
+    다른 분야 숫자를 빌리지 않고, 그 묶음을 쓰기 시작하면 유명 계정에서 타고 내려간 반응 관계로 정해진다 (calibrate)."""
     from popme import fieldscale
     path = domains.REPO_DIR / f"{pid}.json"
     d = json.loads(path.read_text(encoding="utf-8"))
-    reg = json.loads(CHANNELS.read_text(encoding="utf-8"))
-    samples = [(v.get("region"), (v.get("audience") or {}).get("count")) for v in reg.values()
-               if v.get("kind") == "x" and pid in (v.get("fields") or []) and (v.get("audience") or {}).get("count")]
-    d["info"] = {**d.get("info", {}), **fieldscale.rules_from(samples, d)}
+    d["info"] = {**d.get("info", {}), "topic_words": fieldscale.topic_words(d)}
     d = domains.clean(d, pid)
     path.write_text(json.dumps(d, ensure_ascii=False, indent=1) + "\n", encoding="utf-8", newline="\n")
-    i = d["info"]
-    print(pid, "| 표본", i.get("sample"), "배수", i.get("scale"), "| 기준", i.get("followers"), "| 낱말", len(i.get("topic_words", [])))
+    print(pid, "| 분야 낱말", len(d["info"]["topic_words"]))
 
 
 if __name__ == "__main__":
-    if sys.argv[1:2] == ["--rules"]:  # 명부로 발굴 기준만 다시 (AI를 부르지 않음)
+    if sys.argv[1:2] == ["--rules"]:  # 분야 낱말만 다시 (AI를 부르지 않음)
         for pid in sys.argv[2:]:
             rules(pid)
         sys.exit()

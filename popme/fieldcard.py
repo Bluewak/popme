@@ -113,8 +113,9 @@ def build(cfg, field, category="", heads=(), domain=None):
 
 
 def scale_rules(cfg, field, domain):
-    """발굴 기준 (popme/fieldscale.py): 대표 X 계정을 찾고(채널 찾기 페르소나) → 있는지 확인(oEmbed) →
-    팔로워(앱 DB, 없으면 전용 Chrome으로 10곳까지) → 기준. 실패하면 None (AI 기준을 쓴다)."""
+    """발굴 기준 (popme/fieldscale.py) — 그 분야 유명 계정에서 출발해 타고 내려간 그 분야 자체 분포로:
+    유명 계정 찾기(채널 찾기 페르소나) → 있는지 확인(oEmbed) → 프로필을 열어(전용 Chrome, 10곳까지) 그들이 리포스트·인용·답글한
+    계정과 팔로워 → 그 분야 계정만 → 상위 25%·10% 선. 실패·표본 부족이면 기준 없이(조사 중) — 첫 수집 뒤 보정이 채운다."""
     from popme import fieldscale, interests, measure
     try:
         out = persona.ask(cfg, "channel_finder", {"field": field, "must_know": [m["name"] for m in domain.get("must_know", [])],
@@ -122,13 +123,13 @@ def scale_rules(cfg, field, domain):
         accounts = [a for a in out["accounts"] if a["x"]][:12]
         with ThreadPoolExecutor(max_workers=6) as pool:
             alive = list(pool.map(lambda a: interests.x_exists(a["x"]), accounts))
-        accounts = [a for a, ok in zip(accounts, alive) if ok]  # 없는 계정(지어낸 것)은 버림, 확인 못 함(None)도 버림
-        counts = measure.known([a["x"] for a in accounts])
-        counts.update(measure.x_followers(cfg, [a["x"] for a in accounts if a["x"].lower() not in counts]))
-        samples = [(a["region"], counts[a["x"].lower()]) for a in accounts if a["x"].lower() in counts]
-        rules = fieldscale.rules_from(samples, domain)
-        rules["channels"] = [{**a, "followers": counts.get(a["x"].lower())} for a in accounts]
-        log.info("분야 발굴 기준: %s — 표본 %d, 배수 %s", field, rules["sample"], rules["scale"])
+        seeds = [a["x"] for a, ok in zip(accounts, alive) if ok]  # 없는 계정(지어낸 것)·확인 못 함은 버림
+        got = measure.crawl(cfg, seeds)
+        users = {**{h: {"followers": f} for h, f in measure.known(seeds).items()}, **got["users"]}
+        pool = fieldscale.field_pool(seeds, got["edges"], users, fieldscale.topic_words(domain))
+        rules = fieldscale.rules_from(pool, domain, how=f"만들 때 유명 계정 {len(seeds)}곳에서 타고 내려감")
+        rules["seeds"] = seeds
+        log.info("분야 발굴 기준: %s — 유명 계정 %d곳 → 분야 계정 %d곳, 기준 %s", field, len(seeds), len(pool), rules.get("followers"))
         return rules
     except Exception:
         log.exception("분야 발굴 기준 실패: %s", field)

@@ -105,16 +105,18 @@ def clean_info(i):
 
 
 def _scale_info(i):
-    """발굴 기준 칸 (popme/fieldscale.py): 팔로워 기준 {kind: [통과, 지켜보기]}·배수·표본 수·분야 낱말. 없으면 칸도 없음."""
+    """발굴 기준 칸 (popme/fieldscale.py): 팔로워 기준 {kind: [통과, 지켜보기]}·표본 수·어떻게 쟀나·출발한 유명 계정·분야 낱말. 없으면 칸도 없음."""
     out = {}
     f = i.get("followers")
     if isinstance(f, dict):
         out["followers"] = {k: [int(x) for x in v][:2] for k, v in f.items()
                             if k in ("company", "global", "ko", "threads") and isinstance(v, list) and len(v) >= 2}
-    if isinstance(i.get("scale"), dict):
-        out["scale"] = {k: float(i["scale"][k]) for k in ("world", "kr") if k in i["scale"]}
     if i.get("sample") is not None:
         out["sample"] = int(i["sample"])
+    if i.get("how"):
+        out["how"] = _s(i["how"], 60)
+    if i.get("seeds"):
+        out["seeds"] = [_s(h, 30) for h in i["seeds"] if h][:12]
     if i.get("topic_words"):
         out["topic_words"] = [_s(w, 20) for w in i["topic_words"] if w][:80]
     return out

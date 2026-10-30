@@ -238,7 +238,10 @@ def consistency(db, platform, user, s, interest=None):
 def _judge(db, s, platform, user, kind, checked_at, interest=None):
     from popme import fieldscale
     field = (fieldscale.rules_for(interest)["followers"] or {}) if interest else {}
-    pass_f, watch_f = field.get(kind) or s["followers"][kind]  # 그 분야 기준이 있으면 그것으로
+    if interest and interest not in fieldscale.AI_INTERESTS and not field.get(kind):
+        # 다른 분야(AI) 기준을 빌리지 않는다 — 그 분야 유명 계정에서 타고 내려간 조사가 쌓일 때까지 판정을 미룬다
+        return "pool", f"{KIND_LABEL[kind]} · 분야 기준 조사 중"
+    pass_f, watch_f = field.get(kind) or s["followers"][kind]  # 그 분야 기준 (AI 관심사는 DEFAULTS가 그 기준)
     p = db.profile(platform, user)
     f = p["followers"] if p else None
     label = KIND_LABEL[kind]
