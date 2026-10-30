@@ -22,18 +22,23 @@ topics = ["이적", "부상", "대표팀 명단", "경기 결과", "감독 교�
 
 [[subs]]
 label = "해외축구"
+news = "해외축구"
+en = "Premier League"
 region = "world"
 
 [[subs]]
 label = "K리그"
+news = "K리그"
 region = "kr"
 
 [[subs]]
 label = "국가대표"
+news = "축구대표팀"
 region = "kr"
 
 [[subs]]
 label = "여자축구"
+news = "여자축구"
 region = "kr"
 
 [[feeds]]

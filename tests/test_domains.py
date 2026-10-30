@@ -32,7 +32,10 @@ def test_profile_writer_persona_is_well_formed():
         assert set(ex["output"]) == set(domains.KEYS)
 
 
-def test_new_field_gets_persona_then_questions_use_it(monkeypatch):
+def test_new_field_questions_first_then_people_use_checked_card(monkeypatch):
+    """질문은 분야 페르소나를 기다리지 않고 바로, 초안·사실 확인은 뒤에서 → ③ 사람 추천에서 받아 쓴다."""
+    from popme import fieldcard
+    monkeypatch.setattr(fieldcard, "BACKGROUND", True)
     seen = []
     monkeypatch.setattr(interests, "research", lambda *a, **k: ["보드게임콘 일정 발표"])
     monkeypatch.setattr(interests, "news_count", lambda e, scope: 3)
@@ -41,14 +44,16 @@ def test_new_field_gets_persona_then_questions_use_it(monkeypatch):
         seen.append(system + prompt)
         if "분야 페르소나" in system:
             return json.dumps(RAW, ensure_ascii=False)
+        if "사실 확인 담당" in system:
+            return json.dumps({"verdicts": [{"id": "m0", "status": "supported"}]})
         return json.dumps({"type": "취미·생활", "questions": []}, ensure_ascii=False)
     monkeypatch.setattr(persona.llm, "ask", ask)
     monkeypatch.setattr(interests.llm, "ask", ask)
     out = interests.questions({}, "보드게임", "target", None, "생활·취미 › 보드게임")
-    assert out["domain"]["persona"]["name"] == "윤서진"
-    assert "너는 이 분야를 오래 본 사람의 눈으로 일한다: 윤서진" in seen[-1]  # 질문 지시문에 붙음
-    interests.suggest({}, "보드게임", "kr", "target", {}, [], "", out["domain"])
-    assert "꼭 아는 사람·기관: BGG" in seen[-1]  # 후보 추천엔 사람 칸 위주
+    assert out["domain"] is None  # 질문은 기다리지 않는다
+    s = interests.suggest({}, "보드게임", "kr", "target", {}, [], "", out["domain"])
+    assert s["domain"]["persona"]["name"] == "윤서진" and s["domain"]["checked"]  # 뒤에서 만든·확인한 카드
+    assert "꼭 아는 사람·기관: BGG(평점 기준)" in seen[-1]  # 후보 추천엔 사람 칸 위주
 
 
 def test_saved_with_custom_interest(monkeypatch):
@@ -85,3 +90,10 @@ def test_build_card_parses_research_hints():
     spec.loader.exec_module(bc)
     assert bc.share("25% (해외축구 이적만)") == (0.25, "해외축구 이적만") and bc.share("5~10%") == (0.075, "")
     assert bc.nudge("약 — 해외 팬에게만") == ("weak", "해외 팬에게만") and bc.nudge("중")[0] == "medium"
+
+
+def test_text_cut_at_word_boundary():
+    what = "전기차 보조금 지자체별 접수 시작과 국고 보조금 단가 확정 발표, 제조사별 가격 인하 경쟁과 신차 출시 일정 공개"
+    d = domains.clean({"calendar": [{"when": "3월", "what": what}]})
+    got = d["calendar"][0]["what"]
+    assert len(got) <= 60 and what.startswith(got) and what[len(got)] == " "  # 낱말 중간에서 끊지 않는다

@@ -21,7 +21,7 @@ MAX_CLAIMS = 10   # 꼭 아는 사람·기관, 한 해 흐름 각각
 EVIDENCE = 5      # 사실 하나에 헤드라인 몇 개
 DAYS = 30         # 사람·기관은 1주엔 기사가 없을 수 있어 한 달
 YEAR = 365        # 한 해 흐름은 1년에 한 번 있는 일이라 1년
-WAIT = 90         # ③ 대상 추천이 확인을 기다리는 최대 초
+WAIT = 120        # ③ 대상 추천이 초안·확인을 기다리는 최대 초
 BACKGROUND = True  # 테스트는 끈다 (conftest)
 
 _jobs = {}
@@ -40,7 +40,7 @@ class Card(TypedDict, total=False):
 
 def claims_of(field, d):
     """확인할 사실: 꼭 아는 사람·기관(이름으로 검색), 한 해 흐름(분야 + 일로 검색)."""
-    out = [{"id": f"m{i}", "text": f"{x['name']} — {x['why']}", "query": x["name"], "days": DAYS}
+    out = [{"id": f"m{i}", "text": f"{x['name']} — {x['why']}", "query": key_words(x["name"]) or x["name"], "days": DAYS}
            for i, x in enumerate(d.get("must_know", [])[:MAX_CLAIMS])]
     out += [{"id": f"c{i}", "text": f"{x['when']} {x['what']}", "query": f"{field} {key_words(x['what'])}", "days": YEAR}
             for i, x in enumerate(d.get("calendar", [])[:MAX_CLAIMS])]
@@ -109,15 +109,16 @@ def build(cfg, field, category="", heads=(), domain=None):
         return None
 
 
-def start(cfg, field, domain, category=""):
-    """초안으로 확인을 뒤에서 시작 (같은 분야는 한 번만)."""
+def start(cfg, field, domain=None, category="", heads=()):
+    """분야 카드를 뒤에서 만들고(초안이 없으면 프로필 작가부터) 확인한다 — 같은 분야는 한 번만.
+    새 분야는 질문을 먼저 만들어 보여 주고, 그동안 여기서 초안(약 70초)·확인(약 20초)을 돌려 ③ 사람 추천에서 합친다."""
     if not BACKGROUND:
         return
     with _lock:
         if field in _jobs:
             return
         job: dict = {"result": None}
-        job["thread"] = threading.Thread(target=lambda: job.update(result=build(cfg, field, category, domain=domain)), daemon=True)
+        job["thread"] = threading.Thread(target=lambda: job.update(result=build(cfg, field, category, heads, domain)), daemon=True)
         _jobs[field] = job
     job["thread"].start()
 

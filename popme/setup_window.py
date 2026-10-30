@@ -1016,15 +1016,16 @@ class Api:
         from popme import interests
         return interests.questions(self._cfg(provider), field, lens, headlines, context)
 
-    def interest_taste_heads(self, field, provider, domain=None, scope="world", subs=None, extra=None, exclude=None):
-        """④ 취향 문답: 편집자가 고른 서로 다른 종류의 헤드라인 [{title, category}]."""
+    def interest_taste_heads(self, field, provider, domain=None, scope="world", subs=None, targets=None, extra=None, exclude=None):
+        """④ 취향 문답: 고른 세부·대상의 최근 소식에서 편집자가 고른 서로 다른 종류의 헤드라인 [{title, category, group}].
+        subs·targets: [{label, news, en, region}] 또는 이름."""
         from popme import taste
-        return taste.headlines(self._cfg(provider), field, domain, scope, subs or [], extra or [], exclude or [])
+        return taste.headlines(self._cfg(provider), field, domain, scope, subs or [], targets or [], extra or [], exclude or [])
 
-    def interest_taste(self, field, provider, domain=None, shown=None, liked=None):
-        """④ 누른 헤드라인 → {likes, less, summary}."""
+    def interest_taste(self, field, provider, domain=None, shown=None, liked=None, answers=None):
+        """④ 누른 헤드라인 → {likes, less, summary}. answers: ③까지 고른 것 (줄이지 않는다)."""
         from popme import taste
-        return taste.analyze(self._cfg(provider), field, domain, shown or [], liked or [])
+        return taste.analyze(self._cfg(provider), field, domain, shown or [], liked or [], answers or [])
 
     def interest_suggest(self, field, scope, provider, lens=None, answers=None, headlines=None, context="", domain=None):
         from popme import interests

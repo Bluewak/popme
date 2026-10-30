@@ -22,22 +22,27 @@ topics = ["실적 발표", "주요 공시", "금리·환율", "외국인 수급"
 
 [[subs]]
 label = "코스피 대형주"
+news = "코스피 시총 상위"
 region = "kr"
 
 [[subs]]
 label = "코스닥"
+news = "코스닥"
 region = "kr"
 
 [[subs]]
 label = "공모주/IPO"
+news = "공모주 청약"
 region = "kr"
 
 [[subs]]
 label = "배당·밸류업"
+news = "배당 밸류업"
 region = "kr"
 
 [[subs]]
 label = "ETF"
+news = "ETF 순매수"
 region = "kr"
 
 [[feeds]]

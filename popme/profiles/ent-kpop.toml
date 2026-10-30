@@ -22,22 +22,27 @@ topics = ["컴백·신곡", "데뷔", "차트 성적", "투어·공연", "시상
 
 [[subs]]
 label = "보이그룹"
+news = "보이그룹 컴백"
 region = "kr"
 
 [[subs]]
 label = "걸그룹"
+news = "걸그룹 컴백"
 region = "kr"
 
 [[subs]]
 label = "솔로"
+news = "솔로 컴백 가수"
 region = "kr"
 
 [[subs]]
 label = "기획사·산업"
+news = "엔터 기획사"
 region = "kr"
 
 [[subs]]
 label = "차트·시상식"
+news = "음원차트 시상식"
 region = "kr"
 
 [[feeds]]

@@ -22,26 +22,32 @@ topics = ["대출 규제", "토허제", "공급대책", "청약 일정", "집값
 
 [[subs]]
 label = "서울 아파트"
+news = "서울 아파트값"
 region = "kr"
 
 [[subs]]
 label = "수도권·지방"
+news = "수도권 지방 집값"
 region = "kr"
 
 [[subs]]
 label = "청약/분양"
+news = "청약 경쟁률"
 region = "kr"
 
 [[subs]]
 label = "전월세"
+news = "전세 월세"
 region = "kr"
 
 [[subs]]
 label = "재건축/재개발"
+news = "재건축 재개발"
 region = "kr"
 
 [[subs]]
 label = "정책/세금"
+news = "부동산 대책"
 region = "kr"
 
 [[feeds]]
