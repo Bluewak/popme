@@ -82,6 +82,7 @@ MIGRATIONS = [
     "ALTER TABLE candidates ADD COLUMN check_note TEXT",
     "ALTER TABLE candidates ADD COLUMN checked_at TEXT",
     "ALTER TABLE candidates ADD COLUMN fail_since TEXT",  # 승인 계정이 꾸준함 기준에 처음 못 미친 때
+    "ALTER TABLE candidates ADD COLUMN interest TEXT",  # 어느 관심사 계정들의 반응으로 올라왔나 → 그 분야 기준으로 판정 (fieldscale)
     # 브리핑 발굴 카드의 AI 판단 (discovery.remember_verdicts): 추천|비추천|보류, {title, body, date, link} JSON
     "ALTER TABLE candidates ADD COLUMN ai_verdict TEXT",
     "ALTER TABLE candidates ADD COLUMN ai_note TEXT",
@@ -222,17 +223,18 @@ class DB:
         return rows[0] if rows else None
 
     # --- 발굴 후보 ---
-    def upsert_candidate(self, handle, name, reason, score, platform="x", kind=None):
+    def upsert_candidate(self, handle, name, reason, score, platform="x", kind=None, interest=None):
         """Threads 후보는 handle을 'threads/username'으로 저장해 X 계정과 겹치지 않게 한다.
         후보 풀에서 빠졌던(gone) 계정이 다시 조건을 채우면 확인 대기(pool)로 되돌린다."""
         with self.conn() as c:
             c.execute(
-                "INSERT INTO candidates (handle, name, reason, score, updated_at, platform, kind, stage) "
-                "VALUES (?,?,?,?,?,?,?,'pool') "
+                "INSERT INTO candidates (handle, name, reason, score, updated_at, platform, kind, stage, interest) "
+                "VALUES (?,?,?,?,?,?,?,'pool',?) "
                 "ON CONFLICT(handle) DO UPDATE SET name=excluded.name, reason=excluded.reason, "
                 "score=excluded.score, updated_at=excluded.updated_at, kind=COALESCE(excluded.kind, kind), "
+                "interest=COALESCE(excluded.interest, interest), "
                 "stage=CASE WHEN stage='gone' OR stage IS NULL THEN 'pool' ELSE stage END",
-                (handle, name, reason, score, now_iso(), platform, kind),
+                (handle, name, reason, score, now_iso(), platform, kind, interest),
             )
 
     def set_candidate_stage(self, handle, stage, note, kind=None):

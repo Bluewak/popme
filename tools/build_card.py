@@ -4,6 +4,7 @@
 소식 종류와 달라서 AI(구독 CLI, popme.chat)에게 짝지어 달라고 한다. 결과는 그 자리의 페르소나 파일에 info·half_life로 더한다.
 
     python tools/build_card.py sports-soccer invest-kr-stocks ...
+    python tools/build_card.py --rules sports-soccer ...   # 「그 분야 글인가」 낱말만 (팔로워 기준은 쓰면서 그 분야 반응 관계로)
 """
 import json
 import re
@@ -76,7 +77,23 @@ def build(cfg, pid):
           "| 날짜", d["info"]["deadline_kinds"], "| 빠짐", missing)
 
 
+def rules(pid):
+    """분야 카드에 「그 분야 글인가」 낱말 (popme/fieldscale.py). 팔로워 기준은 넣지 않는다 —
+    다른 분야 숫자를 빌리지 않고, 그 묶음을 쓰기 시작하면 유명 계정에서 타고 내려간 반응 관계로 정해진다 (calibrate)."""
+    from popme import fieldscale
+    path = domains.REPO_DIR / f"{pid}.json"
+    d = json.loads(path.read_text(encoding="utf-8"))
+    d["info"] = {**d.get("info", {}), "topic_words": fieldscale.topic_words(d)}
+    d = domains.clean(d, pid)
+    path.write_text(json.dumps(d, ensure_ascii=False, indent=1) + "\n", encoding="utf-8", newline="\n")
+    print(pid, "| 분야 낱말", len(d["info"]["topic_words"]))
+
+
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["--rules"]:  # 분야 낱말만 다시 (AI를 부르지 않음)
+        for pid in sys.argv[2:]:
+            rules(pid)
+        sys.exit()
     cfg = config.load()
     for pid in sys.argv[1:]:
         build(cfg, pid)

@@ -6,7 +6,7 @@ import threading
 import time
 from datetime import datetime
 
-from popme import briefing, catalog, chrome, config, discovery, event_weather, llm, sources
+from popme import briefing, catalog, chrome, config, discovery, event_weather, fieldscale, llm, sources
 from popme.collectors import NeedLogin, caldav, ics, threads, timetree, x, youtube
 from popme.db import DB
 
@@ -201,6 +201,7 @@ class Jobs:
             x.collect(ctx, self.cfg, handles, progress, since, users, on_batch=self._saver(users))
             self.db.upsert_profiles(list(users.values()))  # 새 글 없이 끝난 페이지의 계정 규모도
             discovery.update(self.db, handles, self.cfg)
+            self._calibrate()
             self._check_candidates("x", ctx, warnings, progress)
         except NeedLogin as e:
             warnings.append(str(e))
@@ -240,6 +241,16 @@ class Jobs:
         except Exception as e:
             log.exception("유튜브 실패")
             warnings.append(self._fail("유튜브", e))
+
+    def _calibrate(self):
+        """분야 발굴 기준 보정 (popme/fieldscale.py): 매주, 또는 기준이 아직 없는 관심사가 있으면 바로 — 방금 모은 계정 팔로워로."""
+        try:
+            if fieldscale.due() or fieldscale.missing(self.cfg):
+                done = fieldscale.calibrate(self.db, self.cfg)
+                if done:
+                    log.info("분야 발굴 기준 보정: %s", ", ".join(done))
+        except Exception:
+            log.exception("분야 발굴 기준 보정 실패")
 
     def _saver(self, users):
         def save(batch):

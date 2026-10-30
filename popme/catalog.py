@@ -207,7 +207,7 @@ def x_accounts(cfg):
         for e in entities(cfg, p):
             h = (e.get("x") or "").lstrip("@")
             if h and f"x:{h}".lower() not in off:
-                out.setdefault(h.lower(), {"handle": h, "name": e["name"], "group": f"관심사 · {p['tag']}",
+                out.setdefault(h.lower(), {"handle": h, "name": e["name"], "group": f"관심사 · {p['tag']}", "region": e.get("region", ""),
                                           "focus": e.get("why", ""), "interest": p["id"]})
     return list(out.values())
 

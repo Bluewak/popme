@@ -74,6 +74,22 @@ class Taste(BaseModel):
         return [" ".join(str(x).split())[:16] for x in (v or []) if str(x).strip()][:6]
 
 
+class Channel(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    name: str = ""
+    x: str = ""
+    region: Literal["kr", "world"] = "world"
+    kind: str = ""
+
+    _x = field_validator("x", mode="before")(lambda v: str(v or "").strip().lstrip("@").split("/")[-1][:30])
+
+
+class ChannelList(BaseModel):
+    """채널 찾기 (popme/personas/channel_finder.toml)."""
+    model_config = ConfigDict(extra="ignore")
+    accounts: list[Channel] = []
+
+
 class FactCheck(BaseModel):
     """사실 확인 (popme/personas/fact_checker.toml)."""
     model_config = ConfigDict(extra="ignore")
