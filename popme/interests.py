@@ -189,17 +189,17 @@ def _option(o):
     label = _short(o.get("label"), 20)
     if not label or label in ("상관없어요", "직접 입력", "기타"):
         return None
-    return {"label": label, "region": "kr" if o.get("region") == "kr" else "world", "en": _short(o.get("en"), 40)}
+    return {"label": label, "region": "kr" if o.get("region") == "kr" else "world", "en": _short(o.get("en"), 60)}
 
 
-def _options(xs):
+def _options(xs, n=8):
     out, seen = [], set()
-    for o in (xs or [])[:12]:
+    for o in (xs or [])[:16]:
         o = _option(o)
         if o and o["label"] not in seen:
             seen.add(o["label"])
             out.append(o)
-    return out[:8]
+    return out[:n]
 
 
 def fixed_questions(lens, kind="기타"):
@@ -219,7 +219,7 @@ def clean_questions(raw, lens):
         text = _short(q.get("text"), 30)
         if not text or NO_ASK.search(text):
             continue
-        every = _options(q.get("options"))
+        every = _options(q.get("options"), 12 if q["slot"] == "대상" else 8)  # 대상은 넉넉히 (F1 11팀)
         opts = [o for o in every if not NO_ASK.search(o["label"])]  # 걸린 보기만 뺀다 (「건강·노견 관리」 하나로 질문을 버리지 않게)
         if not opts or len(opts) * 2 <= len(every):  # 보기 절반 이상이 민감하면 그 주제를 묻는 질문 → 버림
             continue

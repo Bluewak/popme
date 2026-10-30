@@ -40,7 +40,9 @@ class Card(TypedDict, total=False):
 
 def claims_of(field, d):
     """확인할 사실: 꼭 아는 사람·기관(이름으로 검색), 한 해 흐름(분야 + 일로 검색)."""
-    out = [{"id": f"m{i}", "text": f"{x['name']} — {x['why']}", "query": key_words(x["name"]) or x["name"], "days": DAYS}
+    # 사람·기관은 「이름 + 분야」로 먼저 (「소방청」만 찾으면 예산·국감 기사, 「소방청 캠핑」이면 캠핑 안전수칙), 없으면 이름만
+    out = [{"id": f"m{i}", "text": f"{x['name']} — {x['why']}", "query": f"{key_words(x['name']) or x['name']} {field}",
+            "alt": key_words(x["name"]) or x["name"], "days": DAYS}
            for i, x in enumerate(d.get("must_know", [])[:MAX_CLAIMS])]
     out += [{"id": f"c{i}", "text": f"{x['when']} {x['what']}", "query": f"{field} {key_words(x['what'])}", "days": YEAR}
             for i, x in enumerate(d.get("calendar", [])[:MAX_CLAIMS])]
@@ -76,7 +78,8 @@ def _graph(cfg):
     def gather(s):
         claims = claims_of(s["field"], s["domain"])
         with ThreadPoolExecutor(max_workers=8) as pool:
-            found = list(pool.map(lambda c: interests.research(c["query"], limit=EVIDENCE, days=c["days"]), claims))
+            found = list(pool.map(lambda c: interests.research(c["query"], limit=EVIDENCE, days=c["days"])
+                                  or (interests.research(c["alt"], limit=EVIDENCE, days=c["days"]) if c.get("alt") else []), claims))
         return {"claims": claims, "evidence": {c["id"]: f for c, f in zip(claims, found)}}
 
     def check(s):

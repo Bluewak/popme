@@ -28,16 +28,19 @@ region = "kr"
 [[subs]]
 label = "OTT 오리지널"
 news = "넷플릭스 시리즈 공개"
+en = "Netflix Korean series"
 region = "kr"
 
 [[subs]]
 label = "일본 드라마"
 news = "일본 드라마"
+en = "Japanese drama"
 region = "world"
 
 [[subs]]
 label = "중국 드라마"
 news = "중국 드라마"
+en = "Chinese drama"
 region = "world"
 
 [[subs]]
