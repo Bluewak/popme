@@ -1,0 +1,296 @@
+# 관심사 묶음: 경제·투자 › 미국주식 — 2026-10-30 조사(local/research/packs/invest-us-stocks.json), 출처·계정은 열어서 확인한 것만
+id = "invest-us-stocks"
+name = "미국주식"
+tag = "미국주식"
+summary = "빅테크·반도체·실적 시즌·Fed 소식"
+order = 31
+status = "ready"
+category = ["경제·투자", "미국주식"]
+criteria = "- FOMC 결정과 의장 발언, CPI·고용 같은 지표 발표, 빅테크·반도체 실적과 가이던스처럼 지수를 움직인 사실을 먼저 고른다.\n- 실적은 예상 대비 매출·이익·가이던스와 시간외 주가 반응을 한 줄로, 관심 종목은 공식 발표(뉴스룸·SEC 보도)를 먼저 확인해 적는다.\n- Fed 관련 전망·관측은 「~라는 보도」 또는 「~는 전망」으로 쓰고, 확정된 결정·수치와 섞지 않는다.\n- 「지금 사야 할 종목」·「10배 오를 주식」 같은 투자 권유성 글, 리딩방·유료 리포트·뉴스레터 구독 홍보, 출처 없는 급등 예언은 버린다.\n- 같은 지수 움직임을 다룬 장중 기사는 버리고 뉴욕 마감 기준 하루 한 번만 정리하며, 한국 시간으로 언제 발표되는지 함께 적는다.\n"
+discovery = "데이터와 근거를 공개하며 시장·Fed를 해설하고 종목 추천이나 유료 상품 홍보를 하지 않는 기자·전략가를 고른다."
+topics = ["실적·가이던스", "FOMC·금리", "물가·고용", "AI 투자", "반도체 수출규제", "자사주·배당", "IPO", "환율"]
+
+[caps]
+"공식 발표" = 15
+"전문 매체" = 20
+"분석·해설" = 10
+"통계·데이터" = 5
+"한국 커뮤니티" = 10
+"해외 커뮤니티" = 5
+"뉴스" = 25
+
+[[subs]]
+label = "빅테크"
+region = "world"
+
+[[subs]]
+label = "반도체"
+region = "world"
+
+[[subs]]
+label = "ETF·지수"
+region = "world"
+
+[[subs]]
+label = "실적 시즌"
+region = "world"
+
+[[subs]]
+label = "금리·Fed"
+region = "world"
+
+[[feeds]]
+id = "fed-monetary"
+why = "FOMC 성명·의사록"
+subs = ["금리·Fed"]
+
+[[feeds]]
+id = "fed-speeches"
+why = "위원 발언 원문"
+subs = ["금리·Fed"]
+default = false
+
+[[feeds]]
+id = "sec-press"
+why = "규제·제재 발표"
+default = false
+
+[[feeds]]
+id = "einfomax-us"
+why = "한국어 미국 증시 기사"
+
+[[feeds]]
+id = "cnbc-top"
+why = "미국 시장 주요 뉴스"
+
+[[feeds]]
+id = "cnbc-earnings"
+why = "기업 실적 기사"
+subs = ["실적 시즌", "빅테크", "반도체"]
+
+[[feeds]]
+id = "cnbc-economy"
+why = "지표·중앙은행 기사"
+subs = ["금리·Fed"]
+default = false
+
+[[feeds]]
+id = "wsj-markets"
+why = "시장 기사 제목·요약"
+default = false
+
+[[feeds]]
+id = "marketwatch-pulse"
+why = "지표·시황 단신"
+default = false
+
+[[feeds]]
+id = "chosunbiz-intl"
+why = "뉴욕증시 마감 한국어"
+default = false
+
+[[feeds]]
+id = "factset-insight"
+why = "S&P500 실적 집계"
+subs = ["실적 시즌"]
+
+[[feeds]]
+id = "nvidia-newsroom"
+why = "실적일정·발표 원문"
+subs = ["반도체"]
+default = false
+
+[[feeds]]
+id = "apple-newsroom"
+why = "신제품·공식 발표"
+subs = ["빅테크"]
+default = false
+
+[[people]]
+name = "Kevin Warsh (Fed 의장)"
+why = "2026-05 취임, 금리 결정과 기자회견"
+region = "world"
+news = "워시 연준 의장"
+news_en = "Kevin Warsh"
+subs = ["금리·Fed"]
+
+[[people]]
+name = "Nick Timiraos (WSJ)"
+why = "Fed 결정 방향을 가장 먼저 짚는 기자"
+region = "world"
+x = "NickTimiraos"
+news = "티미라오스 연준"
+news_en = "Nick Timiraos"
+subs = ["금리·Fed"]
+
+[[people]]
+name = "Liz Ann Sonders (Charles Schwab)"
+why = "지표·업종 순환을 차트로 해설"
+region = "world"
+x = "LizAnnSonders"
+news_en = "Liz Ann Sonders"
+
+[[people]]
+name = "Charlie Bilello (Creative Planning)"
+why = "추천 없이 데이터로 시장 정리"
+region = "world"
+x = "charliebilello"
+news_en = "Charlie Bilello"
+subs = ["ETF·지수"]
+
+[[people]]
+name = "Jensen Huang (NVIDIA CEO)"
+why = "AI 반도체 수요의 기준점"
+region = "world"
+news = "엔비디아 젠슨 황"
+news_en = "Jensen Huang"
+subs = ["반도체"]
+
+[[people]]
+name = "Mohamed El-Erian"
+why = "Fed·채권시장 해설"
+region = "world"
+x = "elerianm"
+news_en = "Mohamed El-Erian"
+subs = ["금리·Fed"]
+default = false
+
+[[people]]
+name = "Jim Bianco (Bianco Research)"
+why = "금리·채권 흐름 분석"
+region = "world"
+x = "biancoresearch"
+news_en = "Jim Bianco"
+subs = ["금리·Fed"]
+default = false
+
+[[people]]
+name = "Ed Yardeni (Yardeni Research)"
+why = "실적·밸류에이션 전망"
+region = "world"
+x = "yardeni"
+news_en = "Ed Yardeni"
+subs = ["실적 시즌"]
+default = false
+
+[[people]]
+name = "Scott Bessent (재무장관)"
+why = "관세·국채·달러 정책"
+region = "world"
+news = "베선트 재무장관"
+news_en = "Scott Bessent stocks"
+default = false
+
+[[people]]
+name = "Carl Quintanilla (CNBC)"
+why = "장중 주요 발언·헤드라인 정리"
+region = "world"
+x = "carlquintanilla"
+default = false
+
+[[companies]]
+name = "Federal Reserve (연준)"
+why = "기준금리·FOMC"
+region = "world"
+x = "federalreserve"
+news = "FOMC 워시"
+news_en = "Federal Reserve"
+subs = ["금리·Fed"]
+
+[[companies]]
+name = "SEC (증권거래위원회)"
+why = "상장·공시 규제, 제재"
+region = "world"
+x = "SECGov"
+news = "SEC 증권거래위원회"
+news_en = "Paul Atkins SEC"
+default = false
+
+[[companies]]
+name = "NVIDIA"
+why = "AI 반도체 대장주"
+region = "world"
+x = "nvidia"
+news = "엔비디아 주가"
+news_en = "Nvidia earnings"
+subs = ["반도체"]
+
+[[companies]]
+name = "Apple"
+why = "시총 최상위 빅테크"
+region = "world"
+news = "애플 주가"
+subs = ["빅테크"]
+default = false
+
+[[companies]]
+name = "Microsoft"
+why = "AI·클라우드 투자 지표"
+region = "world"
+news = "마이크로소프트 주가"
+subs = ["빅테크"]
+default = false
+
+[[companies]]
+name = "TSMC"
+why = "반도체 공급망 기준"
+region = "world"
+news = "TSMC 주가"
+news_en = "TSMC"
+subs = ["반도체"]
+default = false
+
+[[companies]]
+name = "미국 노동통계국 (BLS)"
+why = "CPI·고용보고서 발표처"
+region = "world"
+news = "미국 고용보고서"
+subs = ["금리·Fed"]
+default = false
+
+[[searches]]
+name = "뉴욕증시 마감"
+news = "뉴욕증시 마감"
+region = "kr"
+
+[[searches]]
+name = "서학개미 순매수"
+news = "서학개미 순매수"
+region = "kr"
+
+[[searches]]
+name = "미국 CPI 발표"
+news = "미국 CPI 발표"
+region = "kr"
+subs = ["금리·Fed"]
+
+[[searches]]
+name = "earnings season S&P 500"
+news = "earnings season S&P 500"
+region = "world"
+subs = ["실적 시즌"]
+
+[target]
+text = "관심 있는 미국 종목은?"
+brief = "관심 있는 미국 종목"
+
+[target.options_by]
+"빅테크" = [
+  { label = "애플", region = "world", news = "애플 주가", feeds = ["apple-newsroom"] },
+  { label = "마이크로소프트", region = "world", news = "마이크로소프트 주가" },
+  { label = "알파벳(구글)", region = "world", news = "알파벳 주가" },
+  { label = "아마존", region = "world", news = "아마존 주가" },
+  { label = "테슬라", region = "world", news = "테슬라 주가" },
+]
+"반도체" = [
+  { label = "엔비디아", region = "world", news = "엔비디아 주가", x = "nvidia", feeds = ["nvidia-newsroom"] },
+  { label = "브로드컴", region = "world", news = "브로드컴 주가" },
+  { label = "TSMC", region = "world", news = "TSMC 주가" },
+  { label = "AMD", region = "world", news = "AMD 주가" },
+  { label = "마이크론", region = "world", news = "마이크론 주가" },
+]
+"ETF·지수" = [
+  { label = "S&P 500 (SPY·VOO)", region = "world", news = "S&P500 ETF" },
+  { label = "나스닥100 (QQQ)", region = "world", news = "나스닥100 ETF" },
+  { label = "반도체 ETF (SOXX·SMH)", region = "world", news = "미국 반도체 ETF" },
+]

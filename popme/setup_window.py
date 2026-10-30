@@ -471,7 +471,7 @@ def validate_interests(it):
         out = {}
         if pk.get("scope") in ("kr", "world"):
             out["scope"] = pk["scope"]
-        for k in ("uses", "people", "companies", "topics"):
+        for k in ("subs", "uses", "people", "companies", "topics"):
             if k in pk:
                 out[k] = clean(pk[k], 40)
         if "extra" in pk:
@@ -500,7 +500,7 @@ def apply_interests(text, ids, picks):
     """고른 관심사 + 미리 만든 관심사에서 고친 것(고친 칸만)을 config 텍스트에."""
     text = set_value(text, "news", "interests", ids, before=("llm",))
     for pid, pk in (picks or {}).items():
-        for k in ("uses", "scope", "people", "companies", "topics", "extra"):
+        for k in ("subs", "uses", "scope", "people", "companies", "topics", "extra"):
             if k in pk:
                 text = set_value(text, f"news.picks.{pid}", k, pk[k], before=("llm",))
     return text

@@ -1,6 +1,7 @@
 """RSS/Atom 출처 — 로그인 없이 공식 변경내역·블로그·커뮤니티 새 글을 가져온다."""
 import gzip
 import html
+import http.cookiejar
 import json
 import logging
 import re
@@ -88,6 +89,17 @@ def _date(s):
     return d.astimezone(timezone.utc).isoformat()
 
 
+def _utf8(data):
+    """ElementTree는 EUC-KR 같은 멀티바이트 인코딩을 못 읽는다 (스타뉴스 등) → 선언된 인코딩으로 풀어 UTF-8로."""
+    m = re.match(rb"\s*<\?xml[^>]*encoding=[\"']([\w-]+)[\"']", data)
+    enc = m.group(1).decode().lower() if m else "utf-8"
+    if enc in ("utf-8", "utf8", "us-ascii", "ascii"):
+        return data
+    codec = "cp949" if enc in ("euc-kr", "ks_c_5601-1987", "ksc5601") else enc  # cp949 = EUC-KR을 넓힌 것
+    text = data.decode(codec, errors="replace")
+    return re.sub(r"encoding=[\"'][\w-]+[\"']", 'encoding="utf-8"', text, count=1).encode("utf-8")
+
+
 def fetch(feed, conditional=True, timeout=20):
     """새 글 목록. 지난번과 바뀐 게 없으면(304) [] — 그때 받은 글은 이미 DB에 있다.
     conditional=False면 캐시를 쓰지도 남기지도 않는다 (peek — 저장 안 하는 확인용 받기가 ETag를 남기면 첫 수집이 304로 비어 버린다)."""
@@ -100,10 +112,16 @@ def fetch(feed, conditional=True, timeout=20):
     except urllib.error.HTTPError as e:
         if e.code == 304:
             return []
-        raise
+        if e.code not in (301, 302, 303, 307, 308):
+            raise
+        # 쿠키를 심고 다시 보내는 곳(국토교통부 보도자료): 쿠키 없이는 이동이 끝없이 돈다 → 쿠키를 들고 한 번 더
+        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+        fresh = urllib.request.Request(url, headers=dict(req.header_items()))  # 첫 요청엔 「들른 주소」 기록이 남아 바로 반복으로 본다
+        with opener.open(fresh, timeout=timeout) as r:
+            data, headers = r.read(), r.headers
     if data[:2] == b"\x1f\x8b":  # 묻지 않아도 gzip으로 주는 곳이 있다 (Google DeepMind 블로그 등) — urllib은 안 풀어 줌
         data = gzip.decompress(data)
-    root = ET.fromstring(data)
+    root = ET.fromstring(_utf8(data))
     limit = int(feed.get("max_chars", 500))
     base = {"source": feed["name"], "grp": feed.get("group", "")}
     skip = re.compile(feed["skip"], re.I) if feed.get("skip") else None  # 예: 매일 나오는 nightly 릴리스

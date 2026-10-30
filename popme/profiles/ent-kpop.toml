@@ -1,0 +1,297 @@
+# 관심사 묶음: 엔터·문화 › K-pop — 2026-10-30 조사(local/research/packs/ent-kpop.json), 출처·계정은 열어서 확인한 것만
+id = "ent-kpop"
+name = "K-pop"
+tag = "K팝"
+summary = "컴백·데뷔·차트·기획사 소식"
+order = 40
+status = "ready"
+category = ["엔터·문화", "K-pop"]
+criteria = "- 컴백·데뷔 일정 확정, 음반·음원 성적(초동·써클차트·빌보드), 투어 발표, 멤버 입대·탈퇴·활동 중단을 먼저 챙긴다.\n- 기획사 공식 공지(소속사 입장문·법원 판결·계약 종료/재계약)는 사실 그대로 짧게, 아직 정해지지 않은 건 「~라는 보도」로 적는다.\n- 경영권·인수·실적·소송처럼 업계 판도를 바꾸는 소식은 아티스트 팬이 아니어도 하루 한 건은 남긴다.\n- 공항 패션·화보·광고 모델·SNS 셀카·열애 추측 같은 가십과 단순 홍보 기사는 버린다.\n- 같은 컴백 소식이 여러 매체에 반복되면 가장 구체적인(날짜·곡명·수치 있는) 기사 하나만 남긴다.\n- 해외 반응은 빌보드·스포티파이 같은 공식 차트 수치가 있을 때만 넣고, 「해외 팬 열광」식 기사는 버린다.\n"
+discovery = "추측이나 팬심이 아니라 음반·차트 수치와 업계 구조를 설명하는 평론가·업계 기자·차트 담당자를 고른다."
+topics = ["컴백·신곡", "데뷔", "차트 성적", "투어·공연", "시상식", "기획사 분쟁", "입대·탈퇴", "실적·주가"]
+
+[caps]
+"공식 발표" = 15
+"전문 매체" = 20
+"분석·해설" = 10
+"통계·데이터" = 5
+"한국 커뮤니티" = 10
+"해외 커뮤니티" = 5
+"뉴스" = 25
+
+[[subs]]
+label = "보이그룹"
+region = "kr"
+
+[[subs]]
+label = "걸그룹"
+region = "kr"
+
+[[subs]]
+label = "솔로"
+region = "kr"
+
+[[subs]]
+label = "기획사·산업"
+region = "kr"
+
+[[subs]]
+label = "차트·시상식"
+region = "kr"
+
+[[feeds]]
+id = "tenasia-music"
+why = "가요 전문 연예 매체"
+
+[[feeds]]
+id = "ize-kpop"
+why = "K팝 기획·해설 기사"
+
+[[feeds]]
+id = "idology"
+why = "아이돌 음반 평론·주간 정리"
+
+[[feeds]]
+id = "koreaherald-kpop"
+why = "영문 K팝 산업 기사"
+
+[[feeds]]
+id = "soompi-music"
+why = "해외 팬 시선 영문 뉴스"
+default = false
+
+[[feeds]]
+id = "yna-ent"
+why = "통신사 연예 속보"
+default = false
+
+[[feeds]]
+id = "newsis-ent"
+why = "통신사 연예 속보"
+default = false
+
+[[feeds]]
+id = "starnews"
+why = "연예 전문지 최신 기사"
+default = false
+
+[[feeds]]
+id = "sportsdonga-ent"
+why = "연예 단독·가요 소식"
+default = false
+
+[[feeds]]
+id = "sportschosun-ent"
+why = "연예 전문지 최신 기사"
+default = false
+
+[[people]]
+name = "방시혁"
+why = "하이브 의장, 업계 판도 좌우"
+region = "kr"
+news = "하이브 방시혁"
+subs = ["기획사·산업"]
+
+[[people]]
+name = "박진영"
+why = "JYP 창업자, 공개매수 이슈 중심"
+region = "kr"
+news = "박진영 JYP"
+subs = ["기획사·산업"]
+
+[[people]]
+name = "이수만"
+why = "A2O 수장, A2O LITE 흥행"
+region = "kr"
+news = "이수만"
+subs = ["기획사·산업"]
+
+[[people]]
+name = "민희진"
+why = "오케이 레코즈 대표, 하이브 소송"
+region = "kr"
+news = "민희진"
+subs = ["기획사·산업"]
+
+[[people]]
+name = "양현석"
+why = "YG 총괄, 30주년 전략"
+region = "kr"
+news = "양현석"
+subs = ["기획사·산업"]
+default = false
+
+[[people]]
+name = "장철혁"
+why = "SM 공동대표, 자산 재편"
+region = "kr"
+news = "장철혁 SM"
+subs = ["기획사·산업"]
+default = false
+
+[[people]]
+name = "이재상"
+why = "하이브 CEO, 레이블 개편"
+region = "kr"
+news = "이재상 하이브"
+subs = ["기획사·산업"]
+default = false
+
+[[people]]
+name = "임희윤"
+why = "음악 전문 기자·평론"
+region = "kr"
+news = "임희윤"
+default = false
+
+[[people]]
+name = "Jeff Benjamin"
+why = "빌보드 K팝 담당 기자"
+region = "world"
+x = "jeffbenjam"
+news_en = "Jeff Benjamin K-pop"
+subs = ["차트·시상식"]
+
+[[companies]]
+name = "하이브"
+why = "BTS·세븐틴 등 최대 기획사"
+region = "kr"
+x = "HYBEOFFICIALtwt"
+news = "하이브 엔터"
+
+[[companies]]
+name = "SM엔터테인먼트"
+why = "에스파·라이즈 소속, 카카오 지분 재편"
+region = "kr"
+x = "SMTOWNGLOBAL"
+news = "SM엔터테인먼트"
+
+[[companies]]
+name = "JYP엔터테인먼트"
+why = "트와이스·스트레이 키즈, 공개매수 이슈"
+region = "kr"
+x = "jypnation"
+news = "JYP엔터테인먼트"
+
+[[companies]]
+name = "YG엔터테인먼트"
+why = "블랙핑크·베이비몬스터·빅뱅"
+region = "kr"
+x = "ygent_official"
+news = "YG엔터테인먼트"
+
+[[companies]]
+name = "카카오엔터테인먼트"
+why = "아이브 소속사 모회사·멜론 운영"
+region = "kr"
+news = "카카오엔터테인먼트"
+subs = ["기획사·산업"]
+default = false
+
+[[companies]]
+name = "A2O 엔터테인먼트"
+why = "이수만의 새 기획사"
+region = "kr"
+news = "A2O 엔터테인먼트"
+subs = ["기획사·산업", "걸그룹"]
+default = false
+
+[[companies]]
+name = "써클차트"
+why = "국내 공인 음반·음원 차트"
+region = "kr"
+x = "CIRCLE_CHART"
+news = "써클차트"
+subs = ["차트·시상식"]
+
+[[companies]]
+name = "Mnet (MAMA)"
+why = "MAMA 시상식·음악방송"
+region = "kr"
+x = "MAMAAWARDS"
+news = "엠넷 마마 MAMA"
+subs = ["차트·시상식"]
+
+[[companies]]
+name = "멜론 (MMA)"
+why = "최대 음원 플랫폼·MMA 시상식"
+region = "kr"
+news = "멜론뮤직어워드 MMA"
+subs = ["차트·시상식"]
+default = false
+
+[[companies]]
+name = "빌보드"
+why = "미국 차트 K팝 성적"
+region = "world"
+x = "billboardcharts"
+news_en = "K-pop Billboard"
+subs = ["차트·시상식"]
+
+[[searches]]
+name = "K팝 컴백"
+news = "K팝 컴백"
+region = "kr"
+subs = ["보이그룹", "걸그룹", "솔로"]
+
+[[searches]]
+name = "음반 판매량 초동"
+news = "음반 판매량 초동"
+region = "kr"
+subs = ["차트·시상식"]
+
+[[searches]]
+name = "써클차트"
+news = "써클차트"
+region = "kr"
+subs = ["차트·시상식"]
+
+[[searches]]
+name = "엔터 실적"
+news = "엔터 실적"
+region = "kr"
+subs = ["기획사·산업"]
+
+[target]
+text = "좋아하는 아티스트는?"
+brief = "좋아하는 아티스트"
+
+[target.options_by]
+"보이그룹" = [
+  { label = "방탄소년단", region = "kr", news = "방탄소년단", x = "BTS_twt" },
+  { label = "세븐틴", region = "kr", news = "세븐틴", x = "pledis_17" },
+  { label = "스트레이 키즈", region = "kr", news = "스트레이 키즈", x = "Stray_Kids" },
+  { label = "에이티즈", region = "kr", news = "에이티즈", x = "ATEEZofficial" },
+  { label = "엔하이픈", region = "kr", news = "엔하이픈", x = "ENHYPEN" },
+  { label = "투모로우바이투게더", region = "kr", news = "투모로우바이투게더", x = "TXT_members" },
+  { label = "라이즈", region = "kr", news = "라이즈 RIIZE", x = "RIIZE_official" },
+  { label = "투어스", region = "kr", news = "투어스 TWS", x = "TWS_PLEDIS" },
+  { label = "보이넥스트도어", region = "kr", news = "보이넥스트도어", x = "BOYNEXTDOOR_KOZ" },
+  { label = "코르티스", region = "kr", news = "코르티스" },
+  { label = "플레이브", region = "kr", news = "플레이브" },
+]
+"걸그룹" = [
+  { label = "블랙핑크", region = "kr", news = "블랙핑크", x = "BLACKPINK" },
+  { label = "아이브", region = "kr", news = "아이브", x = "IVEstarship" },
+  { label = "에스파", region = "kr", news = "에스파", x = "aespa_official" },
+  { label = "르세라핌", region = "kr", news = "르세라핌", x = "le_sserafim" },
+  { label = "트와이스", region = "kr", news = "트와이스", x = "JYPETWICE" },
+  { label = "뉴진스", region = "kr", news = "뉴진스", x = "NewJeans_ADOR" },
+  { label = "아일릿", region = "kr", news = "아일릿", x = "ILLIT_twt" },
+  { label = "베이비몬스터", region = "kr", news = "베이비몬스터", x = "YGBABYMONSTER_" },
+  { label = "리센느", region = "kr", news = "리센느" },
+  { label = "하츠투하츠", region = "kr", news = "하츠투하츠" },
+  { label = "키키", region = "kr", news = "키키 KiiiKiii" },
+  { label = "A2O LITE", region = "kr", news = "A2O LITE" },
+]
+"솔로" = [
+  { label = "아이유", region = "kr", news = "아이유", x = "_IUofficial" },
+  { label = "지드래곤", region = "kr", news = "지드래곤" },
+  { label = "임영웅", region = "kr", news = "임영웅" },
+  { label = "정국", region = "kr", news = "방탄소년단 정국" },
+  { label = "지민", region = "kr", news = "방탄소년단 지민" },
+  { label = "로제", region = "kr", news = "블랙핑크 로제" },
+  { label = "제니", region = "kr", news = "블랙핑크 제니" },
+  { label = "태연", region = "kr", news = "소녀시대 태연" },
+  { label = "화사", region = "kr", news = "마마무 화사" },
+]

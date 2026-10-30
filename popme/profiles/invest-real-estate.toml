@@ -1,0 +1,290 @@
+# 관심사 묶음: 경제·투자 › 부동산 — 2026-10-30 조사(local/research/packs/invest-real-estate.json), 출처·계정은 열어서 확인한 것만
+id = "invest-real-estate"
+name = "부동산"
+tag = "부동산"
+summary = "집값·청약·전월세·재건축·부동산 정책"
+order = 32
+status = "ready"
+category = ["경제·투자", "부동산"]
+criteria = "- 정부·서울시 부동산 대책(대출 규제·토지거래허가구역·공급대책·세제 개편)은 무엇이 언제부터 바뀌고 누구에게 해당하는지를 맨 먼저 쓴다.\n- 한국부동산원 주간 아파트 가격동향·국토부 주택통계·실거래 신고가처럼 숫자가 나오는 공식 통계를 우선하고, 사용자가 고른 지역·단지 수치를 앞에 둔다.\n- 청약은 관심 지역의 분양 일정·분양가·경쟁률·무순위(줍줍) 공고를 날짜와 함께, 전월세는 전셋값·월세 전환·전세사기 대책을 챙긴다.\n- 재건축·재개발은 조합 설립·사업시행인가·관리처분·이주 같은 단계 변화와 분담금만 고르고, 행사·수상 같은 기관 홍보는 버린다.\n- 확정되지 않은 규제설·지라시는 「~라는 보도」로 쓰고 정부가 부인했으면 함께 적는다. 연예인 매매·경매 기사, 분양 광고성 기사, 「지금 사야」 류 전망 칼럼은 버린다.\n"
+discovery = "국토부·한국부동산원 통계를 근거로 숫자를 대며 말하는 연구위원·리서치랩장을 고르고, 특정 단지 분양 홍보나 매수 권유를 하는 사람은 뺀다."
+topics = ["대출 규제", "토허제", "공급대책", "청약 일정", "집값 통계", "전월세", "재건축 단계", "보유세·양도세"]
+
+[caps]
+"공식 발표" = 15
+"전문 매체" = 20
+"분석·해설" = 10
+"통계·데이터" = 5
+"한국 커뮤니티" = 10
+"해외 커뮤니티" = 5
+"뉴스" = 25
+
+[[subs]]
+label = "서울 아파트"
+region = "kr"
+
+[[subs]]
+label = "수도권·지방"
+region = "kr"
+
+[[subs]]
+label = "청약/분양"
+region = "kr"
+
+[[subs]]
+label = "전월세"
+region = "kr"
+
+[[subs]]
+label = "재건축/재개발"
+region = "kr"
+
+[[subs]]
+label = "정책/세금"
+region = "kr"
+
+[[feeds]]
+id = "molit-press"
+why = "대책·주택통계 원문"
+
+[[feeds]]
+id = "bizwatch-realestate"
+why = "하루 5건 안팎 해설"
+
+[[feeds]]
+id = "chosunbiz-realestate"
+why = "분양·정책 속보"
+
+[[feeds]]
+id = "hankyung-realestate"
+why = "시장·정책 속보"
+default = false
+
+[[feeds]]
+id = "sedaily-realestate"
+why = "시장·정책 속보"
+default = false
+
+[[feeds]]
+id = "herald-realestate"
+why = "분양·월세 통계 기사"
+default = false
+
+[[feeds]]
+id = "asiae-realestate"
+why = "정비사업·지방 소식"
+default = false
+
+[[feeds]]
+id = "ddangzipgo"
+why = "단지·입주 현장 기사"
+default = false
+
+[[feeds]]
+id = "bok-decisions"
+why = "기준금리 결정 원문"
+subs = ["정책/세금"]
+default = false
+
+[[people]]
+name = "홍지선"
+why = "국토교통부 장관 — 공급대책·규제 발표 당사자"
+region = "kr"
+news = "홍지선 장관"
+
+[[people]]
+name = "오세훈"
+why = "서울시장 — 정비사업·서울 주택공급 결정"
+region = "kr"
+news = "오세훈 부동산"
+subs = ["서울 아파트", "재건축/재개발"]
+
+[[people]]
+name = "이형일"
+why = "부총리 겸 재정경제부 장관 — 보유세·양도세 개편"
+region = "kr"
+x = "leehimofe"
+news = "이형일 부총리"
+subs = ["정책/세금"]
+
+[[people]]
+name = "이억원"
+why = "금융위원장 — 주담대·가계대출 규제"
+region = "kr"
+news = "이억원 금융위원장"
+subs = ["정책/세금"]
+
+[[people]]
+name = "신현송"
+why = "한국은행 총재 — 기준금리"
+region = "kr"
+news = "신현송 총재"
+subs = ["정책/세금"]
+default = false
+
+[[people]]
+name = "함영진"
+why = "우리은행 부동산리서치랩장 — 통계 기반 시장 해설"
+region = "kr"
+news = "함영진 랩장"
+
+[[people]]
+name = "김효선"
+why = "NH농협은행 부동산 수석위원 — 정비사업·전월세 해설"
+region = "kr"
+news = "김효선 수석위원"
+default = false
+
+[[people]]
+name = "송승현"
+why = "도시와경제 대표 — 지역별 시장 해설"
+region = "kr"
+news = "송승현 도시와경제"
+default = false
+
+[[companies]]
+name = "국토교통부"
+why = "주택 공급·규제·통계의 주무 부처"
+region = "kr"
+x = "korea_land"
+news = "국토부 주택"
+
+[[companies]]
+name = "한국부동산원"
+why = "주간 아파트 가격동향·공시가격 발표"
+region = "kr"
+news = "한국부동산원"
+subs = ["서울 아파트", "수도권·지방", "전월세"]
+
+[[companies]]
+name = "청약홈"
+why = "청약 일정·당첨 발표 창구(한국부동산원 운영)"
+region = "kr"
+news = "청약홈"
+subs = ["청약/분양"]
+
+[[companies]]
+name = "서울특별시"
+why = "정비사업 인허가·토지거래허가구역 지정"
+region = "kr"
+x = "seoulmania"
+news = "서울시 주택공급"
+subs = ["서울 아파트", "재건축/재개발"]
+
+[[companies]]
+name = "재정경제부"
+why = "부동산 세제 개편 주무 부처"
+region = "kr"
+x = "mofekorea"
+news = "재정경제부 세제"
+subs = ["정책/세금"]
+
+[[companies]]
+name = "금융위원회"
+why = "주담대·DSR 등 대출 규제"
+region = "kr"
+x = "fsckorea"
+news = "금융위 가계대출"
+subs = ["정책/세금"]
+
+[[companies]]
+name = "한국은행"
+why = "기준금리 결정"
+region = "kr"
+x = "bok_hub"
+news = "한국은행 기준금리"
+subs = ["정책/세금"]
+default = false
+
+[[companies]]
+name = "LH 한국토지주택공사"
+why = "공공분양·신도시 공급"
+region = "kr"
+news = "LH 공공분양"
+subs = ["청약/분양"]
+
+[[companies]]
+name = "SH 서울주택도시개발공사"
+why = "서울 공공분양·임대"
+region = "kr"
+x = "together_sh"
+news = "서울주택도시개발공사"
+subs = ["청약/분양", "전월세"]
+default = false
+
+[[companies]]
+name = "주택도시보증공사(HUG)"
+why = "전세보증·분양보증"
+region = "kr"
+news = "주택도시보증공사"
+subs = ["전월세"]
+default = false
+
+[[searches]]
+name = "서울 아파트값"
+news = "서울 아파트값"
+region = "kr"
+subs = ["서울 아파트"]
+
+[[searches]]
+name = "청약 경쟁률"
+news = "청약 경쟁률"
+region = "kr"
+subs = ["청약/분양"]
+
+[[searches]]
+name = "전세 월세 시장"
+news = "전세 월세 시장"
+region = "kr"
+subs = ["전월세"]
+
+[[searches]]
+name = "재건축 정비사업"
+news = "재건축 정비사업"
+region = "kr"
+subs = ["재건축/재개발"]
+
+[[searches]]
+name = "부동산 대책"
+news = "부동산 대책"
+region = "kr"
+subs = ["정책/세금"]
+
+[target]
+text = "관심 있는 지역(구 단위)이나 단지는?"
+brief = "관심 있는 지역(구 단위)이나 단지"
+
+[target.options_by]
+"서울 아파트" = [
+  { label = "강남구", region = "kr", news = "강남구 집값" },
+  { label = "서초구", region = "kr", news = "서초구 집값" },
+  { label = "송파구", region = "kr", news = "송파구 집값" },
+  { label = "용산구", region = "kr", news = "용산 집값" },
+  { label = "성동구", region = "kr", news = "성동구 집값" },
+  { label = "마포구", region = "kr", news = "마포 집값" },
+  { label = "강동구", region = "kr", news = "강동구 집값" },
+  { label = "양천구(목동)", region = "kr", news = "양천구 집값" },
+  { label = "영등포구(여의도)", region = "kr", news = "영등포구 집값" },
+  { label = "노원구(노도강)", region = "kr", news = "노원구 집값" },
+]
+"수도권·지방" = [
+  { label = "분당", region = "kr", news = "분당 집값" },
+  { label = "과천", region = "kr", news = "과천 집값" },
+  { label = "광명", region = "kr", news = "광명 아파트" },
+  { label = "동탄", region = "kr", news = "동탄 집값" },
+  { label = "인천 송도", region = "kr", news = "송도 아파트" },
+  { label = "부산", region = "kr", news = "부산 집값" },
+  { label = "대구", region = "kr", news = "대구 집값" },
+]
+"청약/분양" = [
+  { label = "3기 신도시", region = "kr", news = "3기 신도시" },
+  { label = "LH 공공분양", region = "kr", news = "LH 공공분양" },
+]
+"재건축/재개발" = [
+  { label = "은마아파트", region = "kr", news = "은마아파트" },
+  { label = "압구정 재건축", region = "kr", news = "압구정 재건축" },
+  { label = "잠실주공5단지", region = "kr", news = "잠실주공5단지" },
+  { label = "목동 재건축", region = "kr", news = "목동 재건축" },
+  { label = "여의도 재건축", region = "kr", news = "여의도 재건축" },
+  { label = "1기 신도시 재건축", region = "kr", news = "1기 신도시 재건축" },
+]

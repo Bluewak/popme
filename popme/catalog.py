@@ -24,7 +24,7 @@ NEWS_URL = "https://news.google.com/rss/search?q={q}+when:2d&{loc}"
 NEWS_LOC = {"kr": "hl=ko&gl=KR&ceid=KR:ko", "world": "hl=en-US&gl=US&ceid=US:en"}
 NEWS_GROUP, NEWS_CAP, NEWS_PER_FEED = "뉴스", 15, 5  # 관심사 하나당 뉴스 상한, 한 사람·기업당 상한 (한 명이 다 차지하지 않게)
 # 구글 뉴스에 섞여 드는 엉뚱한 사이트 (제목 끝 「 - 언론사」). 2026-10-19 「삼성전자 HBM」 70건 중 37건이 이것
-NEWS_SPAM = ["Calgary Roughnecks"]
+NEWS_SPAM = ["Calgary Roughnecks", "Vietnam.vn"]  # Vietnam.vn: 기계번역 기사 (2026-10 축구·야구 조사)
 # 예전 config(관심사 없음)의 묶음별 상한 — 옮기기 전까지만 쓴다
 LEGACY_CAPS = {"공식 변경내역": 40, "공식 발표": 30, "실사용 검증": 15, "새 오픈소스·화제": 20, "한국 커뮤니티": 20}
 
@@ -92,6 +92,29 @@ def picks(cfg, pid):
     return news(cfg).get("picks", {}).get(pid, {})
 
 
+def subs(cfg, p):
+    """묶음의 세부(해외축구·K리그 …) 중 고른 것. 고친 적이 없으면 전부. 세부가 없는 관심사면 []."""
+    allowed = [s["label"] for s in p.get("subs", [])]
+    got = picks(cfg, p["id"]).get("subs")
+    return [s for s in got if s in allowed] if got is not None else allowed
+
+
+def in_subs(item, chosen_subs):
+    """출처·사람·기관이 고른 세부에 해당하나 (세부 표시가 없으면 전부에 해당)."""
+    return not item.get("subs") or not chosen_subs or bool(set(item["subs"]) & set(chosen_subs))
+
+
+def target_options(p, chosen_subs=None):
+    """대상 보기 전부 — 세부와 상관없는 options + 고른 세부마다의 options_by (같은 이름은 하나)."""
+    t = p.get("target", {})
+    by = t.get("options_by", {})
+    keys = [k for k in by if chosen_subs is None or k in chosen_subs]
+    out = {}
+    for o in [*t.get("options", []), *(o for k in keys for o in by[k])]:
+        out.setdefault(o["label"], o)
+    return list(out.values())
+
+
 def uses(cfg, p):
     """「대상」 질문(쓰는 도구 등)에서 고른 보기 label들. 고친 적이 없으면 설정의 「주로 쓰는 도구」에 이름이 들어 있는 보기."""
     pk = picks(cfg, p["id"])
@@ -101,13 +124,13 @@ def uses(cfg, p):
 
     def named(part):  # 단어로: 「pi」가 「Copilot」 안에서 걸리지 않게
         return bool(re.search(rf"(?<![a-z0-9]){re.escape(part.strip().lower())}(?![a-z0-9])", mine))
-    return [o["label"] for o in p.get("target", {}).get("options", [])
+    return [o["label"] for o in target_options(p)
             if any(named(part) for part in o["label"].replace("·", "/").split("/") if part.strip())]
 
 
 def used_options(cfg, p):
     want = set(uses(cfg, p))
-    return [o for o in p.get("target", {}).get("options", []) if o["label"] in want]
+    return [o for o in target_options(p) if o["label"] in want]
 
 
 def user_tools(cfg):
@@ -123,14 +146,21 @@ def entities(cfg, p):
     """그 관심사에서 받을 사람·기업 [{kind, name, why, x, region, news, feeds}]. 고친 적이 없으면 기본 체크된 것.
     「대상」 질문에서 고른 보기의 회사(예: Cursor를 쓰면 Cursor)는 기본 꺼짐이어도 넣는다."""
     pk = picks(cfg, p["id"])
-    by_target = {c for o in used_options(cfg, p) for c in o.get("companies", [])}
+    used = used_options(cfg, p)
+    by_target = {c for o in used for c in o.get("companies", [])}
+    chosen_subs = subs(cfg, p)
     out = []
     for kind, key in (("person", "people"), ("company", "companies"), ("media", "media"), ("search", "searches")):
         names = pk.get(key)
         for e in p.get(key, []):
             keep = (e["name"] in names if names is not None else e.get("default", True) is not False) or e["name"] in by_target
-            if keep:
+            if keep and (e["name"] in by_target or in_subs(e, chosen_subs)):
                 out.append({**e, "kind": kind})
+    have = {e["name"] for e in out}
+    for o in used:  # 고른 대상(응원 팀·아티스트 …) 자체도 사람·기관처럼 X·뉴스로 받는다
+        if o["label"] not in have and (o.get("x") or o.get("news")):
+            out.append({"kind": "target", "name": o["label"], "why": "고른 대상", "region": o.get("region", "world"),
+                        "x": o.get("x", ""), "news": o.get("news", ""), "news_en": o.get("news_en", "")})
     for e in pk.get("extra", []):  # 직접 더한 사람·기업 (kind가 없으면 사람)
         if e.get("name"):
             out.append({"kind": "person", **e})
@@ -138,6 +168,11 @@ def entities(cfg, p):
 
 
 def scope(cfg, p):
+    """한국어만(kr) / 해외도(world). 세부가 있는 묶음은 묻지 않고 고른 세부로: 국내 세부만 골랐으면 kr."""
+    if p.get("subs"):
+        regions = {s["label"]: s.get("region", "world") for s in p["subs"]}
+        chosen_subs = subs(cfg, p)
+        return "kr" if chosen_subs and all(regions.get(s) == "kr" for s in chosen_subs) else "world"
     return picks(cfg, p["id"]).get("scope") or p.get("scope") or "world"
 
 
@@ -187,9 +222,12 @@ def active(cfg):
     cat, acc = feeds(), {}
     for p in chosen(cfg):
         turned = {fid for o in used_options(cfg, p) for fid in o.get("feeds", [])}  # 「대상」에서 고른 도구의 출처는 켠다
+        chosen_subs = subs(cfg, p)
         for e in p.get("feeds", []):
             fid = e["id"]
             if fid in off or (e.get("default", True) is False and fid not in on and fid not in turned) or fid not in cat:
+                continue
+            if fid not in turned and not in_subs(e, chosen_subs):  # 고른 세부(K리그 …)의 출처만
                 continue
             f = acc.setdefault(fid, {**cat[fid], **tweak.get(fid, {}), "interests": {}})
             filt = e.get("filter")

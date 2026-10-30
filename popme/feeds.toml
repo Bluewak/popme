@@ -1137,3 +1137,665 @@ name = 'Karpathy 블로그'
 url = 'https://karpathy.bearblog.dev/feed/'
 group = '실사용 검증'
 max_chars = 600
+
+# --- 2026-10-30 관심사 묶음 (스포츠·경제·투자·엔터): local/research/packs 조사, 열어서 확인 ---
+
+[feed.interfootball-world]
+name = "인터풋볼 해외축구"
+url = "https://www.interfootball.co.kr/rss/S1N1.xml"
+group = "전문 매체"
+max_chars = 400
+note = "해외축구 전문 매체"
+
+[feed.interfootball-kr]
+name = "인터풋볼 국내축구"
+url = "https://www.interfootball.co.kr/rss/S1N2.xml"
+group = "전문 매체"
+max_chars = 400
+note = "K리그·대표팀 뉴스"
+
+[feed.sportsg-k1]
+name = "스포츠니어스 K리그1"
+url = "https://www.sports-g.com/rss/S1N1.xml"
+group = "전문 매체"
+max_chars = 400
+note = "K리그 현장 취재"
+
+[feed.sportsg-k2]
+name = "스포츠니어스 K리그2"
+url = "https://www.sports-g.com/rss/S1N2.xml"
+group = "전문 매체"
+max_chars = 400
+note = "K리그2·승격 경쟁"
+
+[feed.sportsg-national]
+name = "스포츠니어스 국가대표"
+url = "https://www.sports-g.com/rss/S1N3.xml"
+group = "전문 매체"
+max_chars = 400
+note = "대표팀 전용 섹션"
+
+[feed.sportsg-women]
+name = "스포츠니어스 여자축구"
+url = "https://www.sports-g.com/rss/S1N5.xml"
+group = "전문 매체"
+max_chars = 400
+note = "WK리그·여자대표팀"
+
+[feed.footballist]
+name = "풋볼리스트"
+url = "https://www.footballist.co.kr/rss/S1N1.xml"
+group = "분석·해설"
+max_chars = 400
+note = "기획·분석 기사"
+
+[feed.besteleven-kr]
+name = "베스트일레븐 KOREA"
+url = "https://www.besteleven.com/rss/S1N1.xml"
+group = "전문 매체"
+max_chars = 400
+note = "국내 축구·유소년"
+
+[feed.besteleven-world]
+name = "베스트일레븐 WORLD"
+url = "https://www.besteleven.com/rss/S1N2.xml"
+group = "전문 매체"
+max_chars = 400
+note = "해외축구 뉴스"
+
+[feed.fourfourtwo-kr]
+name = "포포투 뉴스"
+url = "https://www.fourfourtwo.co.kr/rss/S1N2.xml"
+group = "전문 매체"
+max_chars = 400
+note = "축구 전문지 뉴스"
+
+[feed.sportsdonga-soccer]
+name = "스포츠동아 축구"
+url = "https://rss.donga.com/sportsdonga/soccer.xml"
+group = "전문 매체"
+max_chars = 400
+note = "축구 종합, 하루 6건쯤"
+
+[feed.stn-soccer]
+name = "STN 뉴스 축구"
+url = "https://www.stnsports.co.kr/rss/S1N1.xml"
+group = "전문 매체"
+max_chars = 400
+note = "축구 섹션 뉴스"
+
+[feed.yna-sports]
+name = "연합뉴스 스포츠"
+url = "https://www.yna.co.kr/rss/sports.xml"
+group = "전문 매체"
+max_chars = 300
+note = "종합 스포츠 속보"
+
+[feed.bbc-football]
+name = "BBC Sport Football"
+url = "https://feeds.bbci.co.uk/sport/football/rss.xml"
+group = "전문 매체"
+max_chars = 500
+note = "영국 축구 핵심 뉴스"
+
+[feed.guardian-football]
+name = "The Guardian Football"
+url = "https://www.theguardian.com/football/rss"
+group = "전문 매체"
+max_chars = 500
+note = "유럽 축구 전반"
+
+[feed.guardian-pl]
+name = "The Guardian Premier League"
+url = "https://www.theguardian.com/football/premierleague/rss"
+group = "전문 매체"
+max_chars = 500
+note = "EPL 전용"
+
+[feed.guardian-ucl]
+name = "The Guardian Champions League"
+url = "https://www.theguardian.com/football/championsleague/rss"
+group = "전문 매체"
+max_chars = 500
+note = "챔피언스리그 전용"
+
+[feed.sky-football]
+name = "Sky Sports Football"
+url = "https://www.skysports.com/rss/12040"
+group = "전문 매체"
+max_chars = 500
+note = "EPL 이적·감독 소식"
+
+[feed.espn-soccer]
+name = "ESPN Soccer"
+url = "https://www.espn.com/espn/rss/soccer/news"
+group = "전문 매체"
+max_chars = 500
+note = "세계 축구 헤드라인"
+
+[feed.athletic-football]
+name = "The Athletic Football"
+url = "https://www.nytimes.com/athletic/rss/football/"
+group = "분석·해설"
+max_chars = 200
+note = "본문 유료, 제목만"
+
+[feed.guardian-women]
+name = "The Guardian Women's Football"
+url = "https://www.theguardian.com/football/womensfootball/rss"
+group = "전문 매체"
+max_chars = 500
+note = "세계 여자축구"
+
+[feed.bbc-women]
+name = "BBC Sport Women's Football"
+url = "https://feeds.bbci.co.uk/sport/football/womens/rss.xml"
+group = "전문 매체"
+max_chars = 500
+note = "WSL·여자 국제대회"
+
+[feed.sportsdonga-baseball]
+name = "스포츠동아 야구&MLB"
+url = "https://rss.donga.com/sportsdonga/baseball.xml"
+group = "전문 매체"
+max_chars = 400
+note = "야구·MLB 종합 뉴스"
+
+[feed.mlbkor]
+name = "MLB Korea"
+url = "https://www.mlbkor.com/rss/allArticle.xml"
+group = "전문 매체"
+max_chars = 400
+note = "MLB 한국어 전문"
+
+[feed.yagongso]
+name = "야구공작소"
+url = "https://yagongso.com/feed/"
+group = "분석·해설"
+max_chars = 500
+note = "데이터 기반 칼럼"
+
+[feed.stn-baseball]
+name = "STN 뉴스 야구"
+url = "https://www.stnsports.co.kr/rss/S1N2.xml"
+group = "전문 매체"
+max_chars = 400
+note = "KBO·MLB 섹션"
+
+[feed.mlb-news]
+name = "MLB.com 뉴스"
+url = "https://www.mlb.com/feeds/news/rss.xml"
+group = "공식 발표"
+max_chars = 500
+note = "MLB 공식 뉴스"
+
+[feed.mlbtr]
+name = "MLB Trade Rumors"
+url = "https://www.mlbtraderumors.com/feed"
+group = "전문 매체"
+max_chars = 500
+note = "트레이드·FA 소식"
+
+[feed.fangraphs]
+name = "FanGraphs"
+url = "https://blogs.fangraphs.com/feed/"
+group = "분석·해설"
+max_chars = 500
+note = "세이버메트릭스 분석"
+
+[feed.espn-mlb]
+name = "ESPN MLB"
+url = "https://www.espn.com/espn/rss/mlb/news"
+group = "전문 매체"
+max_chars = 500
+note = "MLB 헤드라인"
+
+[feed.cbs-mlb]
+name = "CBS Sports MLB"
+url = "https://www.cbssports.com/rss/headlines/mlb/"
+group = "전문 매체"
+max_chars = 500
+note = "MLB 헤드라인"
+
+[feed.athletic-mlb]
+name = "The Athletic MLB"
+url = "https://www.nytimes.com/athletic/rss/mlb/"
+group = "분석·해설"
+max_chars = 200
+note = "본문 유료, 제목만"
+
+[feed.baseball-america]
+name = "Baseball America"
+url = "https://www.baseballamerica.com/feed/"
+group = "전문 매체"
+max_chars = 500
+note = "유망주·드래프트"
+
+[feed.mlb-dodgers]
+name = "MLB.com 다저스 뉴스"
+url = "https://www.mlb.com/dodgers/feeds/news/rss.xml"
+group = "공식 발표"
+max_chars = 400
+note = "다저스 구단 소식"
+
+[feed.mlb-giants]
+name = "MLB.com 자이언츠 뉴스"
+url = "https://www.mlb.com/giants/feeds/news/rss.xml"
+group = "공식 발표"
+max_chars = 400
+note = "자이언츠 구단 소식"
+
+[feed.mlb-padres]
+name = "MLB.com 파드리스 뉴스"
+url = "https://www.mlb.com/padres/feeds/news/rss.xml"
+group = "공식 발표"
+max_chars = 400
+note = "파드리스 구단 소식"
+
+[feed.mlb-yankees]
+name = "MLB.com 양키스 뉴스"
+url = "https://www.mlb.com/yankees/feeds/news/rss.xml"
+group = "공식 발표"
+max_chars = 400
+note = "양키스 구단 소식"
+
+[feed.mlb-brewers]
+name = "MLB.com 브루어스 뉴스"
+url = "https://www.mlb.com/brewers/feeds/news/rss.xml"
+group = "공식 발표"
+max_chars = 400
+note = "브루어스 구단 소식"
+
+[feed.hankyung-finance]
+name = "한국경제 증권"
+url = "https://www.hankyung.com/feed/finance"
+group = "전문 매체"
+max_chars = 400
+note = "증시·종목 주요 기사"
+
+[feed.einfomax-stock]
+name = "연합인포맥스 증권"
+url = "https://news.einfomax.co.kr/rss/S1N2.xml"
+group = "전문 매체"
+max_chars = 400
+note = "시황·실적 빠른 보도"
+
+[feed.einfomax-ib]
+name = "연합인포맥스 IB/기업"
+url = "https://news.einfomax.co.kr/rss/S1N7.xml"
+group = "전문 매체"
+max_chars = 400
+note = "상장·M&A·기업 소식"
+
+[feed.chosunbiz-stock]
+name = "조선비즈 증권"
+url = "https://biz.chosun.com/arc/outboundfeeds/rss/category/stock/?outputType=xml"
+group = "전문 매체"
+max_chars = 400
+note = "증시·종목 기사"
+
+[feed.fnnews-stock]
+name = "파이낸셜뉴스 증권"
+url = "https://www.fnnews.com/rss/r20/fn_realnews_stock.xml"
+group = "전문 매체"
+max_chars = 400
+note = "수급·ETF·증권가 기사"
+
+[feed.yna-market]
+name = "연합뉴스 마켓+"
+url = "https://www.yna.co.kr/rss/market.xml"
+group = "전문 매체"
+max_chars = 300
+note = "특징주·시황 속보"
+
+[feed.dart-today]
+name = "DART 최근 공시 (전체)"
+url = "https://dart.fss.or.kr/api/todayRSS.xml"
+group = "공식 발표"
+max_chars = 200
+note = "전 상장사 실시간 공시"
+
+[feed.dart-samsung-elec]
+name = "DART 공시: 삼성전자"
+url = "https://dart.fss.or.kr/api/companyRSS.xml?crpCd=00126380"
+group = "공식 발표"
+max_chars = 200
+note = "종목 공시 원문"
+
+[feed.dart-sk-hynix]
+name = "DART 공시: SK하이닉스"
+url = "https://dart.fss.or.kr/api/companyRSS.xml?crpCd=00164779"
+group = "공식 발표"
+max_chars = 200
+note = "종목 공시 원문"
+
+[feed.dart-hyundai-motor]
+name = "DART 공시: 현대자동차"
+url = "https://dart.fss.or.kr/api/companyRSS.xml?crpCd=00164742"
+group = "공식 발표"
+max_chars = 200
+note = "종목 공시 원문"
+
+[feed.dart-lg-energy]
+name = "DART 공시: LG에너지솔루션"
+url = "https://dart.fss.or.kr/api/companyRSS.xml?crpCd=01515323"
+group = "공식 발표"
+max_chars = 200
+note = "종목 공시 원문"
+
+[feed.dart-samsung-bio]
+name = "DART 공시: 삼성바이오로직스"
+url = "https://dart.fss.or.kr/api/companyRSS.xml?crpCd=00877059"
+group = "공식 발표"
+max_chars = 200
+note = "종목 공시 원문"
+
+[feed.dart-celltrion]
+name = "DART 공시: 셀트리온"
+url = "https://dart.fss.or.kr/api/companyRSS.xml?crpCd=00413046"
+group = "공식 발표"
+max_chars = 200
+note = "종목 공시 원문"
+
+[feed.dart-naver]
+name = "DART 공시: NAVER"
+url = "https://dart.fss.or.kr/api/companyRSS.xml?crpCd=00266961"
+group = "공식 발표"
+max_chars = 200
+note = "종목 공시 원문"
+
+[feed.dart-kb-financial]
+name = "DART 공시: KB금융"
+url = "https://dart.fss.or.kr/api/companyRSS.xml?crpCd=00688996"
+group = "공식 발표"
+max_chars = 200
+note = "종목 공시 원문"
+
+[feed.dart-hanwha-aero]
+name = "DART 공시: 한화에어로스페이스"
+url = "https://dart.fss.or.kr/api/companyRSS.xml?crpCd=00126566"
+group = "공식 발표"
+max_chars = 200
+note = "종목 공시 원문"
+
+[feed.fed-monetary]
+name = "Fed 통화정책 발표"
+url = "https://www.federalreserve.gov/feeds/press_monetary.xml"
+group = "공식 발표"
+max_chars = 400
+note = "FOMC 성명·의사록"
+
+[feed.fed-speeches]
+name = "Fed 인사 연설"
+url = "https://www.federalreserve.gov/feeds/speeches.xml"
+group = "공식 발표"
+max_chars = 400
+note = "위원 발언 원문"
+
+[feed.sec-press]
+name = "SEC 보도자료"
+url = "https://www.sec.gov/news/pressreleases.rss"
+group = "공식 발표"
+max_chars = 300
+note = "규제·제재 발표"
+
+[feed.einfomax-us]
+name = "연합인포맥스 해외주식"
+url = "https://news.einfomax.co.kr/rss/S1N21.xml"
+group = "전문 매체"
+max_chars = 400
+note = "한국어 미국 증시 기사"
+
+[feed.cnbc-top]
+name = "CNBC Top News"
+url = "https://www.cnbc.com/id/100003114/device/rss/rss.html"
+group = "전문 매체"
+max_chars = 400
+note = "미국 시장 주요 뉴스"
+
+[feed.cnbc-earnings]
+name = "CNBC Earnings"
+url = "https://www.cnbc.com/id/10001147/device/rss/rss.html"
+group = "전문 매체"
+max_chars = 400
+note = "기업 실적 기사"
+
+[feed.cnbc-economy]
+name = "CNBC Economy"
+url = "https://www.cnbc.com/id/20910258/device/rss/rss.html"
+group = "전문 매체"
+max_chars = 400
+note = "지표·중앙은행 기사"
+
+[feed.wsj-markets]
+name = "WSJ Markets"
+url = "https://feeds.content.dowjones.io/public/rss/RSSMarketsMain"
+group = "전문 매체"
+max_chars = 300
+note = "시장 기사 제목·요약"
+
+[feed.marketwatch-pulse]
+name = "MarketWatch MarketPulse"
+url = "https://feeds.content.dowjones.io/public/rss/mw_marketpulse"
+group = "전문 매체"
+max_chars = 300
+note = "지표·시황 단신"
+
+[feed.chosunbiz-intl]
+name = "조선비즈 국제"
+url = "https://biz.chosun.com/arc/outboundfeeds/rss/category/international/?outputType=xml"
+group = "전문 매체"
+max_chars = 400
+note = "뉴욕증시 마감 한국어"
+
+[feed.factset-insight]
+name = "FactSet Insight"
+url = "https://insight.factset.com/rss.xml"
+group = "통계·데이터"
+max_chars = 400
+note = "S&P500 실적 집계"
+
+[feed.nvidia-newsroom]
+name = "NVIDIA 뉴스룸"
+url = "https://nvidianews.nvidia.com/releases.xml"
+group = "공식 발표"
+max_chars = 300
+note = "실적일정·발표 원문"
+
+[feed.apple-newsroom]
+name = "Apple Newsroom"
+url = "https://www.apple.com/newsroom/rss-feed.rss"
+group = "공식 발표"
+max_chars = 300
+note = "신제품·공식 발표"
+
+[feed.tenasia-music]
+name = "텐아시아 음악"
+url = "https://www.tenasia.co.kr/rss/music/"
+group = "전문 매체"
+max_chars = 400
+note = "가요 전문 연예 매체"
+
+[feed.ize-kpop]
+name = "아이즈 K-POP"
+url = "https://www.ize.co.kr/rss/S1N2.xml"
+group = "전문 매체"
+max_chars = 400
+note = "K팝 기획·해설 기사"
+
+[feed.idology]
+name = "아이돌로지"
+url = "https://idology.kr/feed"
+group = "분석·해설"
+max_chars = 600
+note = "아이돌 음반 평론·주간 정리"
+
+[feed.koreaherald-kpop]
+name = "코리아헤럴드 K-pop"
+url = "https://www.koreaherald.com/rss/kh_Kpop"
+group = "전문 매체"
+max_chars = 400
+note = "영문 K팝 산업 기사"
+
+[feed.soompi-music]
+name = "Soompi 음악"
+url = "https://www.soompi.com/category/music/feed"
+group = "해외 커뮤니티"
+max_chars = 300
+note = "해외 팬 시선 영문 뉴스"
+
+[feed.yna-ent]
+name = "연합뉴스 연예"
+url = "https://www.yna.co.kr/rss/entertainment.xml"
+group = "전문 매체"
+max_chars = 300
+note = "통신사 연예 속보"
+
+[feed.newsis-ent]
+name = "뉴시스 연예"
+url = "https://www.newsis.com/RSS/entertain.xml"
+group = "전문 매체"
+max_chars = 300
+note = "통신사 연예 속보"
+
+[feed.starnews]
+name = "스타뉴스"
+url = "https://rss.mt.co.kr/st_news.xml"
+group = "전문 매체"
+max_chars = 300
+note = "연예 전문지 최신 기사"
+
+[feed.sportsdonga-ent]
+name = "스포츠동아 엔터"
+url = "https://rss.donga.com/sportsdonga/entertainment.xml"
+group = "전문 매체"
+max_chars = 300
+note = "연예 단독·가요 소식"
+
+[feed.sportschosun-ent]
+name = "스포츠조선 연예"
+url = "https://www.sportschosun.com/rss/index_enter.htm"
+group = "전문 매체"
+max_chars = 300
+note = "연예 전문지 최신 기사"
+
+[feed.tenasia-tvdrama]
+name = "텐아시아 TV·드라마"
+url = "https://www.tenasia.co.kr/rss/tv-drama/"
+group = "전문 매체"
+max_chars = 400
+note = "드라마 전문 연예 매체"
+
+[feed.ize-tv]
+name = "아이즈 방송"
+url = "https://www.ize.co.kr/rss/S1N1.xml"
+group = "분석·해설"
+max_chars = 500
+note = "방송·드라마 해설 기사"
+
+[feed.deadline-korea]
+name = "Deadline Korea"
+url = "https://deadline.com/tag/korea/feed/"
+group = "전문 매체"
+max_chars = 400
+note = "해외 업계지의 한국 콘텐츠"
+
+[feed.dramabeans]
+name = "Dramabeans"
+url = "https://dramabeans.com/feed/"
+group = "분석·해설"
+max_chars = 400
+note = "영문 K드라마 리뷰"
+
+[feed.mydramalist-news]
+name = "MyDramaList 뉴스"
+url = "https://mydramalist.com/rss"
+group = "해외 커뮤니티"
+max_chars = 300
+note = "아시아 드라마 신작 소식"
+
+[feed.dramapanda]
+name = "DramaPanda"
+url = "https://dramapanda.com/feed"
+group = "전문 매체"
+max_chars = 300
+note = "중국 드라마 신작·캐스팅"
+
+[feed.modelpress]
+name = "모델프레스 토픽스"
+url = "https://mdpr.jp/rss/export/mdpr-topics.xml"
+group = "전문 매체"
+max_chars = 300
+note = "일본 연예·드라마 속보"
+
+[feed.variety-asia]
+name = "Variety Asia"
+url = "https://variety.com/c/global/asia/feed/"
+group = "전문 매체"
+max_chars = 300
+note = "아시아 영상 산업 동향"
+
+# --- 2026-10-30 관심사 묶음 (스포츠·경제·투자·엔터): local/research/packs 조사, 열어서 확인 ---
+
+[feed.molit-press]
+name = "국토교통부 보도자료"
+url = "https://www.molit.go.kr/dev/board/board_rss.jsp?rss_id=NEWS"
+group = "공식 발표"
+max_chars = 500
+note = "대책·주택통계 원문"
+
+[feed.bizwatch-realestate]
+name = "비즈워치 부동산"
+url = "https://news.bizwatch.co.kr/rss/service/real_estate"
+group = "분석·해설"
+max_chars = 400
+note = "하루 5건 안팎 해설"
+
+[feed.chosunbiz-realestate]
+name = "조선비즈 부동산"
+url = "https://biz.chosun.com/arc/outboundfeeds/rss/category/real_estate/?outputType=xml"
+group = "전문 매체"
+max_chars = 400
+note = "분양·정책 속보"
+
+[feed.hankyung-realestate]
+name = "한국경제 부동산"
+url = "https://www.hankyung.com/feed/realestate"
+group = "전문 매체"
+max_chars = 400
+note = "시장·정책 속보"
+
+[feed.sedaily-realestate]
+name = "서울경제 부동산"
+url = "https://www.sedaily.com/rss/realestate"
+group = "전문 매체"
+max_chars = 400
+note = "시장·정책 속보"
+
+[feed.herald-realestate]
+name = "헤럴드경제 부동산"
+url = "https://biz.heraldcorp.com/rss/google/realestate"
+group = "전문 매체"
+max_chars = 400
+note = "분양·월세 통계 기사"
+
+[feed.asiae-realestate]
+name = "아시아경제 부동산"
+url = "https://www.asiae.co.kr/rss/realestate.htm"
+group = "전문 매체"
+max_chars = 400
+note = "정비사업·지방 소식"
+
+[feed.ddangzipgo]
+name = "땅집고(조선일보)"
+url = "https://realty.chosun.com/site/data/rss/rss.xml"
+group = "전문 매체"
+max_chars = 400
+note = "단지·입주 현장 기사"
+
+[feed.bok-decisions]
+name = "한국은행 금통위 의결사항"
+url = "https://www.bok.or.kr/portal/bbs/P0000093/news.rss?menuNo=200789"
+group = "공식 발표"
+max_chars = 300
+note = "기준금리 결정 원문"

@@ -1,0 +1,307 @@
+# 관심사 묶음: 스포츠 › 야구 — 2026-10-30 조사(local/research/packs/sports-baseball.json), 출처·계정은 열어서 확인한 것만
+id = "sports-baseball"
+name = "야구"
+tag = "야구"
+summary = "KBO·MLB·국가대표·아마야구 소식"
+order = 21
+status = "ready"
+category = ["스포츠", "야구"]
+criteria = "- 응원 팀의 경기 결과·순위, 1군 등록·말소와 부상 소식을 가장 먼저 챙긴다.\n- 한국인 빅리거(이정후·김혜성·송성문·김하성)의 출전 기록과 계약·트레이드는 꼭 넣되, 트레이드·FA 설은 「~라는 보도」로 쓰고 누가 보도했는지 밝힌다.\n- 오프시즌에는 FA 계약, 외국인·아시아쿼터 재계약, 감독·코치 선임처럼 확정된 발표를 루머보다 앞세운다.\n- 국가대표(APBC·WBC·프리미어12) 명단과 감독, 신인 드래프트, 고교·대학 유망주의 해외 진출은 결정된 것만 싣는다.\n- 「美 매체 충격 주장」식 반응 짜깁기, 은퇴 선수 예능·사생활, 중계 링크·베팅 글은 버린다.\n- 같은 경기를 다룬 기사 여러 개는 하나로 묶어 점수와 승부처 한두 줄로 줄인다.\n"
+discovery = "트레이드·FA 계약을 발표 전에 정확히 전해 온 기자나 세이버메트릭스로 선수를 설명하는 분석가를 고르고, 반응 기사 위주 계정은 뺀다."
+topics = ["경기 결과", "부상·엔트리", "FA·트레이드", "코리안 빅리거", "국가대표", "신인 드래프트", "감독·코치"]
+
+[caps]
+"공식 발표" = 15
+"전문 매체" = 20
+"분석·해설" = 10
+"통계·데이터" = 5
+"한국 커뮤니티" = 10
+"해외 커뮤니티" = 5
+"뉴스" = 25
+
+[[subs]]
+label = "KBO"
+region = "kr"
+
+[[subs]]
+label = "MLB"
+region = "world"
+
+[[subs]]
+label = "국가대표"
+region = "kr"
+
+[[subs]]
+label = "고교/대학"
+region = "kr"
+
+[[feeds]]
+id = "sportsdonga-baseball"
+why = "야구·MLB 종합 뉴스"
+subs = ["KBO", "MLB", "국가대표"]
+
+[[feeds]]
+id = "mlbkor"
+why = "MLB 한국어 전문"
+subs = ["MLB"]
+
+[[feeds]]
+id = "yagongso"
+why = "데이터 기반 칼럼"
+
+[[feeds]]
+id = "stn-baseball"
+why = "KBO·MLB 섹션"
+subs = ["KBO", "MLB"]
+default = false
+
+[[feeds]]
+id = "yna-sports"
+why = "종합 스포츠 속보"
+default = false
+
+[[feeds]]
+id = "mlb-news"
+why = "MLB 공식 뉴스"
+subs = ["MLB"]
+
+[[feeds]]
+id = "mlbtr"
+why = "트레이드·FA 소식"
+subs = ["MLB"]
+
+[[feeds]]
+id = "fangraphs"
+why = "세이버메트릭스 분석"
+subs = ["MLB"]
+default = false
+
+[[feeds]]
+id = "espn-mlb"
+why = "MLB 헤드라인"
+subs = ["MLB"]
+default = false
+
+[[feeds]]
+id = "cbs-mlb"
+why = "MLB 헤드라인"
+subs = ["MLB"]
+default = false
+
+[[feeds]]
+id = "athletic-mlb"
+why = "본문 유료, 제목만"
+subs = ["MLB"]
+default = false
+
+[[feeds]]
+id = "baseball-america"
+why = "유망주·드래프트"
+subs = ["MLB"]
+default = false
+
+[[feeds]]
+id = "mlb-dodgers"
+why = "다저스 구단 소식"
+subs = ["MLB"]
+default = false
+
+[[feeds]]
+id = "mlb-giants"
+why = "자이언츠 구단 소식"
+subs = ["MLB"]
+default = false
+
+[[feeds]]
+id = "mlb-padres"
+why = "파드리스 구단 소식"
+subs = ["MLB"]
+default = false
+
+[[feeds]]
+id = "mlb-yankees"
+why = "양키스 구단 소식"
+subs = ["MLB"]
+default = false
+
+[[feeds]]
+id = "mlb-brewers"
+why = "브루어스 구단 소식"
+subs = ["MLB"]
+default = false
+
+[[people]]
+name = "이정후"
+why = "SF 자이언츠 외야수, 트레이드설"
+region = "kr"
+news = "이정후 자이언츠"
+subs = ["MLB"]
+
+[[people]]
+name = "김혜성"
+why = "LA 다저스 내야수"
+region = "kr"
+news = "김혜성 다저스"
+subs = ["MLB"]
+
+[[people]]
+name = "송성문"
+why = "샌디에이고 파드리스 내야수"
+region = "kr"
+news = "송성문"
+subs = ["MLB"]
+
+[[people]]
+name = "김하성"
+why = "MLB FA 내야수(2026 겨울)"
+region = "kr"
+news = "김하성"
+subs = ["MLB"]
+
+[[people]]
+name = "김도영"
+why = "KIA 간판 타자, 대표팀 중심"
+region = "kr"
+news = "김도영"
+subs = ["KBO", "국가대표"]
+default = false
+
+[[people]]
+name = "허구연"
+why = "KBO 총재(3연임 사실상 확정)"
+region = "kr"
+news = "허구연 KBO"
+subs = ["KBO"]
+default = false
+
+[[people]]
+name = "최원호"
+why = "APBC 야구대표팀 감독"
+region = "kr"
+news = "최원호 감독 APBC"
+subs = ["국가대표"]
+
+[[people]]
+name = "오타니 쇼헤이"
+why = "다저스 투타 겸업 슈퍼스타"
+region = "world"
+news = "오타니"
+news_en = "Shohei Ohtani"
+subs = ["MLB"]
+default = false
+
+[[people]]
+name = "제프 파산"
+why = "ESPN MLB 기자, 계약 특종"
+region = "world"
+x = "JeffPassan"
+news_en = "Jeff Passan"
+subs = ["MLB"]
+
+[[people]]
+name = "켄 로젠탈"
+why = "MLB 인사이더 기자"
+region = "world"
+x = "Ken_Rosenthal"
+news = "켄 로젠탈"
+news_en = "Ken Rosenthal"
+subs = ["MLB"]
+default = false
+
+[[companies]]
+name = "KBO(한국야구위원회)"
+why = "리그 일정·제도·대표팀 운영"
+region = "kr"
+news = "한국야구위원회"
+subs = ["KBO", "국가대표"]
+
+[[companies]]
+name = "MLB 사무국"
+why = "규정·노사협약·시상"
+region = "world"
+x = "MLB"
+news = "MLB 사무국"
+news_en = "MLB"
+subs = ["MLB"]
+
+[[companies]]
+name = "MLB 선수노조(MLBPA)"
+why = "노사협약 협상 당사자"
+region = "world"
+x = "MLB_PLAYERS"
+news = "MLB 노사협약"
+news_en = "MLBPA"
+subs = ["MLB"]
+default = false
+
+[[companies]]
+name = "대한야구소프트볼협회"
+why = "아마야구·고교대회 주관"
+region = "kr"
+news = "대한야구소프트볼협회"
+subs = ["고교/대학", "국가대표"]
+
+[[companies]]
+name = "WBSC"
+why = "국제대회·세계 랭킹"
+region = "world"
+x = "WBSC"
+news = "WBSC 야구"
+subs = ["국가대표"]
+default = false
+
+[[searches]]
+name = "KBO FA"
+news = "KBO FA"
+region = "kr"
+subs = ["KBO"]
+
+[[searches]]
+name = "KBO 트레이드"
+news = "KBO 트레이드"
+region = "kr"
+subs = ["KBO"]
+
+[[searches]]
+name = "MLB FA 시장"
+news = "MLB FA 시장"
+region = "kr"
+subs = ["MLB"]
+
+[[searches]]
+name = "야구 국가대표"
+news = "야구 국가대표"
+region = "kr"
+subs = ["국가대표"]
+
+[[searches]]
+name = "고교야구"
+news = "고교야구"
+region = "kr"
+subs = ["고교/대학"]
+
+[target]
+text = "응원하는 팀은?"
+brief = "응원하는 팀"
+
+[target.options_by]
+"KBO" = [
+  { label = "KT 위즈", region = "kr", news = "KT 위즈" },
+  { label = "삼성 라이온즈", region = "kr", news = "삼성 라이온즈" },
+  { label = "KIA 타이거즈", region = "kr", news = "KIA 타이거즈" },
+  { label = "LG 트윈스", region = "kr", news = "LG 트윈스", x = "LGTWINS_SEOUL" },
+  { label = "두산 베어스", region = "kr", news = "두산 베어스" },
+  { label = "한화 이글스", region = "kr", news = "한화 이글스" },
+  { label = "롯데 자이언츠", region = "kr", news = "롯데 자이언츠" },
+  { label = "NC 다이노스", region = "kr", news = "NC 다이노스", x = "ncdinos_fan" },
+  { label = "SSG 랜더스", region = "kr", news = "SSG 랜더스" },
+  { label = "키움 히어로즈", region = "kr", news = "키움 히어로즈" },
+]
+"MLB" = [
+  { label = "LA 다저스 (김혜성)", region = "world", news = "다저스", x = "Dodgers", feeds = ["mlb-dodgers"] },
+  { label = "SF 자이언츠 (이정후)", region = "world", news = "샌프란시스코 자이언츠", x = "SFGiants", feeds = ["mlb-giants"] },
+  { label = "샌디에이고 파드리스 (송성문)", region = "world", news = "샌디에이고 파드리스", x = "Padres", feeds = ["mlb-padres"] },
+  { label = "뉴욕 양키스", region = "world", news = "양키스", x = "Yankees", feeds = ["mlb-yankees"] },
+  { label = "밀워키 브루어스", region = "world", news = "밀워키 브루어스", x = "Brewers", feeds = ["mlb-brewers"] },
+  { label = "뉴욕 메츠", region = "world", news = "메츠", x = "Mets" },
+]
