@@ -18,6 +18,7 @@ topics = ["실적 발표", "주요 공시", "금리·환율", "외국인 수급"
 "한국 커뮤니티" = 10
 "해외 커뮤니티" = 5
 "뉴스" = 25
+"영상" = 8
 
 [[subs]]
 label = "코스피 대형주"
@@ -326,3 +327,11 @@ news = "게임주"
   { label = "알테오젠", region = "kr", news = "알테오젠 주가" },
   { label = "에코프로비엠", region = "kr", news = "에코프로비엠 주가" },
 ]
+
+[[feeds]]
+id = "yt-3protv"
+why = "경제·증시 해설"
+
+[[feeds]]
+id = "yt-syukaworld"
+why = "경제 해설"

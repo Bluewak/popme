@@ -18,6 +18,7 @@ topics = ["새 드라마", "캐스팅", "시청률", "화제성 순위", "OTT �
 "한국 커뮤니티" = 10
 "해외 커뮤니티" = 5
 "뉴스" = 25
+"영상" = 8
 
 [[subs]]
 label = "한국 드라마"
@@ -317,3 +318,18 @@ x = "wavve_official"
   { label = "김태리", region = "kr", news = "김태리" },
   { label = "이제훈", region = "kr", news = "배우 이제훈" },
 ]
+
+[[feeds]]
+id = "yt-netflixkorea"
+why = "공개일·예고편"
+subs = ["OTT 오리지널"]
+
+[[feeds]]
+id = "yt-tvndrama-official"
+why = "티저·예고"
+subs = ["한국 드라마"]
+
+[[feeds]]
+id = "yt-jtbcdrama"
+why = "티저·예고"
+subs = ["한국 드라마"]

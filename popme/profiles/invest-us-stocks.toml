@@ -18,6 +18,7 @@ topics = ["실적·가이던스", "FOMC·금리", "물가·고용", "AI 투자",
 "한국 커뮤니티" = 10
 "해외 커뮤니티" = 5
 "뉴스" = 25
+"영상" = 8
 
 [[subs]]
 label = "빅테크"
@@ -294,3 +295,11 @@ brief = "관심 있는 미국 종목"
   { label = "나스닥100 (QQQ)", region = "world", news = "나스닥100 ETF" },
   { label = "반도체 ETF (SOXX·SMH)", region = "world", news = "미국 반도체 ETF" },
 ]
+
+[[feeds]]
+id = "yt-3protv"
+why = "경제·증시 해설"
+
+[[feeds]]
+id = "yt-syukaworld"
+why = "경제 해설"

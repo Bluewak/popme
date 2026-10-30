@@ -1799,3 +1799,146 @@ url = "https://www.bok.or.kr/portal/bbs/P0000093/news.rss?menuNo=200789"
 group = "공식 발표"
 max_chars = 300
 note = "기준금리 결정 원문"
+
+# 유튜브 채널 (type = "youtube": 전용 Chrome으로 「동영상」 탭을 읽는다 — popme/collectors/youtube.py. 채널 RSS는 2026-10 불안정)
+# 2026-10-30 채널 명부(local/research/channels) 측정에서 고름
+
+[feed.yt-kleague]
+name = "K리그 유튜브"
+url = "https://www.youtube.com/@kleague/videos"
+type = "youtube"
+group = "영상"
+max_chars = 200
+
+[feed.yt-coupangplaysports]
+name = "쿠팡플레이 스포츠 유튜브"
+url = "https://www.youtube.com/@CoupangPlaySports/videos"
+type = "youtube"
+group = "영상"
+max_chars = 200
+
+[feed.yt-dalsoolive]
+name = "달수네라이브 유튜브"
+url = "https://www.youtube.com/@DALSOOLIVE/videos"
+type = "youtube"
+group = "영상"
+max_chars = 200
+
+[feed.yt-fabrizioromanoyt]
+name = "Fabrizio Romano YouTube"
+url = "https://www.youtube.com/@FabrizioRomanoYT/videos"
+type = "youtube"
+group = "영상"
+max_chars = 200
+
+[feed.yt-kbo1982]
+name = "KBO 유튜브"
+url = "https://www.youtube.com/@KBO1982/videos"
+type = "youtube"
+group = "영상"
+max_chars = 200
+
+[feed.yt-hanwhaeagles-official]
+name = "한화이글스 유튜브"
+url = "https://www.youtube.com/@HanwhaEagles_official/videos"
+type = "youtube"
+group = "영상"
+max_chars = 200
+
+[feed.yt-lgtwinstv]
+name = "LG트윈스 유튜브"
+url = "https://www.youtube.com/@LGTwinsTV/videos"
+type = "youtube"
+group = "영상"
+max_chars = 200
+
+[feed.yt-3protv]
+name = "삼프로TV 유튜브"
+url = "https://www.youtube.com/@3protv/videos"
+type = "youtube"
+group = "영상"
+max_chars = 200
+
+[feed.yt-syukaworld]
+name = "슈카월드 유튜브"
+url = "https://www.youtube.com/@syukaworld/videos"
+type = "youtube"
+group = "영상"
+max_chars = 200
+
+[feed.yt-weolbu-official]
+name = "월급쟁이부자들TV 유튜브"
+url = "https://www.youtube.com/@weolbu_official/videos"
+type = "youtube"
+group = "영상"
+max_chars = 200
+
+[feed.yt-buiknam-tv]
+name = "부읽남TV 유튜브"
+url = "https://www.youtube.com/@buiknam_tv/videos"
+type = "youtube"
+group = "영상"
+max_chars = 200
+
+[feed.yt-hybelabels]
+name = "HYBE LABELS 유튜브"
+url = "https://www.youtube.com/@HYBELABELS/videos"
+type = "youtube"
+group = "영상"
+max_chars = 200
+
+[feed.yt-smtown]
+name = "SMTOWN 유튜브"
+url = "https://www.youtube.com/@SMTOWN/videos"
+type = "youtube"
+group = "영상"
+max_chars = 200
+
+[feed.yt-jypentertainment]
+name = "JYP 유튜브"
+url = "https://www.youtube.com/@JYPEntertainment/videos"
+type = "youtube"
+group = "영상"
+max_chars = 200
+
+[feed.yt-ygentertainment]
+name = "YG 유튜브"
+url = "https://www.youtube.com/@YGEntertainment/videos"
+type = "youtube"
+group = "영상"
+max_chars = 200
+
+[feed.yt-1thek]
+name = "1theK 유튜브"
+url = "https://www.youtube.com/@1theK/videos"
+type = "youtube"
+group = "영상"
+max_chars = 200
+
+[feed.yt-mnet]
+name = "Mnet 유튜브"
+url = "https://www.youtube.com/@Mnet/videos"
+type = "youtube"
+group = "영상"
+max_chars = 200
+
+[feed.yt-netflixkorea]
+name = "넷플릭스 코리아 유튜브"
+url = "https://www.youtube.com/@NetflixKorea/videos"
+type = "youtube"
+group = "영상"
+max_chars = 200
+
+[feed.yt-tvndrama-official]
+name = "tvN 드라마 유튜브"
+url = "https://www.youtube.com/@tvNDRAMA_official/videos"
+type = "youtube"
+group = "영상"
+max_chars = 200
+
+[feed.yt-jtbcdrama]
+name = "JTBC 드라마 유튜브"
+url = "https://www.youtube.com/@JTBCdrama/videos"
+type = "youtube"
+group = "영상"
+max_chars = 200

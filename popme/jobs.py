@@ -7,7 +7,7 @@ import time
 from datetime import datetime
 
 from popme import briefing, catalog, chrome, config, discovery, event_weather, llm, sources
-from popme.collectors import NeedLogin, caldav, ics, threads, timetree, x
+from popme.collectors import NeedLogin, caldav, ics, threads, timetree, x, youtube
 from popme.db import DB
 
 log = logging.getLogger(__name__)
@@ -133,12 +133,18 @@ class Jobs:
 
         th = threading.Thread(target=threads_job, daemon=True)
         th.start()
+        videos = [f for f in catalog.active(self.cfg) if f.get("type") == "youtube"]
+        yt = threading.Thread(target=self._collect_youtube, args=(port, videos, warnings, progress("youtube")), daemon=True)
+        if videos:  # 유튜브도 사이트가 달라 동시에 (탭 하나)
+            yt.start()
         try:
             self._with_browser(port, lambda ctx: self._collect_calendar_x(ctx, warnings, progress("x")))
         except Exception as e:  # 붙기 전에 Chrome이 닫혔을 때 등 — 나머지(RSS·브리핑)는 이어서
             log.exception("X 실패")
             warnings.append(self._fail("X", e))
         th.join()
+        if videos:
+            yt.join()
 
     def _minimizing(self):
         """수집 중 전용 Chrome 창을 내려 둘까 (기본 켜짐 — config [chrome] minimize_while_collecting). 로그인 창은 해당 없음."""
@@ -218,6 +224,22 @@ class Jobs:
             log.exception("Threads 실패")
             warnings.append(self._fail("Threads", e))
         progress("Threads 완료")
+
+    def _collect_youtube(self, port, feeds, warnings, progress):
+        """유튜브 채널 새 영상 (popme/collectors/youtube.py) → RSS 글과 같은 표에."""
+        try:
+            since = briefing.window_start(self.db)
+            items = []
+
+            def run(ctx):
+                got, errs = youtube.collect(ctx, feeds, progress, since)
+                items.extend(got)
+                warnings.extend(f"유튜브 실패 — {e}" for e in errs)
+            self._with_browser(port, run)
+            self.db.upsert_items(items)
+        except Exception as e:
+            log.exception("유튜브 실패")
+            warnings.append(self._fail("유튜브", e))
 
     def _saver(self, users):
         def save(batch):

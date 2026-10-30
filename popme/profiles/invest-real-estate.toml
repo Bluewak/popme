@@ -18,6 +18,7 @@ topics = ["대출 규제", "토허제", "공급대책", "청약 일정", "집값
 "한국 커뮤니티" = 10
 "해외 커뮤니티" = 5
 "뉴스" = 25
+"영상" = 8
 
 [[subs]]
 label = "서울 아파트"
@@ -288,3 +289,11 @@ brief = "관심 있는 지역(구 단위)이나 단지"
   { label = "여의도 재건축", region = "kr", news = "여의도 재건축" },
   { label = "1기 신도시 재건축", region = "kr", news = "1기 신도시 재건축" },
 ]
+
+[[feeds]]
+id = "yt-weolbu-official"
+why = "부동산 해설"
+
+[[feeds]]
+id = "yt-buiknam-tv"
+why = "부동산 해설"
