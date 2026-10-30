@@ -168,7 +168,9 @@ def entities(cfg, p):
 
 
 def scope(cfg, p):
-    """한국어만(kr) / 해외도(world). 세부가 있는 묶음은 묻지 않고 고른 세부로: 국내 세부만 골랐으면 kr."""
+    """한국어만(kr) / 해외도(world). 관심사 설정 ②에서 고른 게 있으면 그대로, 없으면 세부가 있는 묶음은 고른 세부로: 국내 세부만 골랐으면 kr."""
+    if picks(cfg, p["id"]).get("scope") in ("kr", "world"):
+        return picks(cfg, p["id"])["scope"]
     if p.get("subs"):
         regions = {s["label"]: s.get("region", "world") for s in p["subs"]}
         chosen_subs = subs(cfg, p)

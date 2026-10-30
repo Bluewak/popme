@@ -375,8 +375,9 @@ def _q(v):
     return _literal(v)
 
 
-def save_custom(field, scope, verified, topics, final, lens=None, kind=None, answers=None, domain=None):
-    """새 관심사 → DATA_DIR/profiles/custom-<이름>.toml. 확인된 것만 담는다. 반환: 관심사 id."""
+def save_custom(field, scope, verified, topics, final, lens=None, kind=None, answers=None, domain=None, taste=None):
+    """새 관심사 → DATA_DIR/profiles/custom-<이름>.toml. 확인된 것만 담는다. 반환: 관심사 id.
+    taste: ④ 취향 문답 결과 {summary, likes, less} → [taste] (브리핑 지시문의 「취향」 줄)."""
     pid = f"custom-{_slug(field)}"
     lines = [f"# 관심사 설정에서 만든 관심사 ({datetime.now():%Y-%m-%d}). 「{field}」",
              f"id = {_q(pid)}", f"name = {_q(final['name'])}", f"tag = {_q(final['tag'])}",
@@ -386,6 +387,10 @@ def save_custom(field, scope, verified, topics, final, lens=None, kind=None, ans
              f"lens = {_q(lens if lens in LENSES else 'target')}", f"type = {_q(kind if kind in TYPES else '기타')}",
              "", "[answers]                     # 관심사 설정에서 고른 것 (칸 → 보기)"]
     lines += [f"{json.dumps(k, ensure_ascii=False)} = {json.dumps(list(v), ensure_ascii=False)}" for k, v in (answers or {}).items() if v]
+    if taste and (taste.get("summary") or taste.get("likes")):
+        lines += ["", "[taste]                       # ④ 취향 문답: 읽고 싶다고 누른 헤드라인에서",
+                  f"summary = {_q(taste.get('summary', ''))}", f"likes = {_q(list(taste.get('likes', [])))}",
+                  f"less = {_q(list(taste.get('less', [])))}"]
     lines += ["", "[caps]",
              f'"{catalog.NEWS_GROUP}" = 20', '"공식 발표" = 10', '"실사용 검증" = 10', ""]
     for e in verified:  # 전문 매체 (확인된 RSS만), 분야 검색어 (기사가 나오는 것만)
@@ -442,7 +447,10 @@ def preset_view(pid, cfg):
     chosen_subs = set(catalog.subs(cfg, p))
     flat = {o["label"] for o in catalog.target_options(p)}
     opt = lambda o: {"label": o["label"], "on": o["label"] in used}
-    return {"id": pid, "name": p["name"], "tag": p["tag"], "scope": catalog.scope(cfg, p),
+    from popme import domains
+    domain = domains.load(pid) if not p.get("custom") else None  # 분야 페르소나가 있는 묶음은 ①전반 ②국내외 ③대상 ④취향
+    return {"id": pid, "name": p["name"], "tag": p["tag"], "scope": catalog.scope(cfg, p), "domain": domain,
+            "taste": {"summary": pk.get("taste", ""), "likes": pk.get("likes", []), "less": pk.get("less", [])} if "taste" in pk else None,
             "subs": [{**s, "on": s["label"] in chosen_subs} for s in p.get("subs", [])],
             "target": {"text": target["text"], "options": [opt(o) for o in target.get("options", [])]
                                                  + [{"label": u, "on": True, "added": True} for u in used if u not in flat],

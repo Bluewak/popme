@@ -45,6 +45,35 @@ class Verdict(BaseModel):
     _note = field_validator("note", mode="before")(_text(30))
 
 
+class Pick(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: int
+    category: str = ""
+
+    _cat = field_validator("category", mode="before")(_text(12))
+
+
+class EditorPicks(BaseModel):
+    """편집자 (popme/personas/editor.toml)."""
+    model_config = ConfigDict(extra="ignore")
+    picks: list[Pick] = []
+
+
+class Taste(BaseModel):
+    """취향 분석가 (popme/personas/taste_analyst.toml)."""
+    model_config = ConfigDict(extra="ignore")
+    likes: list[str] = []
+    less: list[str] = []
+    summary: str = ""
+
+    _summary = field_validator("summary", mode="before")(_text(80))
+
+    @field_validator("likes", "less", mode="before")
+    @classmethod
+    def _names(cls, v):
+        return [" ".join(str(x).split())[:12] for x in (v or []) if str(x).strip()][:6]
+
+
 class FactCheck(BaseModel):
     """사실 확인 (popme/personas/fact_checker.toml)."""
     model_config = ConfigDict(extra="ignore")
