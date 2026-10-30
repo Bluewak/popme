@@ -16,6 +16,21 @@ WORKERS = 8
 # 잠깐 오류면 한 번 더: 서버 과부하(5xx)·요청 많음(429)·Cloudflare 간헐 차단(403)·시간 초과. 429는 조금 더 기다린다
 RETRY_CODES = {403, 429, 500, 502, 503, 504}
 RETRY_WAIT = {429: 8}
+# 429에 서버가 「몇 초 뒤에」를 알려 주면 그만큼 (최대 90초). Reddit은 로그인 없이 1분에 한 번만 받아 줘서
+# (x-ratelimit-reset ≈ 55초) 8초 뒤에 다시 받으면 또 429였다 — 2026-10 r/Rag가 날마다 경고로 쌓였다
+MAX_WAIT = 90
+
+
+def retry_wait(e):
+    code = getattr(e, "code", None)
+    if code == 429:
+        headers = getattr(e, "headers", None) or {}
+        for k in ("Retry-After", "x-ratelimit-reset"):
+            try:
+                return min(MAX_WAIT, int(float(headers.get(k))) + 1)
+            except (TypeError, ValueError):
+                continue
+    return RETRY_WAIT.get(code, 3)
 
 
 def transient(e):
@@ -45,7 +60,7 @@ def collect(feeds, progress=lambda s: None):
                 except Exception as e:
                     if attempt == 1 and transient(e):
                         log.info("출처 잠깐 오류, 다시 받기 %s: %s", f.get("name"), e)
-                        time.sleep(RETRY_WAIT.get(getattr(e, "code", None), 3))
+                        time.sleep(retry_wait(e))
                         continue
                     log.warning("출처 실패 %s: %s", f.get("name"), e)
                     errs.append(f"{f.get('name')}: {e}")
