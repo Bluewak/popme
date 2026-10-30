@@ -94,3 +94,32 @@ def test_persona_prompt_and_output_check(monkeypatch):
     monkeypatch.setattr(persona.llm, "ask", lambda *a, **k: "이건 JSON이 아님")
     with pytest.raises(ValueError):
         persona.ask({}, "privacy_reviewer", {"word": "부평"})
+
+
+def test_cli_chat_model_splits_system_and_prompt(monkeypatch):
+    from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+
+    from popme import chat
+    got = []
+    monkeypatch.setattr(chat.llm, "ask", lambda cfg, system, prompt, timeout=0: got.append((system, prompt, timeout)) or "답")
+    m = chat.CliChatModel(cfg={}, timeout=7)
+    assert m.invoke([SystemMessage("역할"), HumanMessage("물음")]).content == "답"
+    assert got[-1] == ("역할", "물음", 7)
+    m.invoke([SystemMessage("역할"), HumanMessage("하나"), AIMessage("둘"), HumanMessage("셋")])
+    assert got[-1][1] == "사용자: 하나\n\nAI: 둘\n\n사용자: 셋"  # 주고받은 말은 누가 했는지 붙여 한 덩어리로
+
+
+@pytest.mark.parametrize("conf, want", [("0.9", 0.9), (95, 0.95), ("모름", 0.0), (-1, 0.0), (1, 1.0)])
+def test_schema_fixes_types(monkeypatch, conf, want):
+    monkeypatch.setattr(persona.llm, "ask", lambda *a, **k: json.dumps(
+        {"verdict": "proper_noun", "phrase": "  부평유나이티드 ", "confidence": conf, "reason": "구단" * 50, "extra": 1}))
+    out = persona.ask({}, "privacy_reviewer", {"word": "부평"})
+    assert out == {"verdict": "proper_noun", "phrase": "부평유나이티드", "confidence": want, "reason": ("구단" * 50)[:60]}
+
+
+def test_schema_rejects_then_asks_once_more(monkeypatch):
+    answers = iter(['{"verdict": "maybe"}', '{"verdict": "personal", "confidence": 0.9}'])
+    seen = []
+    monkeypatch.setattr(persona.llm, "ask", lambda cfg, system, user, timeout=0: seen.append(user) or next(answers))
+    assert persona.ask({}, "privacy_reviewer", {"word": "부평"})["verdict"] == "personal"
+    assert "주의: 정해진 칸의 JSON 하나만" in seen[1]

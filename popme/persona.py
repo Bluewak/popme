@@ -1,19 +1,20 @@
 """페르소나: 역할·규칙·예시를 파일(popme/personas/<이름>.toml)로 두고, 지금 쓰는 AI(구독 CLI, 도구 끔)에 묻는다.
 
 예시만 고쳐 가며 시행착오를 할 수 있게 코드와 떼어 둔다. 흐름(묻기 → 검사 → 모자라면 다시)은 LangGraph로 짠다 (popme/judges.py).
-답은 정해진 JSON으로 받고 [output]의 칸·값으로 검사한다. 수집한 글이 지시문인 척해도 따르지 않게, 입력은 <input> 안의 데이터로만 준다.
+부르기는 LangChain 체인: [시스템·사용자 메시지] → CliChatModel(popme/chat.py) → 글 → JSON → 검사.
+검사는 파일의 `schema = "이름"`이 있으면 popme/schemas.py의 pydantic 모델로(형 고치기·값 범위까지), 없으면 [output]의 칸·허용값으로.
+수집한 글이 지시문인 척해도 따르지 않게, 입력은 <input> 안의 데이터로만 준다.
 """
 import json
-import os
 import tomllib
 from functools import lru_cache
 from pathlib import Path
 
-from popme import llm
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnableLambda
 
-# LangGraph/LangChain이 외부(LangSmith)로 흐름을 보내지 않게 — 기본도 꺼짐이지만 확실히
-os.environ.setdefault("LANGSMITH_TRACING", "false")
-os.environ.setdefault("LANGCHAIN_TRACING_V2", "false")
+from popme import chat, llm, schemas  # noqa: F401  (llm: 테스트가 persona.llm.ask를 바꿔 끼운다)
 
 DIR = Path(__file__).resolve().parent / "personas"
 
@@ -42,9 +43,11 @@ def prompts(p, inputs):
 
 
 def check(p, out):
-    """정해진 칸·값인지. 허용값 목록이 있는 칸은 그 안의 값이어야 한다."""
+    """정해진 칸·값인지 → 정리한 dict. 스키마가 있으면 그걸로, 없으면 허용값 목록이 있는 칸은 그 안의 값이어야 한다."""
     if not isinstance(out, dict):
         raise ValueError("JSON 객체가 아님")
+    if p.get("schema"):
+        return getattr(schemas, p["schema"]).model_validate(out).model_dump()
     for k, v in p["output"].items():
         if k not in out:
             raise ValueError(f"{k} 없음")
@@ -53,12 +56,19 @@ def check(p, out):
     return out
 
 
+def chain(cfg, p, timeout=120):
+    """[메시지] → 구독 CLI → 글 → JSON → 검사한 dict."""
+    from popme.briefing import parse_json
+    return (chat.CliChatModel(cfg=cfg, timeout=timeout) | StrOutputParser()
+            | RunnableLambda(parse_json) | RunnableLambda(lambda out: check(p, out)))
+
+
 def ask(cfg, name, inputs, timeout=120):
     """페르소나에게 묻는다 → 검사한 답 dict. 형식이 깨지면 한 번만 다시."""
-    from popme.briefing import parse_json
     p = load(name)
     system, user = prompts(p, inputs)
+    run = chain(cfg, p, timeout)
     try:
-        return check(p, parse_json(llm.ask(cfg, system, user, timeout=timeout)))
+        return run.invoke([SystemMessage(system), HumanMessage(user)])
     except ValueError:
-        return check(p, parse_json(llm.ask(cfg, system, user + "\n(주의: 정해진 칸의 JSON 하나만)", timeout=timeout)))
+        return run.invoke([SystemMessage(system), HumanMessage(user + "\n(주의: 정해진 칸의 JSON 하나만)")])

@@ -29,12 +29,7 @@ def _graph(cfg):
     def judge(s):
         out = persona.ask(cfg, "privacy_reviewer", {"word": s["word"], "path": s["path"], "line": s["line"],
                                                     "context": s["wide"] if s.get("tries") else s["context"]})
-        try:
-            conf = float(out.get("confidence") or 0)
-        except (TypeError, ValueError):
-            conf = 0.0
-        return {"verdict": out["verdict"], "phrase": str(out.get("phrase") or "").strip(),
-                "confidence": conf, "reason": str(out.get("reason") or "")[:60], "tries": s.get("tries", 0) + 1}
+        return {**out, "tries": s.get("tries", 0) + 1}  # 형·길이는 스키마(schemas.PrivacyVerdict)가 정리
 
     def again(s):  # 애매하면 앞뒤를 더 보여 주고 한 번 더 (최대 MAX_TRIES번)
         unsure = s["verdict"] == "unsure" or (s["verdict"] == "proper_noun" and s["confidence"] < ALLOW_AT)
