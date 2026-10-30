@@ -1108,6 +1108,8 @@ function intTaste(body, c, d) {
       : `<p class="hint">지금은 헤드라인을 못 가져왔어요. 그대로 넘어가도 돼요.</p>`}
     <div class="row"><button id="int-more">다른 헤드라인 보기</button></div>
     ${d.tasteNote ? `<p class="hint">${esc(d.tasteNote)}</p>` : ""}
+    ${(() => { const miss = hs.length ? tasteTerms(c, d).targets.filter(t => !hs.some(h => h.group === "대상:" + t.label)).map(t => t.label) : [];
+      return miss.length ? `<p class="hint">고른 ${esc(miss.join(", "))}${josa(miss[miss.length - 1], "은", "는")} 최근 1주 기사가 없었어요. 브리핑에서는 소식이 나오면 챙겨요.</p>` : ""; })()}
     ${d.taste && d.taste.summary ? `<div class="ai-note">이렇게 이해했어요 — ${esc(d.taste.summary)}</div>`
       : d.base?.taste?.summary ? `<div class="ai-note">지금 취향 — ${esc(d.base.taste.summary)} (헤드라인을 누르면 새로 정리해요)</div>` : ""}`;
   body.querySelectorAll("input[data-h]").forEach(b => b.onchange = () => {
@@ -1127,7 +1129,7 @@ async function tasteLoad(c, d, more) {  // 헤드라인 받기 (more: 보여 준
   intRender();
   const { subs, targets } = tasteTerms(c, d);
   const got = await api().interest_taste_heads(field, radio("ai"), d.domain || null, d.scope, subs, targets,
-    more ? [] : (d.headlines || []), more ? (d.tasteShown || []).map(h => h.title) : []) || [];
+    more ? [] : (d.headlines || []), more ? (d.tasteShown || []).map(h => h.title) : [], d.names || null) || [];
   if (!ok() || ticket !== d.tasteTicket) return;  // 그사이 「이전」·다시 요청·세부 바꾸기를 했으면 늦게 온 답은 버린다
   d.liked = d.liked || new Set();
   if (more && got.length) {
@@ -1397,6 +1399,7 @@ async function intNext() {  // 반환: 이 단계를 다 끝냈나
     const r = await api().interest_questions(c.field, d.lens, radio("ai"), heads, c.context || "");
     if (!ok()) return false;
     d.qs = r.questions; d.type = r.type; d.headlines = r.headlines || []; d.qerror = r.error || ""; d.domain = r.domain || null;
+    d.names = r.names || null;  // 분야의 한국어·영어 이름·다른 말 (④ 검색어)
     d.qsLens = d.lens; d.answers = {}; d.suggested = false; tasteReset(d);
     d.subs = ["lens", "scope", ...d.qs.map((_, i) => "q" + i), "people", "companies", "taste", "result"];
     INT.busy = ""; INT.sub = 1;

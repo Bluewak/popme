@@ -50,13 +50,19 @@ QUESTIONS = """{persona}분야: {field}{where}
 2) questions: 아래 칸을 이 순서대로 하나씩 (칸 이름은 유형별 말로 바꿔 묻는다)
 {slots}
 각 질문: {{"slot": "칸 이름(범위·변화·대상 중 하나)", "text": "질문 문장 25자 이내", "multi": true,
-  "options": [{{"label": "보기 20자 이내", "region": "kr 또는 world", "en": "영어(원어) 이름 — 해외만, 없으면 빈 문자열"}}],
+  "options": [{{"label": "보기 20자 이내", "region": "kr 또는 world",
+               "q": "이 보기의 최근 뉴스를 찾을 한국어 검색어 — 핵심 낱말 1~3개 (「소식·변화·동향·시즌·정보」 같은 일반어 없이, 다른 뜻과 겹치면 분야 낱말을 붙여: 「에깅 낚시」)",
+               "en": "영어(원어) 검색어 — 해외 고유명사(사람·팀·브랜드·대회·제품)일 때만, 다른 뜻과 겹치면 맥락을 붙여(「SpaceX Starship」), 아니면 빈 문자열"}}],
   "options_by": {{"범위 보기 label": [보기 …]}}  ← 「대상」 칸만: 「범위」에서 고른 것마다 다른 보기 (없으면 생략)}}
-- 보기는 4~8개, 실존하는 것만, 지금 기준으로 (헤드라인을 참고). 「상관없어요」·「직접 입력」은 넣지 마라 (코드가 붙인다).
+3) names: {{"ko": "분야의 한국어 이름 (한국 기사에서 쓰는 말, 예: Taylor Swift → 테일러 스위프트)", "en": "영어 이름",
+   "aliases": ["뉴스에서 이 분야를 부르는 다른 말 0~3개 (예: 홈베이킹 → 베이킹, 제빵)"]}}
+- 보기는 4~8개 (「대상」은 12개까지), 실존하는 것만, 이 분야에 늘 있는 대표 갈래·대상부터. 헤드라인은 지금 상황 확인용 참고일 뿐
+  (이번 주 기사 한두 개 때문에 생긴 갈래 — 「중국 공무원 시험」 같은 것 — 는 넣지 마라). 「상관없어요」·「직접 입력」은 넣지 마라 (코드가 붙인다).
+- 「범위」(어느 갈래)와 「변화」(어떤 일) 보기는 서로 다른 축으로 — 같은 보기를 두 칸에 넣지 마라.
 - 「대상」 보기는 이 분야 팬이 실제로 응원·관심 두는 대표 팀·사람·작품·브랜드 (이 분야를 대표하는 것부터). 헤드라인은 지금 상황 확인용일 뿐 —
   이번 주 보도자료·광고에 나온 다른 업종 회사(협회 홍보·식품·여행 예약 사이트 등)는 넣지 마라.
-- 정치 성향·종교·건강·사는 곳·나이·소득은 묻지 마라.
-출력: {{"type": "...", "questions": [...]}}"""
+- 사용자 본인의 정치 성향·종교·병력·사는 곳·나이·소득은 묻지 마라 (분야의 소식 주제인 건강·질병은 괜찮다).
+출력: {{"type": "...", "names": {{...}}, "questions": [...]}}"""
 SYSTEM = "너는 소식 출처를 고르는 도우미다. 요청한 JSON 하나만 출력한다. 실존하는 사람·기업만 쓰고, 모르면 적게 쓴다."
 SUGGEST = """{persona}분야: {field}{where}
 범위: {scope}
@@ -70,8 +76,8 @@ people·companies 각 항목:
    "news": "한국어 뉴스 검색어 — 이름 (동명이인이 있으면 분야 단어를 붙여)",
    "news_en": "영어(원어) 뉴스 검색어 — 해외 사람·기업만, 국내면 빈 문자열"}}
 출력: {{"people": [...], "companies": [...], "topics": ["..."]{extra_out}}}"""
-WHO = {"overview": "이 분야 흐름을 잘 정리해 전하는 사람 (전문 기자·분석가·업계 리더)",
-       "target": "고른 대상의 당사자 (선수·감독, 창업자·경영진 등)와 그 소식을 잘 전하는 기자",
+WHO = {"overview": "이 분야 흐름을 잘 정리해 전하는 사람 (전문 기자·분석가·업계 리더, 취미·생활 분야면 전문가·크리에이터)",
+       "target": "고른 대상의 당사자 (선수·감독·작가·가수 본인과 공식 채널, 기업이면 창업자·경영진 — 단 취미·생활 분야에서 브랜드를 골랐으면 경영진 말고 그 브랜드의 전문가·크리에이터)와 그 소식을 잘 전하는 기자",
        "both": "고른 대상의 당사자와, 이 분야 흐름을 잘 정리하는 기자·분석가를 섞어서"}
 WHAT = {"overview": "이 분야를 대표하는 기업·단체·협회·기관", "target": "고른 대상(기업·팀·브랜드)과 관련 단체", "both": "고른 대상과 이 분야 대표 기업·단체"}
 EXTRA = """
@@ -189,7 +195,8 @@ def _option(o):
     label = _short(o.get("label"), 20)
     if not label or label in ("상관없어요", "직접 입력", "기타"):
         return None
-    return {"label": label, "region": "kr" if o.get("region") == "kr" else "world", "en": _short(o.get("en"), 60)}
+    return {"label": label, "region": "kr" if o.get("region") == "kr" else "world", "en": _short(o.get("en"), 60),
+            "q": _short(o.get("q"), 30)}  # q: 이 보기의 뉴스 검색어 (④ 헤드라인 모으기 — popme/taste.py)
 
 
 def _options(xs, n=8):
@@ -229,7 +236,10 @@ def clean_questions(raw, lens):
             by = {k: v for k, v in by.items() if v}
         got[q["slot"]] = {"slot": q["slot"], "text": text, "multi": q.get("multi") is not False, "options": opts, "options_by": by}
     fixed = {q["slot"]: q for q in fixed_questions(lens, kind)}
-    return {"type": kind, "questions": [got.get(s) or fixed[s] for s in SLOTS[lens]]}
+    n = raw.get("names") if isinstance(raw.get("names"), dict) else {}
+    names = {"ko": _short(n.get("ko"), 30), "en": _short(n.get("en"), 40),
+             "aliases": [a for a in (_short(x, 20) for x in (n.get("aliases") or [])[:3]) if a]}
+    return {"type": kind, "names": names, "questions": [got.get(s) or fixed[s] for s in SLOTS[lens]]}
 
 
 def check_options(questions, scope="world"):
