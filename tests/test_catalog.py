@@ -25,7 +25,8 @@ def test_catalog_is_consistent():
             re.compile(f["skip"])
     used = set()
     for p in catalog.profiles():
-        assert {"id", "name", "tag", "topic", "criteria", "caps"} <= set(p)
+        assert {"id", "name", "tag", "criteria", "caps"} <= set(p)
+        assert "topic" in p or not any(e.get("filter") is True for e in p["feeds"])  # 거르기 규칙을 쓰는 출처가 있으면 topic
         for e in p["feeds"]:
             assert e["id"] in feeds, (p["id"], e["id"])
             assert feeds[e["id"]]["group"] in p["caps"], (p["id"], e["id"])

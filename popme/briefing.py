@@ -126,10 +126,14 @@ def rules_for(cfg):
         topics_ = catalog.picks(cfg, p["id"]).get("topics") or (p.get("topics") if p.get("custom") else None)
         picked = " / ".join(f"{k}: {'·'.join(v)}" for k, v in (p.get("answers") or {}).items() if v)  # 관심사 설정에서 고른 것
         used = catalog.uses(cfg, p)
+        chosen_subs = catalog.subs(cfg, p) if len(catalog.subs(cfg, p)) < len(p.get("subs", [])) else []
+        word = p.get("target", {}).get("brief")  # 묶음마다: 「응원하는 팀」 등. 없으면 도구 (AI 관심사)
+        used_line = (f"\n- {word}: {'·'.join(used)} — 이 소식을 먼저, 작은 소식도 고른다." if word else
+                     f"\n- 내가 쓰는 것: {'·'.join(used)} — 이것의 변화(새 기능·기본값·요금·단종)를 먼저 고른다. 다른 것은 큰 소식만.")
         return (p["criteria"].strip() + (f"\n- 특히 궁금한 것: {'·'.join(topics_)} — 이 주제를 먼저 고른다." if topics_ else "")
                 + (f"\n- 고른 것: {picked} — 이것과 관련된 소식을 먼저 고른다." if picked else "")
-                + (f"\n- 내가 쓰는 것: {'·'.join(used)} — 이것의 변화(새 기능·기본값·요금·단종)를 먼저 고른다. 다른 것은 큰 소식만."
-                   if used else ""))
+                + (f"\n- 보는 범위: {'·'.join(chosen_subs)}만." if chosen_subs else "")
+                + (used_line if used else ""))
     if len(profs) == 1:
         criteria = crit(profs[0])
     else:

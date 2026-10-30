@@ -1,0 +1,348 @@
+# 관심사 묶음: 스포츠 › 축구 — 2026-10-30 조사(local/research/packs/sports-soccer.json), 출처·계정은 열어서 확인한 것만
+id = "sports-soccer"
+name = "축구"
+tag = "축구"
+summary = "해외축구·K리그·국가대표·여자축구 소식"
+order = 20
+status = "ready"
+category = ["스포츠", "축구"]
+criteria = "- 한국 선수(손흥민·이강인·김민재·황희찬 등)의 출전·골·부상과 대표팀 소집 명단 발표를 가장 먼저 챙긴다.\n- 응원 팀의 경기 결과·순위 변동·감독 교체·구단이 발표한 이적(오피셜)은 빠뜨리지 않는다.\n- 이적설은 공신력 있는 기자(로마노·온스테인 등)나 현지 유력지 보도만 「~라는 보도」로 적고, 같은 소문의 재탕은 한 번만 쓴다.\n- 협회·연맹 행정(감독 선임, 회장 선거, 징계·오심 인정)은 결정된 내용 위주로 짧게 정리한다.\n- 선수 사생활·SNS 논란, 「충격」「대박」식 해외 반응 짜깁기, 중계 링크·베팅 글은 버린다.\n- 같은 경기를 다룬 기사가 여러 매체에서 오면 하나로 묶고, 경기 전 예상보다 결과와 기록을 앞세운다.\n"
+discovery = "이적·감독 선임을 발표 전에 정확히 맞혀 온 기자나 전술·데이터로 경기를 풀어 주는 해설가를 고르고, 반응 기사 위주 계정은 뺀다."
+topics = ["이적", "부상", "대표팀 명단", "경기 결과", "감독 교체", "순위·승강", "전술 분석"]
+
+[caps]
+"공식 발표" = 15
+"전문 매체" = 20
+"분석·해설" = 10
+"통계·데이터" = 5
+"한국 커뮤니티" = 10
+"해외 커뮤니티" = 5
+"뉴스" = 25
+
+[[subs]]
+label = "해외축구"
+region = "world"
+
+[[subs]]
+label = "K리그"
+region = "kr"
+
+[[subs]]
+label = "국가대표"
+region = "kr"
+
+[[subs]]
+label = "여자축구"
+region = "kr"
+
+[[feeds]]
+id = "interfootball-world"
+why = "해외축구 전문 매체"
+subs = ["해외축구"]
+
+[[feeds]]
+id = "interfootball-kr"
+why = "K리그·대표팀 뉴스"
+subs = ["K리그", "국가대표"]
+
+[[feeds]]
+id = "sportsg-k1"
+why = "K리그 현장 취재"
+subs = ["K리그"]
+
+[[feeds]]
+id = "sportsg-k2"
+why = "K리그2·승격 경쟁"
+subs = ["K리그"]
+default = false
+
+[[feeds]]
+id = "sportsg-national"
+why = "대표팀 전용 섹션"
+subs = ["국가대표"]
+
+[[feeds]]
+id = "sportsg-women"
+why = "WK리그·여자대표팀"
+subs = ["여자축구"]
+
+[[feeds]]
+id = "footballist"
+why = "기획·분석 기사"
+default = false
+
+[[feeds]]
+id = "besteleven-kr"
+why = "국내 축구·유소년"
+subs = ["K리그", "국가대표"]
+default = false
+
+[[feeds]]
+id = "besteleven-world"
+why = "해외축구 뉴스"
+subs = ["해외축구"]
+default = false
+
+[[feeds]]
+id = "fourfourtwo-kr"
+why = "축구 전문지 뉴스"
+default = false
+
+[[feeds]]
+id = "sportsdonga-soccer"
+why = "축구 종합, 하루 6건쯤"
+default = false
+
+[[feeds]]
+id = "stn-soccer"
+why = "축구 섹션 뉴스"
+default = false
+
+[[feeds]]
+id = "yna-sports"
+why = "종합 스포츠 속보"
+default = false
+
+[[feeds]]
+id = "bbc-football"
+why = "영국 축구 핵심 뉴스"
+subs = ["해외축구"]
+
+[[feeds]]
+id = "guardian-football"
+why = "유럽 축구 전반"
+subs = ["해외축구"]
+default = false
+
+[[feeds]]
+id = "guardian-pl"
+why = "EPL 전용"
+subs = ["해외축구"]
+default = false
+
+[[feeds]]
+id = "guardian-ucl"
+why = "챔피언스리그 전용"
+subs = ["해외축구"]
+default = false
+
+[[feeds]]
+id = "sky-football"
+why = "EPL 이적·감독 소식"
+subs = ["해외축구"]
+default = false
+
+[[feeds]]
+id = "espn-soccer"
+why = "세계 축구 헤드라인"
+subs = ["해외축구"]
+default = false
+
+[[feeds]]
+id = "athletic-football"
+why = "본문 유료, 제목만"
+subs = ["해외축구"]
+default = false
+
+[[feeds]]
+id = "guardian-women"
+why = "세계 여자축구"
+subs = ["여자축구"]
+
+[[feeds]]
+id = "bbc-women"
+why = "WSL·여자 국제대회"
+subs = ["여자축구"]
+default = false
+
+[[people]]
+name = "손흥민"
+why = "대표팀 주장, LAFC 공격수"
+region = "kr"
+news = "손흥민"
+subs = ["해외축구", "국가대표"]
+
+[[people]]
+name = "이강인"
+why = "아틀레티코 마드리드 미드필더"
+region = "kr"
+news = "이강인"
+subs = ["해외축구", "국가대표"]
+
+[[people]]
+name = "김민재"
+why = "바이에른 뮌헨 수비수"
+region = "kr"
+news = "김민재 바이에른"
+subs = ["해외축구", "국가대표"]
+
+[[people]]
+name = "황희찬"
+why = "샬케04 공격수"
+region = "kr"
+news = "황희찬 샬케"
+subs = ["해외축구", "국가대표"]
+
+[[people]]
+name = "오현규"
+why = "베식타시 공격수"
+region = "kr"
+news = "오현규 베식타시"
+subs = ["해외축구", "국가대표"]
+default = false
+
+[[people]]
+name = "모레노 감독"
+why = "축구대표팀 임시 감독(스페인 출신)"
+region = "kr"
+news = "모레노 감독 대표팀"
+subs = ["국가대표"]
+
+[[people]]
+name = "박문성"
+why = "해설위원, 협회·대표팀 비평"
+region = "kr"
+news = "박문성"
+subs = ["국가대표", "K리그"]
+default = false
+
+[[people]]
+name = "파브리치오 로마노"
+why = "이적 소식 1순위 기자"
+region = "world"
+x = "FabrizioRomano"
+news = "파브리치오 로마노"
+news_en = "Fabrizio Romano"
+subs = ["해외축구"]
+
+[[people]]
+name = "데이비드 온스테인"
+why = "The Athletic 이적·구단 특종 기자"
+region = "world"
+x = "David_Ornstein"
+news_en = "David Ornstein"
+subs = ["해외축구"]
+default = false
+
+[[companies]]
+name = "대한축구협회"
+why = "대표팀 명단·감독 선임·회장 선거"
+region = "kr"
+x = "theKFA"
+news = "대한축구협회"
+subs = ["국가대표", "여자축구"]
+
+[[companies]]
+name = "한국프로축구연맹(K리그)"
+why = "K리그 일정·징계·승강 제도"
+region = "kr"
+x = "kleague"
+news = "한국프로축구연맹"
+subs = ["K리그"]
+
+[[companies]]
+name = "아시아축구연맹(AFC)"
+why = "2027 아시안컵·ACL 주관"
+region = "world"
+x = "theafcdotcom"
+news = "아시아축구연맹 AFC"
+subs = ["국가대표", "K리그"]
+
+[[companies]]
+name = "FIFA"
+why = "월드컵·국제 규정"
+region = "world"
+x = "FIFAcom"
+news = "FIFA"
+news_en = "FIFA"
+subs = ["국가대표", "여자축구"]
+default = false
+
+[[companies]]
+name = "UEFA"
+why = "챔피언스리그 주관"
+region = "world"
+x = "ChampionsLeague"
+news = "UEFA 챔피언스리그"
+subs = ["해외축구"]
+
+[[companies]]
+name = "프리미어리그"
+why = "EPL 공식"
+region = "world"
+x = "premierleague"
+news = "프리미어리그"
+news_en = "Premier League"
+subs = ["해외축구"]
+default = false
+
+[[searches]]
+name = "축구대표팀 명단"
+news = "축구대표팀 명단"
+region = "kr"
+subs = ["국가대표"]
+
+[[searches]]
+name = "아시안컵 축구"
+news = "아시안컵 축구"
+region = "kr"
+subs = ["국가대표"]
+
+[[searches]]
+name = "K리그1 순위"
+news = "K리그1 순위"
+region = "kr"
+subs = ["K리그"]
+
+[[searches]]
+name = "해외축구 이적"
+news = "해외축구 이적"
+region = "kr"
+subs = ["해외축구"]
+
+[[searches]]
+name = "WK리그"
+news = "WK리그"
+region = "kr"
+subs = ["여자축구"]
+
+[target]
+text = "응원하는 팀은?"
+brief = "응원하는 팀"
+
+[target.options_by]
+"해외축구" = [
+  { label = "토트넘", region = "world", news = "토트넘", x = "SpursOfficial", feeds = ["guardian-pl"] },
+  { label = "아스널", region = "world", news = "아스널", x = "Arsenal", feeds = ["guardian-pl"] },
+  { label = "리버풀", region = "world", news = "리버풀 축구", x = "LFC", feeds = ["guardian-pl"] },
+  { label = "맨체스터 시티", region = "world", news = "맨시티", x = "ManCity", feeds = ["guardian-pl"] },
+  { label = "맨체스터 유나이티드", region = "world", news = "맨유", x = "ManUtd", feeds = ["guardian-pl"] },
+  { label = "첼시", region = "world", news = "첼시", x = "ChelseaFC", feeds = ["guardian-pl"] },
+  { label = "바이에른 뮌헨 (김민재)", region = "world", news = "바이에른 뮌헨", x = "FCBayern" },
+  { label = "아틀레티코 마드리드 (이강인)", region = "world", news = "아틀레티코 마드리드", x = "Atleti" },
+  { label = "레알 마드리드", region = "world", news = "레알 마드리드", x = "realmadrid" },
+  { label = "바르셀로나", region = "world", news = "바르셀로나 축구", x = "FCBarcelona" },
+  { label = "파리 생제르맹", region = "world", news = "파리 생제르맹", x = "PSG_inside" },
+  { label = "LAFC (손흥민)", region = "world", news = "LAFC", x = "LAFC" },
+]
+"K리그" = [
+  { label = "전북 현대", region = "kr", news = "전북 현대 축구", feeds = ["sportsg-k1"] },
+  { label = "울산 HD", region = "kr", news = "울산 HD", feeds = ["sportsg-k1"] },
+  { label = "포항 스틸러스", region = "kr", news = "포항 스틸러스", feeds = ["sportsg-k1"] },
+  { label = "FC서울", region = "kr", news = "FC서울", feeds = ["sportsg-k1"] },
+  { label = "강원FC", region = "kr", news = "강원FC", feeds = ["sportsg-k1"] },
+  { label = "하나시티즌", region = "kr", news = "하나시티즌 축구", feeds = ["sportsg-k1"] },
+  { label = "광주FC", region = "kr", news = "광주FC", feeds = ["sportsg-k1"] },
+  { label = "제주SK", region = "kr", news = "제주SK", feeds = ["sportsg-k1"] },
+  { label = "FC안양", region = "kr", news = "FC안양", feeds = ["sportsg-k1"] },
+  { label = "인천 유나이티드", region = "kr", news = "인천유나이티드", feeds = ["sportsg-k1"] },
+  { label = "부천FC", region = "kr", news = "부천FC", feeds = ["sportsg-k1"] },
+  { label = "김천 상무", region = "kr", news = "김천 상무", feeds = ["sportsg-k1"] },
+  { label = "수원 삼성", region = "kr", news = "수원 삼성 축구", feeds = ["sportsg-k2"] },
+  { label = "수원FC", region = "kr", news = "수원FC", feeds = ["sportsg-k2"] },
+  { label = "대구FC", region = "kr", news = "대구FC", feeds = ["sportsg-k2"] },
+  { label = "부산 아이파크", region = "kr", news = "부산 아이파크", feeds = ["sportsg-k2"] },
+]
+"여자축구" = [
+  { label = "수원FC 위민", region = "kr", news = "수원FC 위민", feeds = ["sportsg-women"] },
+]

@@ -1,0 +1,319 @@
+# 관심사 묶음: 엔터·문화 › 드라마 — 2026-10-30 조사(local/research/packs/ent-drama.json), 출처·계정은 열어서 확인한 것만
+id = "ent-drama"
+name = "드라마"
+tag = "드라마"
+summary = "새 드라마·OTT 오리지널·시청률 소식"
+order = 41
+status = "ready"
+category = ["엔터·문화", "드라마"]
+criteria = "- 새 드라마 편성·공개일 확정, 주연 캐스팅 확정, 시즌2 제작 확정, 종영과 최종 시청률을 먼저 챙긴다.\n- 시청률은 닐슨코리아 수치, 화제성은 굿데이터 펀덱스 수치가 있는 기사를 고르고 「자체 최고」 같은 의미 있는 변화만 남긴다.\n- 캐스팅은 소속사 확정 발표만 사실로 쓰고, 「출연 제안을 받고 검토 중」은 「~라는 보도」로 적는다.\n- OTT는 요금제 변경·합병·서비스 종료처럼 구독자 지갑에 닿는 소식을 작품 소식보다 앞에 둔다.\n- 배우 화보·공항 패션·광고 모델·SNS 근황·열애 추측과 줄거리 요약만 있는 회차 기사는 버린다.\n- 작품을 둘러싼 논란(방영 중단 청원·고증 문제)은 사실관계가 분명한 것 하나만 남기고 악플 중계성 기사는 버린다.\n"
+discovery = "회차 줄거리가 아니라 제작 흐름·플랫폼 전략·시청 데이터를 읽어 주는 평론가, 업계 임원, 작가·감독을 고른다."
+topics = ["새 드라마", "캐스팅", "시청률", "화제성 순위", "OTT 요금", "시즌2", "종영", "해외 성과"]
+
+[caps]
+"공식 발표" = 15
+"전문 매체" = 20
+"분석·해설" = 10
+"통계·데이터" = 5
+"한국 커뮤니티" = 10
+"해외 커뮤니티" = 5
+"뉴스" = 25
+
+[[subs]]
+label = "한국 드라마"
+region = "kr"
+
+[[subs]]
+label = "OTT 오리지널"
+region = "kr"
+
+[[subs]]
+label = "일본 드라마"
+region = "world"
+
+[[subs]]
+label = "중국 드라마"
+region = "world"
+
+[[subs]]
+label = "시청률·화제성"
+region = "kr"
+
+[[feeds]]
+id = "tenasia-tvdrama"
+why = "드라마 전문 연예 매체"
+subs = ["한국 드라마", "OTT 오리지널", "시청률·화제성"]
+
+[[feeds]]
+id = "ize-tv"
+why = "방송·드라마 해설 기사"
+subs = ["한국 드라마", "OTT 오리지널", "시청률·화제성"]
+
+[[feeds]]
+id = "deadline-korea"
+why = "해외 업계지의 한국 콘텐츠"
+subs = ["OTT 오리지널"]
+
+[[feeds]]
+id = "dramabeans"
+why = "영문 K드라마 리뷰"
+subs = ["한국 드라마"]
+default = false
+
+[[feeds]]
+id = "mydramalist-news"
+why = "아시아 드라마 신작 소식"
+subs = ["일본 드라마", "중국 드라마"]
+
+[[feeds]]
+id = "dramapanda"
+why = "중국 드라마 신작·캐스팅"
+subs = ["중국 드라마"]
+
+[[feeds]]
+id = "modelpress"
+why = "일본 연예·드라마 속보"
+subs = ["일본 드라마"]
+default = false
+
+[[feeds]]
+id = "variety-asia"
+why = "아시아 영상 산업 동향"
+subs = ["OTT 오리지널", "일본 드라마", "중국 드라마"]
+default = false
+
+[[feeds]]
+id = "yna-ent"
+why = "통신사 연예 속보"
+subs = ["한국 드라마", "시청률·화제성"]
+default = false
+
+[[feeds]]
+id = "newsis-ent"
+why = "통신사 연예 속보"
+subs = ["한국 드라마", "시청률·화제성"]
+default = false
+
+[[feeds]]
+id = "sportschosun-ent"
+why = "연예 전문지 최신 기사"
+subs = ["한국 드라마"]
+default = false
+
+[[people]]
+name = "김은숙"
+why = "흥행 보증 드라마 작가"
+region = "kr"
+news = "김은숙 작가"
+subs = ["한국 드라마", "OTT 오리지널"]
+
+[[people]]
+name = "김은희"
+why = "장르물 작가, 차기작 집필 중"
+region = "kr"
+news = "김은희 작가"
+subs = ["한국 드라마", "OTT 오리지널"]
+
+[[people]]
+name = "노희경"
+why = "송혜교·공유 신작 작가"
+region = "kr"
+news = "노희경 작가"
+subs = ["한국 드라마"]
+
+[[people]]
+name = "안판석"
+why = "'연애박사' 연출 감독"
+region = "kr"
+news = "안판석 감독"
+subs = ["한국 드라마"]
+default = false
+
+[[people]]
+name = "김원석"
+why = "'시그널2' 등 연출 감독"
+region = "kr"
+news = "김원석 감독"
+subs = ["한국 드라마"]
+default = false
+
+[[people]]
+name = "강동한"
+why = "넷플릭스 한국 콘텐츠 총괄 VP"
+region = "kr"
+news = "넷플릭스 강동한"
+subs = ["OTT 오리지널"]
+
+[[people]]
+name = "정덕현"
+why = "대중문화 평론가"
+region = "kr"
+news = "정덕현 평론가"
+
+[[people]]
+name = "김헌식"
+why = "대중문화 평론가"
+region = "kr"
+news = "김헌식 평론가"
+default = false
+
+[[companies]]
+name = "넷플릭스"
+why = "국내 1위 OTT, 한국 10주년"
+region = "kr"
+x = "NetflixKR"
+news = "넷플릭스 코리아"
+subs = ["OTT 오리지널"]
+
+[[companies]]
+name = "티빙"
+why = "토종 OTT, 웨이브와 합병 추진"
+region = "kr"
+x = "tvingdotcom"
+news = "티빙"
+subs = ["OTT 오리지널"]
+
+[[companies]]
+name = "쿠팡플레이"
+why = "가입자 급성장, 무료 시청"
+region = "kr"
+x = "CoupangPlay"
+news = "쿠팡플레이"
+subs = ["OTT 오리지널"]
+
+[[companies]]
+name = "디즈니+"
+why = "오리지널 시리즈·광고 요금제"
+region = "kr"
+x = "DisneyPlusKR"
+news = "디즈니플러스"
+subs = ["OTT 오리지널"]
+default = false
+
+[[companies]]
+name = "웨이브"
+why = "지상파 OTT, 티빙과 합병 추진"
+region = "kr"
+x = "wavve_official"
+news = "웨이브 wavve"
+subs = ["OTT 오리지널"]
+default = false
+
+[[companies]]
+name = "스튜디오드래곤"
+why = "최대 드라마 제작사"
+region = "kr"
+news = "스튜디오드래곤"
+subs = ["한국 드라마"]
+
+[[companies]]
+name = "CJ ENM (tvN)"
+why = "tvN 드라마 편성·제작"
+region = "kr"
+x = "chtvn"
+news = "CJ ENM 드라마"
+subs = ["한국 드라마"]
+default = false
+
+[[companies]]
+name = "SLL"
+why = "JTBC 계열 드라마 제작사"
+region = "kr"
+news = "SLL 드라마"
+subs = ["한국 드라마"]
+default = false
+
+[[companies]]
+name = "닐슨코리아"
+why = "공식 TV 시청률 집계"
+region = "kr"
+news = "닐슨코리아 시청률"
+subs = ["시청률·화제성"]
+
+[[companies]]
+name = "굿데이터코퍼레이션"
+why = "펀덱스 화제성 집계"
+region = "kr"
+news = "드라마 화제성 펀덱스"
+subs = ["시청률·화제성"]
+
+[[searches]]
+name = "드라마 시청률"
+news = "드라마 시청률"
+region = "kr"
+subs = ["시청률·화제성", "한국 드라마"]
+
+[[searches]]
+name = "넷플릭스 오리지널 한국"
+news = "넷플릭스 오리지널 한국"
+region = "kr"
+subs = ["OTT 오리지널"]
+
+[[searches]]
+name = "드라마 종영"
+news = "드라마 종영"
+region = "kr"
+subs = ["한국 드라마"]
+
+[[searches]]
+name = "일본 드라마 넷플릭스"
+news = "일본 드라마 넷플릭스"
+region = "kr"
+subs = ["일본 드라마"]
+
+[[searches]]
+name = "중국 드라마 OTT"
+news = "중국 드라마 OTT"
+region = "kr"
+subs = ["중국 드라마"]
+
+[target]
+text = "좋아하는 배우나 보는 플랫폼은?"
+brief = "좋아하는 배우나 보는 플랫폼"
+
+[[target.options]]
+label = "넷플릭스"
+region = "kr"
+news = "넷플릭스 코리아"
+x = "NetflixKR"
+feeds = ["deadline-korea"]
+
+[[target.options]]
+label = "티빙"
+region = "kr"
+news = "티빙"
+x = "tvingdotcom"
+
+[[target.options]]
+label = "쿠팡플레이"
+region = "kr"
+news = "쿠팡플레이"
+x = "CoupangPlay"
+
+[[target.options]]
+label = "디즈니+"
+region = "kr"
+news = "디즈니플러스"
+x = "DisneyPlusKR"
+
+[[target.options]]
+label = "웨이브"
+region = "kr"
+news = "웨이브 wavve"
+x = "wavve_official"
+
+[target.options_by]
+"한국 드라마" = [
+  { label = "김지원", region = "kr", news = "배우 김지원" },
+  { label = "송혜교", region = "kr", news = "송혜교" },
+  { label = "박보검", region = "kr", news = "박보검" },
+  { label = "변우석", region = "kr", news = "변우석" },
+  { label = "김혜윤", region = "kr", news = "김혜윤" },
+  { label = "추영우", region = "kr", news = "추영우" },
+  { label = "안효섭", region = "kr", news = "안효섭" },
+  { label = "박은빈", region = "kr", news = "배우 박은빈" },
+  { label = "고윤정", region = "kr", news = "고윤정" },
+  { label = "김고은", region = "kr", news = "김고은" },
+  { label = "김태리", region = "kr", news = "김태리" },
+  { label = "이제훈", region = "kr", news = "배우 이제훈" },
+]

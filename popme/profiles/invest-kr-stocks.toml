@@ -1,0 +1,328 @@
+# 관심사 묶음: 경제·투자 › 국내주식 — 2026-10-30 조사(local/research/packs/invest-kr-stocks.json), 출처·계정은 열어서 확인한 것만
+id = "invest-kr-stocks"
+name = "국내주식"
+tag = "국내주식"
+summary = "코스피·코스닥·공모주·배당·ETF 소식"
+order = 30
+status = "ready"
+category = ["경제·투자", "국내주식"]
+criteria = "- 공시(실적·자사주·유상증자·합병·풍문 해명)와 잠정 실적, 금통위 금리 결정, 외국인·국민연금 수급처럼 주가를 실제로 움직인 사실을 먼저 고른다.\n- 관심 종목·업종은 DART 공시 원문과 기사를 짝지어, 무엇이 결정됐고 언제부터인지를 한 줄로 적는다.\n- 증권사 목표가 변경은 여러 곳이 같은 방향으로 움직였거나 큰 폭일 때만 「~증권은 목표가를 ~로 낮췄다」 식으로 짧게, 확인 안 된 이야기는 「~라는 보도」로 쓴다.\n- 「지금 사라」·「급등 예상」 같은 투자 권유성 글, 리딩방·유튜브 종목 추천, 유료 리포트·구독·강의 홍보, 출처 없는 테마주 띄우기는 버린다.\n- 같은 시황을 되풀이하는 장중 속보와 [게시판]·인사·행사 기사는 버리고, 하루 흐름은 마감 기준 한 번만 정리한다.\n- 공모주는 청약 일정·공모가 확정·상장일 같은 사실만 다루고 「따상」 기대를 부추기는 글은 버린다.\n"
+discovery = "공시·실적·정책을 자기 이름으로 풀어 주면서 종목 추천이나 유료 상품 홍보는 하지 않는 리서치센터장·기자·기관 인사를 고른다."
+topics = ["실적 발표", "주요 공시", "금리·환율", "외국인 수급", "공모주 일정", "배당·자사주", "세제·정책", "상장폐지"]
+
+[caps]
+"공식 발표" = 15
+"전문 매체" = 20
+"분석·해설" = 10
+"통계·데이터" = 5
+"한국 커뮤니티" = 10
+"해외 커뮤니티" = 5
+"뉴스" = 25
+
+[[subs]]
+label = "코스피 대형주"
+region = "kr"
+
+[[subs]]
+label = "코스닥"
+region = "kr"
+
+[[subs]]
+label = "공모주/IPO"
+region = "kr"
+
+[[subs]]
+label = "배당·밸류업"
+region = "kr"
+
+[[subs]]
+label = "ETF"
+region = "kr"
+
+[[feeds]]
+id = "hankyung-finance"
+why = "증시·종목 주요 기사"
+
+[[feeds]]
+id = "einfomax-stock"
+why = "시황·실적 빠른 보도"
+
+[[feeds]]
+id = "einfomax-ib"
+why = "상장·M&A·기업 소식"
+subs = ["공모주/IPO", "코스피 대형주"]
+default = false
+
+[[feeds]]
+id = "chosunbiz-stock"
+why = "증시·종목 기사"
+default = false
+
+[[feeds]]
+id = "fnnews-stock"
+why = "수급·ETF·증권가 기사"
+default = false
+
+[[feeds]]
+id = "yna-market"
+why = "특징주·시황 속보"
+default = false
+
+[[feeds]]
+id = "dart-today"
+why = "전 상장사 실시간 공시"
+default = false
+
+[[feeds]]
+id = "dart-samsung-elec"
+why = "종목 공시 원문"
+subs = ["코스피 대형주"]
+default = false
+
+[[feeds]]
+id = "dart-sk-hynix"
+why = "종목 공시 원문"
+subs = ["코스피 대형주"]
+default = false
+
+[[feeds]]
+id = "dart-hyundai-motor"
+why = "종목 공시 원문"
+subs = ["코스피 대형주"]
+default = false
+
+[[feeds]]
+id = "dart-lg-energy"
+why = "종목 공시 원문"
+subs = ["코스피 대형주"]
+default = false
+
+[[feeds]]
+id = "dart-samsung-bio"
+why = "종목 공시 원문"
+subs = ["코스피 대형주"]
+default = false
+
+[[feeds]]
+id = "dart-celltrion"
+why = "종목 공시 원문"
+subs = ["코스피 대형주"]
+default = false
+
+[[feeds]]
+id = "dart-naver"
+why = "종목 공시 원문"
+subs = ["코스피 대형주"]
+default = false
+
+[[feeds]]
+id = "dart-kb-financial"
+why = "종목 공시 원문"
+subs = ["코스피 대형주", "배당·밸류업"]
+default = false
+
+[[feeds]]
+id = "dart-hanwha-aero"
+why = "종목 공시 원문"
+subs = ["코스피 대형주"]
+default = false
+
+[[people]]
+name = "신현송 (한국은행 총재)"
+why = "기준금리·환율 방향을 정함 (2026-04 취임)"
+region = "kr"
+news = "신현송 총재"
+
+[[people]]
+name = "이억원 (금융위원장)"
+why = "밸류업·자본시장 제도와 세제 방향"
+region = "kr"
+news = "이억원 금융위원장"
+subs = ["배당·밸류업"]
+
+[[people]]
+name = "이재용 (삼성전자 회장)"
+why = "시총 1위 종목의 투자·환원 결정"
+region = "kr"
+news = "이재용 회장 삼성전자"
+subs = ["코스피 대형주"]
+
+[[people]]
+name = "이찬진 (금융감독원장)"
+why = "불공정거래·공시 감독"
+region = "kr"
+news = "이찬진 금감원장"
+default = false
+
+[[people]]
+name = "정은보 (한국거래소 이사장)"
+why = "상장·상장폐지·거래 제도"
+region = "kr"
+news = "정은보 이사장"
+subs = ["공모주/IPO", "코스닥"]
+default = false
+
+[[people]]
+name = "김성주 (국민연금 이사장)"
+why = "국내주식 비중·리밸런싱"
+region = "kr"
+news = "김성주 국민연금 이사장"
+default = false
+
+[[people]]
+name = "최태원 (SK그룹 회장)"
+why = "SK하이닉스 투자·환원 결정"
+region = "kr"
+news = "최태원 SK하이닉스"
+subs = ["코스피 대형주"]
+default = false
+
+[[people]]
+name = "김학균 (신영증권 리서치센터장)"
+why = "추천 없이 시장 위치를 짚는 해설"
+region = "kr"
+news = "김학균 센터장"
+default = false
+
+[[companies]]
+name = "한국거래소"
+why = "상장·상장폐지·거래정지·지수 변경"
+region = "kr"
+news = "한국거래소"
+
+[[companies]]
+name = "금융위원회"
+why = "자본시장 제도·밸류업 정책"
+region = "kr"
+x = "fsckorea"
+news = "이억원 금융위원장"
+subs = ["배당·밸류업"]
+
+[[companies]]
+name = "한국은행"
+why = "기준금리 결정(금통위)"
+region = "kr"
+x = "bok_hub"
+news = "한국은행 금통위"
+
+[[companies]]
+name = "금융감독원"
+why = "DART 운영·공시 심사·불공정거래"
+region = "kr"
+news = "금융감독원 공시"
+default = false
+
+[[companies]]
+name = "국민연금공단"
+why = "국내 증시 최대 기관 수급"
+region = "kr"
+news = "국민연금 기금운용"
+default = false
+
+[[companies]]
+name = "삼성전자"
+why = "코스피 비중 1위"
+region = "kr"
+news = "삼성전자 주가"
+subs = ["코스피 대형주"]
+default = false
+
+[[companies]]
+name = "SK하이닉스"
+why = "반도체 업황 대표 종목"
+region = "kr"
+news = "SK하이닉스 주가"
+subs = ["코스피 대형주"]
+default = false
+
+[[searches]]
+name = "한국은행 금통위"
+news = "한국은행 금통위"
+region = "kr"
+
+[[searches]]
+name = "코스피 외국인 순매도"
+news = "코스피 외국인 순매도"
+region = "kr"
+subs = ["코스피 대형주"]
+
+[[searches]]
+name = "공모주 청약"
+news = "공모주 청약"
+region = "kr"
+subs = ["공모주/IPO"]
+
+[[searches]]
+name = "밸류업 배당"
+news = "밸류업 배당"
+region = "kr"
+subs = ["배당·밸류업"]
+
+[[searches]]
+name = "ETF 순자산"
+news = "ETF 순자산"
+region = "kr"
+subs = ["ETF"]
+
+[target]
+text = "관심 있는 종목이나 업종은?"
+brief = "관심 있는 종목이나 업종"
+
+[[target.options]]
+label = "반도체"
+region = "kr"
+news = "반도체주"
+
+[[target.options]]
+label = "2차전지"
+region = "kr"
+news = "2차전지주"
+
+[[target.options]]
+label = "바이오"
+region = "kr"
+news = "바이오주"
+
+[[target.options]]
+label = "조선"
+region = "kr"
+news = "조선주"
+
+[[target.options]]
+label = "방산"
+region = "kr"
+news = "방산주"
+
+[[target.options]]
+label = "자동차"
+region = "kr"
+news = "자동차주"
+
+[[target.options]]
+label = "은행·금융지주"
+region = "kr"
+news = "은행주 금융지주"
+
+[[target.options]]
+label = "게임"
+region = "kr"
+news = "게임주"
+
+[target.options_by]
+"코스피 대형주" = [
+  { label = "삼성전자", region = "kr", news = "삼성전자 주가", feeds = ["dart-samsung-elec"] },
+  { label = "SK하이닉스", region = "kr", news = "SK하이닉스 주가", feeds = ["dart-sk-hynix"] },
+  { label = "현대차", region = "kr", news = "현대차 주가", feeds = ["dart-hyundai-motor"] },
+  { label = "LG에너지솔루션", region = "kr", news = "LG에너지솔루션 주가", feeds = ["dart-lg-energy"] },
+  { label = "삼성바이오로직스", region = "kr", news = "삼성바이오로직스 주가", feeds = ["dart-samsung-bio"] },
+  { label = "셀트리온", region = "kr", news = "셀트리온 주가", feeds = ["dart-celltrion"] },
+  { label = "NAVER", region = "kr", news = "네이버 주가", feeds = ["dart-naver"] },
+  { label = "KB금융", region = "kr", news = "KB금융 주가", feeds = ["dart-kb-financial"] },
+  { label = "한화에어로스페이스", region = "kr", news = "한화에어로스페이스 주가", feeds = ["dart-hanwha-aero"] },
+  { label = "HD현대중공업", region = "kr", news = "HD현대중공업 주가" },
+  { label = "카카오", region = "kr", news = "카카오 주가" },
+]
+"코스닥" = [
+  { label = "알테오젠", region = "kr", news = "알테오젠 주가" },
+  { label = "에코프로비엠", region = "kr", news = "에코프로비엠 주가" },
+]
