@@ -6,6 +6,8 @@
      기업 계정은 더 엄격하게: 서로 다른 회사 3곳 이상이 8주 중 3주 이상에 걸쳐 반응해야 한다.
   Threads: 여러 태그·검색에 반복 등장하고 반응 큰 한국어 작성자 (사용자 승인 로직).
 1단계 인기: 카테고리별 팔로워 기준. 시장 크기가 달라 세계 기업·세계 개인·국내 X·Threads 기준이 다르다.
+  분야마다도 다르다 (K팝 수천만, 부동산 수천): 후보가 어느 관심사 계정들의 반응으로 올라왔는지 기억해(interest)
+  그 분야 카드의 기준·분야 낱말로 판정한다 (popme/fieldscale.py). 분야 기준이 없으면(AI 관심사) 아래 DEFAULTS.
 2단계 꾸준함: 국내 X·Threads만. 세계 기업·개인은 가끔 올려도 하나하나 파급력이 커서 면제.
   후보 프로필을 한 번 열어 최근 글로 판단한다 (실행마다 몇 명씩, 한 번 확인하면 recheck_days 동안 재사용).
 두 단계를 통과한 후보(stage='pass')만 화면·브리핑에 보인다.
@@ -92,14 +94,24 @@ def _drop_stale(db, platform, keep):
             db.set_candidate_stage(r["handle"], "gone", "후보 조건에서 빠짐")
 
 
+def _interest_of(cfg):
+    """핵심 X 계정 → 관심사 id (그 계정이 반응한 후보는 그 관심사 후보)."""
+    from popme import catalog
+    try:
+        return {a["handle"].lower(): a["interest"] for a in catalog.x_accounts(cfg or {}) if a.get("interest")}
+    except Exception:
+        return {}
+
+
 def update(db, core_handles, cfg=None):
     s = settings(cfg)
     core = {h.lower() for h in core_handles}
+    interest_of = _interest_of(cfg)
     orgs = {r["handle"].lower(): (r["org"] or "").lower() for r in db.q("SELECT handle, org FROM profiles WHERE platform='x'")}
     org_of = lambda h: orgs.get(h.lower()) or h.lower()  # 소속 배지가 없으면 그 사람 자체가 하나의 출처
     person_since = _ago(s["person_window_days"])
     stats = defaultdict(lambda: {"name": None, "by": set(), "orgs": set(), "orgs_recent": set(), "weeks": set(),
-                                 "inter": 0, "ko": 0, "ko_likes": 0})
+                                 "inter": 0, "ko": 0, "ko_likes": 0, "interests": defaultdict(int)})
 
     # 1) 핵심 계정이 리포스트·인용·답글한 대상
     for r in db.q("SELECT author, ref_author, created_at FROM tweets WHERE kind IN ('retweet','quote','reply') "
@@ -113,6 +125,8 @@ def update(db, core_handles, cfg=None):
         st = stats[ref]
         st["inter"] += 1
         st["by"].add(r["author"])
+        if interest_of.get(a):
+            st["interests"][interest_of[a]] += 1
         st["orgs"].add(src)
         st["weeks"].add(_week(r["created_at"]))
         if r["created_at"] >= person_since:
@@ -154,7 +168,8 @@ def update(db, core_handles, cfg=None):
             if st["ko"]:
                 reasons.append(f"한국어 글 {st['ko']}개, 반응 합계 ♥{st['ko_likes']:,}")
             reason = " · ".join(reasons)
-        db.upsert_candidate(handle, st["name"] or names.get(handle.lower()), reason, round(score, 1), "x", kind)
+        top = max(st["interests"], key=st["interests"].get) if st["interests"] else None  # 가장 많이 반응한 관심사
+        db.upsert_candidate(handle, st["name"] or names.get(handle.lower()), reason, round(score, 1), "x", kind, top)
         keep.add(handle.lower())
     _drop_stale(db, "x", keep)
 
@@ -192,8 +207,12 @@ def update_threads(db, core_usernames, cfg=None):
 
 
 # ---------------- 1·2단계: 인기 → 꾸준함 ----------------
-def consistency(db, platform, user, s):
-    """최근 글로 꾸준함 판단. s = settings(cfg). 반환: (통과 여부, 설명)."""
+def consistency(db, platform, user, s, interest=None):
+    """최근 글로 꾸준함 판단. s = settings(cfg). interest가 있으면 그 분야 낱말로 「분야 글」 비율을 본다 (없으면 AI·개발 글).
+    반환: (통과 여부, 설명)."""
+    from popme import fieldscale
+    field_topic = fieldscale.rules_for(interest)["topic"] if interest else None
+    topic_re, topic_name = (field_topic, "분야 글") if field_topic else (TOPIC, "AI·개발 글")
     rows = db.q("SELECT text, likes, created_at FROM tweets WHERE COALESCE(platform,'x')=? AND author=? COLLATE NOCASE "
                 "AND created_at >= ?", platform, user, _ago(30))
     if not rows:
@@ -202,22 +221,24 @@ def consistency(db, platform, user, s):
         return False, f"꾸준함 미달: 최근 30일 글 없음 (마지막 글 {last[:10] if last else '모름'})"
     last = max(r["created_at"] for r in rows)
     weeks = {_week(r["created_at"]) for r in rows if r["created_at"] >= _ago(28)}
-    topic = sum(1 for r in rows if TOPIC.search(r["text"] or "")) / len(rows)
+    topic = sum(1 for r in rows if topic_re.search(r["text"] or "")) / len(rows)
     liked = sum(1 for r in rows if (r["likes"] or 0) >= s["liked_min"])
     checks = [
         (last >= _ago(s["recent_days"]), f"마지막 글 {last[:10]}"),
         (len(rows) >= s["min_posts_30d"], f"30일 글 {len(rows)}개"),
         (len(weeks) >= s["min_active_weeks"], f"최근 4주 중 {len(weeks)}주 활동"),
-        (topic >= s["min_topic_share"], f"AI·개발 글 {topic:.0%}"),
+        (topic >= s["min_topic_share"], f"{topic_name} {topic:.0%}"),
         (liked >= s["min_liked_posts"], f"♥{s['liked_min']}+ 글 {liked}개"),
     ]
     if all(ok for ok, _ in checks):
-        return True, f"꾸준함 통과: 30일 글 {len(rows)}개 · {len(weeks)}주 활동 · AI·개발 글 {topic:.0%}"
+        return True, f"꾸준함 통과: 30일 글 {len(rows)}개 · {len(weeks)}주 활동 · {topic_name} {topic:.0%}"
     return False, "꾸준함 미달: " + ", ".join(t for ok, t in checks if not ok)
 
 
-def _judge(db, s, platform, user, kind, checked_at):
-    pass_f, watch_f = s["followers"][kind]
+def _judge(db, s, platform, user, kind, checked_at, interest=None):
+    from popme import fieldscale
+    field = (fieldscale.rules_for(interest)["followers"] or {}) if interest else {}
+    pass_f, watch_f = field.get(kind) or s["followers"][kind]  # 그 분야 기준이 있으면 그것으로
     p = db.profile(platform, user)
     f = p["followers"] if p else None
     label = KIND_LABEL[kind]
@@ -232,7 +253,7 @@ def _judge(db, s, platform, user, kind, checked_at):
         return "pass", f"{head} · 꾸준함 검사 면제"
     if not checked_at or checked_at < _ago(s["recheck_days"]):
         return "pool", f"{head} · 꾸준함 확인 대기"
-    ok, why = consistency(db, platform, user, s)
+    ok, why = consistency(db, platform, user, s, interest)
     return ("pass" if ok else "fail"), f"{head} · {why}"
 
 
@@ -245,7 +266,7 @@ def evaluate(db, cfg=None, platform=None):
             continue
         user = _split(c["handle"], plat)
         kind = c["kind"] or kind_of(db, user, plat)
-        stage, note = _judge(db, s, plat, user, kind, c["checked_at"])
+        stage, note = _judge(db, s, plat, user, kind, c["checked_at"], c["interest"] if "interest" in c.keys() else None)
         db.set_candidate_stage(c["handle"], stage, note, kind)
 
 
@@ -287,7 +308,7 @@ def review(db, cfg=None, platform=None):
         user = _split(c["handle"], plat)
         if (c["kind"] or kind_of(db, user, plat)) in EXEMPT:
             continue
-        ok, why = consistency(db, plat, user, s)
+        ok, why = consistency(db, plat, user, s, c["interest"] if "interest" in c.keys() else None)
         db.set_fail_since(c["handle"], None if ok else (c["fail_since"] or _now().isoformat()), why)
 
 

@@ -100,7 +100,24 @@ def clean_info(i):
             "nudge_note": _s(i.get("nudge_note"), 100), "must_have": strs("must_have"), "page_watch": strs("page_watch"),
             "deadline_kinds": strs("deadline_kinds", 6, 30),
             "seasonality": [{"when": _s(x.get("when"), 20), "intensity": x.get("intensity") if x.get("intensity") in ("높음", "보통", "낮음") else "보통",
-                             "what": _s(x.get("what"), 60)} for x in (i.get("seasonality") or [])[:10] if isinstance(x, dict) and x.get("when")]}
+                             "what": _s(x.get("what"), 60)} for x in (i.get("seasonality") or [])[:10] if isinstance(x, dict) and x.get("when")],
+            **_scale_info(i)}
+
+
+def _scale_info(i):
+    """발굴 기준 칸 (popme/fieldscale.py): 팔로워 기준 {kind: [통과, 지켜보기]}·배수·표본 수·분야 낱말. 없으면 칸도 없음."""
+    out = {}
+    f = i.get("followers")
+    if isinstance(f, dict):
+        out["followers"] = {k: [int(x) for x in v][:2] for k, v in f.items()
+                            if k in ("company", "global", "ko", "threads") and isinstance(v, list) and len(v) >= 2}
+    if isinstance(i.get("scale"), dict):
+        out["scale"] = {k: float(i["scale"][k]) for k in ("world", "kr") if k in i["scale"]}
+    if i.get("sample") is not None:
+        out["sample"] = int(i["sample"])
+    if i.get("topic_words"):
+        out["topic_words"] = [_s(w, 20) for w in i["topic_words"] if w][:80]
+    return out
 
 
 def max_age(d, category=""):

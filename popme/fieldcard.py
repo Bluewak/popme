@@ -112,16 +112,48 @@ def build(cfg, field, category="", heads=(), domain=None):
         return None
 
 
+def scale_rules(cfg, field, domain):
+    """발굴 기준 (popme/fieldscale.py): 대표 X 계정을 찾고(채널 찾기 페르소나) → 있는지 확인(oEmbed) →
+    팔로워(앱 DB, 없으면 전용 Chrome으로 10곳까지) → 기준. 실패하면 None (AI 기준을 쓴다)."""
+    from popme import fieldscale, interests, measure
+    try:
+        out = persona.ask(cfg, "channel_finder", {"field": field, "must_know": [m["name"] for m in domain.get("must_know", [])],
+                                                  "categories": [c["name"] for c in domain.get("categories", [])]}, timeout=120)
+        accounts = [a for a in out["accounts"] if a["x"]][:12]
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            alive = list(pool.map(lambda a: interests.x_exists(a["x"]), accounts))
+        accounts = [a for a, ok in zip(accounts, alive) if ok]  # 없는 계정(지어낸 것)은 버림, 확인 못 함(None)도 버림
+        counts = measure.known([a["x"] for a in accounts])
+        counts.update(measure.x_followers(cfg, [a["x"] for a in accounts if a["x"].lower() not in counts]))
+        samples = [(a["region"], counts[a["x"].lower()]) for a in accounts if a["x"].lower() in counts]
+        rules = fieldscale.rules_from(samples, domain)
+        rules["channels"] = [{**a, "followers": counts.get(a["x"].lower())} for a in accounts]
+        log.info("분야 발굴 기준: %s — 표본 %d, 배수 %s", field, rules["sample"], rules["scale"])
+        return rules
+    except Exception:
+        log.exception("분야 발굴 기준 실패: %s", field)
+        return None
+
+
 def start(cfg, field, domain=None, category="", heads=()):
-    """분야 카드를 뒤에서 만들고(초안이 없으면 프로필 작가부터) 확인한다 — 같은 분야는 한 번만.
-    새 분야는 질문을 먼저 만들어 보여 주고, 그동안 여기서 초안(약 70초)·확인(약 20초)을 돌려 ③ 사람 추천에서 합친다."""
+    """분야 카드를 뒤에서 만들고(초안이 없으면 프로필 작가부터) 확인한 뒤, 이어서 발굴 기준(대표 계정 팔로워)을 잰다 — 같은 분야는 한 번만.
+    새 분야는 질문을 먼저 만들어 보여 주고, 그동안 여기서 초안(약 70초)·확인(약 20초)을 돌려 ③ 사람 추천에서 합친다.
+    발굴 기준은 그 뒤로 더 걸릴 수 있어(X 10곳 × 10초) 기다리지 않고, 저장할 때 붙인다 (attach)."""
     if not BACKGROUND:
         return
     with _lock:
         if field in _jobs:
             return
-        job: dict = {"result": None}
-        job["thread"] = threading.Thread(target=lambda: job.update(result=build(cfg, field, category, heads, domain)), daemon=True)
+        job: dict = {"result": None, "rules": None, "card": threading.Event()}
+
+        def run():
+            try:
+                job["result"] = build(cfg, field, category, heads, domain)
+            finally:
+                job["card"].set()
+            if job["result"]:
+                job["rules"] = scale_rules(cfg, field, job["result"])
+        job["thread"] = threading.Thread(target=run, daemon=True)
         _jobs[field] = job
     job["thread"].start()
 
@@ -131,5 +163,24 @@ def verified(field, wait=WAIT):
     job = _jobs.get(field)
     if not job:
         return None
-    job["thread"].join(wait)
+    job["card"].wait(wait)
     return job["result"]
+
+
+def attach(field, pid, wait=600):
+    """저장한 새 관심사의 분야 카드에 발굴 기준을 붙인다 — 아직 재는 중이면 끝날 때까지 뒤에서 기다렸다가."""
+    job = _jobs.get(field)
+    if not job:
+        return None
+
+    def run():
+        job["thread"].join(wait)
+        if not job.get("rules"):
+            return
+        d = domains.load(pid)
+        if d:
+            d["info"] = {**d.get("info", {}), **job["rules"]}
+            domains.save_local(pid, domains.clean(d, pid))
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    return t

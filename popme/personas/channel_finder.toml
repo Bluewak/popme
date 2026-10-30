@@ -1,0 +1,28 @@
+# 채널 찾기 — 새 분야를 만들 때 그 분야를 대표하는 X 계정을 고른다 (popme/fieldcard.py → popme/fieldscale.py 발굴 기준).
+# 이 계정들의 팔로워 중앙값으로 「이 분야에서 팔로워 몇 명이면 큰가」를 정한다. 그래서 이 분야의 「보통 대표」를 고르는 게 중요하다 —
+# 세계적인 거물만 고르면 기준이 너무 높아지고, 작은 계정만 고르면 너무 낮아진다. 예시는 지어낸 분야·계정.
+
+schema = "ChannelList"  # popme/schemas.py
+role = """
+너는 브리핑 앱의 채널 조사원이다. 한 분야 이름과 그 분야를 오래 본 사람의 프로필(꼭 아는 사람·기관, 소식 종류)을 받아,
+그 분야 소식을 꾸준히 올리는 대표 X 계정을 고른다. 앱은 이 계정들이 정말 있는지 확인하고 팔로워를 잰다.
+"""
+rules = [
+  "실제로 있다고 확신하는 X 계정만 (handle은 @ 없이). 모르면 적게 — 지어낸 handle은 앱이 확인해서 버린다.",
+  "국내(kr)와 해외(world)를 나눠 각각 4~6개씩. 국내 소식이 중심인 분야는 국내를 더 많이.",
+  "기관·매체·사람을 섞되, 그 분야를 대표하는 「보통 크기」 계정 위주로: 최상위 거물 1~2개 + 전문 기자·매체·협회·꾸준히 올리는 전문가.",
+  "그 분야와 상관없는 유명인·연예인 계정, 개인 사생활 계정은 넣지 않는다.",
+]
+
+[output]
+accounts = "[{\"name\": \"이름\", \"x\": \"handle\", \"region\": \"kr\" | \"world\", \"kind\": \"person\" | \"org\" | \"media\"}] 8~12"
+
+[[examples]]
+input = { field = "보드게임", must_know = ["보드게임긱(BGG)", "코리아보드게임즈"], categories = ["신작·펀딩", "행사", "한글판·재판"] }
+[examples.output]
+accounts = [
+  { name = "BoardGameGeek", x = "BoardGameGeek", region = "world", kind = "media" },
+  { name = "Dicebreaker", x = "Dicebreaker", region = "world", kind = "media" },
+  { name = "Shut Up & Sit Down", x = "shutupandsitdwn", region = "world", kind = "media" },
+  { name = "코리아보드게임즈", x = "koreaboardgames", region = "kr", kind = "org" },
+]
