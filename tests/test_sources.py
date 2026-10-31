@@ -138,6 +138,17 @@ def test_transient_errors_are_retried_once(monkeypatch):
     assert calls == {"a": 2, "b": 2, "c": 1, "d": 1} and sorted(waits) == [3, 8]
 
 
+def test_429_waits_as_long_as_server_says():
+    """429에 Retry-After·x-ratelimit-reset이 있으면 그만큼 (+1초, 최대 90초). Reddit은 1분에 한 번이라 8초로는 또 429였다."""
+    import urllib.error
+    err = lambda code, h: urllib.error.HTTPError("https://e/x", code, "x", h, None)
+    assert sources.retry_wait(err(429, {"x-ratelimit-reset": "54"})) == 55
+    assert sources.retry_wait(err(429, {"Retry-After": "5"})) == 6
+    assert sources.retry_wait(err(429, {"Retry-After": "600"})) == 90
+    assert sources.retry_wait(err(429, {"Retry-After": "Wed, 21 Oct 2026 07:28:00 GMT"})) == 8  # 날짜 형식은 기본값
+    assert sources.retry_wait(err(429, {})) == 8 and sources.retry_wait(err(502, {"Retry-After": "30"})) == 3
+
+
 def test_hn_module_reads_algolia(monkeypatch):
     """Hacker News는 Algolia를 직접 (hnrss보다 빠르고 502가 없다). 글 모양은 hnrss와 같게."""
     import json
