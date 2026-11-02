@@ -1,19 +1,19 @@
 r"""캐릭터 원본(흰 배경) → 배경 투명 + 여백 자르기 + 320px.
 
 사용 (POPME 폴더의 PowerShell에서, 설치 때 만든 Python으로):
-  & "$env:LOCALAPPDATA\POPME\venv\Scripts\python.exe" assets\prepare.py <원본.png> <pet|pet_busy|pet_happy|pet_sleepy|pet_alert>
+  & "$env:LOCALAPPDATA\POPME\venv\Scripts\python.exe" -m popme.prepare <원본.png> <pet|pet_busy|pet_happy|pet_sleepy|pet_alert>
+결과는 %LOCALAPPDATA%\POPME\assets에 저장된다.
 바깥 흰 배경만 모서리에서부터 채워 지우므로, 외곽선 안쪽의 밝은 색(몸통)은 그대로 남는다.
 """
 import sys
-from pathlib import Path
 
 try:
     from PIL import Image, ImageDraw, ImageFilter
 except ImportError:  # 그냥 python으로 돌리면 Pillow가 없다 (POPME 패키지는 전용 venv에 설치됨)
     sys.exit("Pillow가 없는 Python이에요. POPME 폴더의 PowerShell에서 이렇게 실행해 주세요:\n"
-             r'  & "$env:LOCALAPPDATA\POPME\venv\Scripts\python.exe" assets\prepare.py <원본.png> pet')
+             r'  & "$env:LOCALAPPDATA\POPME\venv\Scripts\python.exe" -m popme.prepare <원본.png> pet')
 
-HERE = Path(__file__).resolve().parent
+from popme import config  # noqa: E402
 
 
 def prepare(src, name, size=320, out=None):
@@ -40,7 +40,7 @@ def prepare(src, name, size=320, out=None):
 def finish(img, name, size, out):
     img = img.crop(img.getbbox())
     img.thumbnail((size, size), Image.LANCZOS)
-    out = out or HERE / f"{name}.png"
+    out = out or config.ASSETS_DIR / f"{name}.png"
     img.save(out)
     print(out, img.size)
 

@@ -16,7 +16,6 @@ from PIL import Image, ImageChops, ImageDraw
 from popme import config
 
 log = logging.getLogger(__name__)
-ASSETS = config.ROOT / "assets"
 FILES = {"idle": "pet", "busy": "pet_busy", "happy": "pet_happy", "alert": "pet_alert", "sleepy": "pet_sleepy"}
 ICON_SIZES = [(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
 u32, g32, k32 = ctypes.windll.user32, ctypes.windll.gdi32, ctypes.windll.kernel32
@@ -53,10 +52,10 @@ WM_RBUTTONUP = 0x205
 
 
 def load_images(folder=""):
-    """pet*.{png,webp,gif} → {"idle": PIL.Image, ...}. folder: 캐릭터 파일 [persona] images (없으면 assets).
+    """pet*.{png,webp,gif} → {"idle": PIL.Image, ...}. folder: 캐릭터 파일 [persona] images (없으면 내 이미지 폴더).
     평소 이미지가 없으면 주황 방울."""
     imgs = {}
-    base = config.ROOT / folder if folder else ASSETS
+    base = config.image_dir(folder)
     for state, name in FILES.items():
         for ext in ("png", "webp", "gif"):
             p = base / f"{name}.{ext}"
@@ -82,11 +81,11 @@ def icon_image(img):
 
 
 def write_icon(img):
-    """assets/pet.ico를 지금 캐릭터 이미지로. 바로가기가 이 경로를 가리키므로 이미지를 바꾸면 아이콘도 따라 바뀐다.
+    """내 이미지 폴더의 pet.ico를 지금 캐릭터 이미지로. 바로가기가 이 경로를 가리키므로 이미지를 바꾸면 아이콘도 따라 바뀐다.
     수정 시각이 아니라 내용으로 비교한다 (복사한 파일은 원본의 수정 시각을 그대로 가져와서). 바뀌었으면 True."""
     buf = io.BytesIO()
     icon_image(img).save(buf, format="ICO", sizes=ICON_SIZES)
-    ico = ASSETS / "pet.ico"
+    ico = config.ASSETS_DIR / "pet.ico"
     if ico.exists() and ico.read_bytes() == buf.getvalue():
         return False
     ico.write_bytes(buf.getvalue())

@@ -11,7 +11,7 @@
    - 회사·학교(Google Workspace) 계정은 관리자가 막아 두었을 수 있습니다.
 3. **IMAP**: 지금 Gmail은 기본으로 켜져 있습니다. Gmail 설정 → 전달 및 POP/IMAP에 "IMAP 사용"이 보이면 켜세요.
 
-## 2. config.toml
+## 2. config.toml (`%LOCALAPPDATA%\POPME\config.toml`)
 
 ```toml
 [mail]
@@ -24,9 +24,9 @@ ignore = ["newsletter@"]
 quiet_hours = "23:00-07:00"
 ```
 
-나머지 항목과 기본값은 `config.example.toml`의 `[mail]`에 있습니다. 고친 뒤 POPME를 다시 켜면 반영됩니다. 켜지면 패널에 **메일** 탭이 생깁니다.
+나머지 항목과 기본값은 `popme/defaults/config.example.toml`의 `[mail]`에 있습니다. 고친 뒤 POPME를 다시 켜면 반영됩니다. 켜지면 패널에 **메일** 탭이 생깁니다.
 
-`config.toml`은 저장소에 올라가지 않지만, 비밀번호가 PC에 그대로(평문) 저장됩니다. 그래서 일반 비밀번호가 아닌 앱 비밀번호를 씁니다.
+`password`에 넣은 값은 POPME가 켜질 때 Windows 자격 증명 관리자로 옮기고 파일의 칸은 비웁니다. 그래도 일반 비밀번호가 아닌 앱 비밀번호를 쓰세요.
 
 ## 3. 동작 방식
 

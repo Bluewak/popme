@@ -8,18 +8,18 @@ config.toml의 주석·다른 설정은 그대로 두고 고른 값의 줄만 �
   python -m popme.setup_window check-ics '<주소>'          주소가 열리는지, 일정 몇 개인지
   python -m popme.setup_window check-caldav '<Apple 계정 이메일>'   앱 암호를 물어 iCloud 캘린더·일정 수만 보여 줌 (저장 안 함)
 """
+import base64
 import json
 import logging
 import os
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
 import tomllib
 from pathlib import Path
 
-from popme import config
+from popme import config, vault
 from popme.collectors import caldav
 
 log = logging.getLogger(__name__)
@@ -315,23 +315,34 @@ def set_value(text, section, key, value, before=()):
 # ---------------------------------------------------------------- 현재 값 읽기 · 고른 값 쓰기
 
 def base_text():
-    path = config.CONFIG_PATH if config.CONFIG_PATH.exists() else config.ROOT / "config.example.toml"
+    path = config.CONFIG_PATH if config.CONFIG_PATH.exists() else config.EXAMPLE_CONFIG
     return path.read_text(encoding="utf-8")
 
 
 def characters():
-    """폴더의 캐릭터 파일들 [{file, name, intro, image}] ([persona]가 있는 *.toml)."""
+    """기본 캐릭터와 내가 만든 캐릭터 파일들 [{file, name, intro, image}] ([persona]가 있는 *.toml). 이름이 같으면 내 것."""
     out = []
-    for p in sorted(config.ROOT.glob("*.toml")):
+    files = {p.name: p for folder in (config.DEFAULTS_DIR, config.DATA_DIR) for p in folder.glob("*.toml")}
+    for _, p in sorted(files.items()):
         try:
             persona = tomllib.loads(p.read_text(encoding="utf-8")).get("persona")
         except (tomllib.TOMLDecodeError, OSError):
             continue
         if persona is not None:
-            image = config.ROOT / persona.get("images", "assets") / "pet.png"
+            image = config.image_dir(persona.get("images", "")) / "pet.png"
             out.append({"file": p.name, "name": persona.get("name") or p.stem, "intro": persona.get("intro", ""),
-                        "image": image.relative_to(config.ROOT).as_posix() if image.exists() else ""})
+                        "image": image_uri(image) if image.exists() else ""})
     return out
+
+
+def image_uri(path):
+    """설정 창이 앱 폴더 밖의 이미지도 보이게 data URI로."""
+    return "data:image/png;base64," + base64.b64encode(path.read_bytes()).decode()
+
+
+def saved_password(section, cfg):
+    """저장해 둔 비밀번호: 자격 증명 관리자, 못 옮겼으면 config.toml의 평문."""
+    return cfg.get(section, {}).get("password") or vault.get(section)
 
 
 def charmaker_tones():
@@ -361,13 +372,13 @@ def current():
         "source": cal.get("source", "timetree"),
         "ics": [{"name": c.get("name", ""), "url": c.get("url", "")} for c in cal.get("ics", [])],
         "holidays": cal.get("holidays", True),
-        "caldav": {"user": dav.get("user", ""), "has_password": bool(dav.get("password")),
+        "caldav": {"user": dav.get("user", ""), "has_password": bool(saved_password("caldav", cfg)),
                    "calendars": [{"name": c.get("name", ""), "url": c.get("url", "")} for c in dav.get("calendars", [])]},
         "use_windows_location": w.get("use_windows_location", True),
         "place": w.get("name", ""),
         "mail": {"supported": mail_supported(), "enabled": mail.get("enabled", False),
                  "host": mail.get("host", "imap.gmail.com"), "user": mail.get("user", ""),
-                 "has_password": bool(mail.get("password")), "quiet_hours": mail.get("quiet_hours", "")},
+                 "has_password": bool(saved_password("mail", cfg)), "quiet_hours": mail.get("quiet_hours", "")},
         "mail_domains": MAIL_DOMAINS,
         "character": char,
         "characters": chars,
@@ -379,7 +390,7 @@ def current():
                         for k, v in LOGIN_SITES.items()},
         "python": sys.version.split()[0],
         # 「생각 중」 화면의 캐릭터 그림 (개인 이미지가 있을 때만 — 없으면 화면이 기본 방울 모양을 그린다)
-        "pet_image": next((f"../../assets/{n}" for n in ("pet_busy.png", "pet.png") if (config.ROOT / "assets" / n).exists()), ""),
+        "pet_image": next((image_uri(p) for n in ("pet_busy.png", "pet.png") if (p := config.ASSETS_DIR / n).exists()), ""),
         **interest_choices(cfg),
     }
 
@@ -454,7 +465,7 @@ def validate(ch):
     else:
         mail = None
     char = ch.get("character")
-    if char == "character.example.toml" and not (config.ROOT / "character.toml").exists():
+    if char == "character.example.toml" and not (config.DATA_DIR / "character.toml").exists():
         # 기본 캐릭터는 이름을 박지 않는다: character.toml을 나중에 만들면 그대로 쓰이고, 없으면 예시로 넘어간다
         char = "character.toml"
     if ch.get("new_character"):
@@ -583,6 +594,7 @@ def apply(text, ch):
 
 def write(text):
     config.CONFIG_PATH.write_text(text, encoding="utf-8", newline="\n")
+    config.hide_passwords()
 
 
 def geocode_place(name):
@@ -623,9 +635,10 @@ def guess_mail_host(domain):
 
 def saved_mail_password(host, user):
     """저장된 메일 비밀번호 — 저장된 것과 같은 계정(서버·주소)일 때만. 계정을 바꿨으면 "" (예전 계정 비밀번호를 쓰지 않게)."""
-    m = tomllib.loads(base_text()).get("mail", {})
+    cfg = tomllib.loads(base_text())
+    m = cfg.get("mail", {})
     same = (m.get("user") or "").strip().lower() == (user or "").strip().lower() and m.get("host") == (host or "").strip()
-    return m.get("password", "") if same else ""
+    return saved_password("mail", cfg) if same else ""
 
 
 def _mail_login_error(host, raw):
@@ -649,7 +662,7 @@ def check_mail(host, user, password):
     password = (password or "").replace(" ", "")
     if not password:  # 비밀번호 칸을 비웠으면 저장된 것으로 — 같은 계정일 때만
         password = saved_mail_password(host, user)
-        if not password and tomllib.loads(base_text()).get("mail", {}).get("password"):
+        if not password and saved_password("mail", tomllib.loads(base_text())):
             raise ValueError(f"메일 주소가 바뀌었어요. 새 계정의 {'앱 비밀번호' if gmail else '비밀번호'}를 넣어 주세요.")
         if not password:
             raise ValueError("앱 비밀번호 칸이 비어 있어요. ②의 「앱 비밀번호 만들기」를 눌러 주세요." if gmail
@@ -813,7 +826,7 @@ def check_caldav(user, password):
     """Apple 계정 + 앱 암호로 로그인해 일정 캘린더 목록. 앱 암호를 비우면 저장된 것으로. 실패하면 ValueError."""
     password = (password or "").strip()
     if not password:
-        password = tomllib.loads(base_text()).get("caldav", {}).get("password", "")
+        password = saved_password("caldav", tomllib.loads(base_text()))
     if not (user or "").strip() or not password:
         raise ValueError("Apple 계정 이메일과 앱 암호를 넣어 주세요.")
     cals = caldav.discover(user, password)

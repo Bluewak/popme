@@ -1,8 +1,10 @@
 import sys
 
+from popme import config
 from popme.app import main
 
 if __name__ == "__main__":
+    config.adopt_old_files()  # git으로 받은 폴더처럼 install.bat을 거치지 않고 새 버전이 된 경우
     if len(sys.argv) > 1 and sys.argv[1] == "run-once":
         # 위젯 없이 수집+브리핑 1회 (디버깅용)
         from popme.jobs import Jobs

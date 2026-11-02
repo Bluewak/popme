@@ -1,7 +1,7 @@
 """날씨 (popme/weather.py): Open-Meteo 응답 처리·캐시·판단 기준, 일정 장소 다시 뽑기."""
 import io
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from popme import event_weather, weather
 from popme.db import DB

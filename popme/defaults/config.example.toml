@@ -1,8 +1,8 @@
-# POPME 예시 설정 — config.toml로 복사해서 고치세요 (config.toml은 저장소에 올라가지 않음).
+# POPME 기본 설정 — 설정 창이 이 파일에서 시작해 %LOCALAPPDATA%\POPME\config.toml을 만듭니다. 직접 고치려면 그 파일을 고치세요.
 # 고친 뒤 캐릭터 우클릭 > 종료 후 다시 실행하면 반영됩니다.
 
 [character]
-file = "character.toml"           # 캐릭터 파일. 없으면 character.example.toml(기본 캐릭터 "포피"). docs/CHARACTER.md
+file = "character.toml"           # 캐릭터 파일. 없으면 기본 캐릭터 "포피". docs/CHARACTER.md
 
 [user]
 plan = "Claude Pro"               # 내 요금제 — 혜택·크레딧 대상 여부 판단 기준
@@ -88,7 +88,7 @@ holidays = true                    # source = "ics"·"caldav"일 때 대한민�
 [caldav]                           # source = "caldav"일 때. 설정 창(트레이 > 설정 바꾸기)에서 넣는 게 편해요
 server = "https://caldav.icloud.com"
 user = ""                          # Apple 계정 이메일
-password = ""                      # 「앱 암호」 xxxx-xxxx-xxxx-xxxx (Apple 계정 비밀번호 아님). account.apple.com에서 만들고 지움
+password = ""                      # 「앱 암호」 (Apple 계정 비밀번호 아님). 넣으면 Windows 자격 증명 관리자로 옮기고 이 칸은 비움
 calendars = []                     # 읽을 캘린더 [{ name, url }] — 설정 창의 「연결 확인」이 채워 줌
 
 [timetree]                         # source = "timetree"일 때
@@ -106,7 +106,7 @@ lon = 126.98
 enabled = false
 host = "imap.gmail.com"            # 네이버 imap.naver.com · 다음 imap.daum.net · 카카오 imap.kakao.com
 user = ""                          # 예: you@example.com
-password = ""                      # Gmail은 "앱 비밀번호" 16자리 (일반 비밀번호 아님)
+password = ""                      # Gmail은 "앱 비밀번호" 16자리. 넣으면 Windows 자격 증명 관리자로 옮기고 이 칸은 비움
 vip = []                           # 무조건 알릴 보낸사람 (이름·주소 일부). 예: ["boss@example.com", "국세청"]
 keywords = []                      # 제목에 있으면 무조건 알림. 예: ["긴급", "결제 실패"]
 ignore = []                        # 무조건 무시할 보낸사람. 예: ["newsletter@", "noreply@shop"]
@@ -124,6 +124,10 @@ interests = []                     # 예: ["ai-coding", "data-science"] — ai-c
 card_tags = false                  # true면 펼친 카드에서 관심사 태그를 고칠 수 있어요 (그 카드에만 저장)
 
 # 내가 더한 소식 출처 — 형식은 예전과 같다 (name·url·group·max_chars·skip·topic, 관심사를 정하려면 interest = "…")
+
+# 하루 한 번 GitHub에서 최신 버전 번호만 확인해 새 버전을 알려 줍니다. 끄려면 false
+[update]
+check = true
 
 [llm]
 provider = "claude"   # 브리핑 쓸 AI: "claude"(Claude 구독, claude CLI) | "codex"(ChatGPT 구독, Codex CLI) | "gemini"(Gemini CLI)

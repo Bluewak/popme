@@ -1,0 +1,10 @@
+# 패키지로 배포하지 않는다 (릴리스 zip + install.bat) — 개발 도구 설정만 둔다. 버전은 popme/__init__.py
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 140
+
+[tool.ruff.lint]
+select = ["E9", "F"]   # 문법 오류와 실제 버그(안 쓴 import·없는 이름)만. 모양은 맞추지 않는다

@@ -6,7 +6,7 @@
 [persona]
 name = "포피"              # 말풍선 이름표·메뉴에 쓰임. 비우면 이름표 없음
 intro = "차분하고 다정한 방울"  # 설정 창 카드의 소개
-images = "assets/characters/poppy"  # 이미지 폴더 (pet.png 외). 비우면 assets
+images = "characters/poppy"  # 이미지 폴더 (pet.png 외). 비우면 내 이미지 폴더(%LOCALAPPDATA%\POPME\assets)
 call_user = ""             # 사용자 호칭 (예: "주인님"). 대사에서 {user}로 씀
 # 아침 브리핑 때 Claude에게 '오늘의 멘트'를 만들게 할 때 주는 말투 설명
 prompt = """너는 데스크톱 비서 캐릭터 '포피'다. 사용자를 돕는 차분하고 다정한 비서다.

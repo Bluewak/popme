@@ -31,13 +31,13 @@ BLOCKED_FILES = [
     "assets/backup/*", "docs/bubble_mockups.png",
     "*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp", "*.ico",  # 이미지는 아래 허용 목록에 있는 것만
 ]
-# 캐릭터 파일은 공개 예시(character.example.toml)만. 그 밖의 *.toml 캐릭터는 개인 것
-ALLOWED_TOML = {"config.example.toml", "character.example.toml"}
+# 캐릭터 파일은 공개 기본값(popme/defaults)만. 그 밖의 *.toml 캐릭터는 개인 것
+ALLOWED_TOML = {"pyproject.toml"}
 # 앱이 챙기는 소식 출처·관심사 목록 (개인 설정 아님 — 내용의 개인 단어 검사는 그대로 한다)
-ALLOWED_TOML_PATHS = ["character.*.example.toml", "popme/feeds.toml", "popme/profiles/*.toml", "popme/taxonomy.toml", "popme/personas/*.toml"]
-ALLOWED_IMAGES = ["assets/characters/*/pet*.png"]  # 공개해도 되는 이미지 (직접 만든 기본 캐릭터 그림)
+ALLOWED_TOML_PATHS = ["popme/defaults/*.toml", "popme/feeds.toml", "popme/profiles/*.toml", "popme/taxonomy.toml", "popme/personas/*.toml"]
+ALLOWED_IMAGES = ["popme/defaults/characters/*/pet*.png"]  # 공개해도 되는 이미지 (직접 만든 기본 캐릭터 그림)
 SKIP_CONTENT = {".gitignore"}  # 올리지 않을 파일 이름을 적는 곳이라 단어 검사에서 뺀다
-TEXT_EXT = {".py", ".md", ".toml", ".html", ".ps1", ".txt", ".json", ".yml", ".yaml", ".js", ".css", ".cfg", ""}
+TEXT_EXT = {".py", ".md", ".toml", ".html", ".ps1", ".txt", ".json", ".yml", ".yaml", ".js", ".css", ".cfg", ".lock", ""}
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 EMAIL_OK = re.compile(r"(users\.noreply\.github\.com|@example\.(com|org)|noreply@)", re.I)
 MAX_BYTES = 5 * 1024 * 1024

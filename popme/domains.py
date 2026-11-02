@@ -1,7 +1,7 @@
 """분야 페르소나: 그 분야를 오래 본 한 사람의 상세 프로필 (설계 4-8).
 
 일 페르소나(질문 설계자·편집자·취향 분석가 …, popme/personas)가 「이 사람의 눈으로」 일하게 지시문에 붙인다.
-묶음이 있는 분야는 조사해서 확인한 프로필(popme/domains/<묶음 id>.json), 새 분야는 앱이 프로필 작가 페르소나로 그 자리에서
+묶음이 있는 분야는 조사해서 확인한 프로필(popme/domain_profiles/<묶음 id>.json), 새 분야는 앱이 프로필 작가 페르소나로 그 자리에서
 펼쳐 %LOCALAPPDATA%\\POPME\\domains\\<관심사 id>.json에 둔다 (다음부터 재사용).
 """
 import json
@@ -11,7 +11,7 @@ import re
 from popme import config
 
 log = logging.getLogger(__name__)
-REPO_DIR = config.ROOT / "popme" / "domains"
+REPO_DIR = config.ROOT / "popme" / "domain_profiles"
 LOCAL_DIR = config.DATA_DIR / "domains"
 KEYS = ["persona", "fan_types", "categories", "cares", "dislikes", "sensitive", "vocabulary", "calendar", "must_know",
         "personal", "question_ideas"]

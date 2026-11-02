@@ -1,4 +1,4 @@
-"""분야 카드 만들기 (개발 도구, 설계 4-9): 분야 페르소나(popme/domains/<id>.json) + 정보 지형 조사(local/research/landscape/<id>.json).
+"""분야 카드 만들기 (개발 도구, 설계 4-9): 분야 페르소나(popme/domain_profiles/<id>.json) + 정보 지형 조사(local/research/landscape/<id>.json).
 
 조사의 수집 힌트(X 몫·로그인 권유·꼭 필요한 출처·시기)는 그대로 옮기고, 조사의 「소식 종류별 유통기한」은 이름이 페르소나의
 소식 종류와 달라서 AI(구독 CLI, popme.chat)에게 짝지어 달라고 한다. 결과는 그 자리의 페르소나 파일에 info·half_life로 더한다.

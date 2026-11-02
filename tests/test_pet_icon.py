@@ -4,12 +4,12 @@ import os
 import pytest
 from PIL import Image
 
-from popme import pet
+from popme import config, pet
 
 
 @pytest.fixture
 def assets(tmp_path, monkeypatch):
-    monkeypatch.setattr(pet, "ASSETS", tmp_path)
+    monkeypatch.setattr(config, "ASSETS_DIR", tmp_path)
     monkeypatch.setattr(pet, "_refresh_shell_icons", lambda: None)
     return tmp_path
 

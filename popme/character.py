@@ -1,7 +1,7 @@
 """캐릭터의 말과 표정 고르기. 이름·말투·멘트·수치는 캐릭터 파일(TOML)에서 읽는다.
 
-캐릭터 파일: config.toml [character] file (기본 character.toml) → 없으면 character.example.toml.
-개인 캐릭터 파일은 .gitignore로 저장소에서 빠진다.
+캐릭터 파일: config.toml [character] file (기본 character.toml).
+내가 만든 것(DATA_DIR) → 기본 캐릭터(popme/defaults) → 없으면 character.example.toml.
 """
 import ctypes
 import random
@@ -40,6 +40,7 @@ LINE_DEFAULTS = {
     "collecting_hint": ["전용 Chrome 창으로 소식을 모으는 중이에요. 끝나면 저절로 멈추니 창은 닫지 말아 주세요."],
     "collect_busy": ["지금 모으는 중이에요. {status}"],
     "chrome_closed": ["Chrome 창이 닫혀서 이번엔 일부만 모았어요. 다시 모을까요?"],
+    "update": ["새 버전 {version}이 나왔어요. 트레이 메뉴의 「새 버전 받기」에서 받을 수 있어요."],
 }
 WEATHER_ADVICE_DEFAULTS = {"snow": "미끄럼 조심하세요.", "rain": "우산 챙기세요.", "hot": "물 챙기세요.",
                            "cold": "따뜻하게 입으세요.", "gap": "겉옷 챙기세요.", "nice": "좋은 날이에요.", "cloudy": ""}
@@ -47,8 +48,10 @@ WEATHER_ADVICE_DEFAULTS = {"snow": "미끄럼 조심하세요.", "rain": "우산
 
 def character_path():
     name = config.load().get("character", {}).get("file", "character.toml")
-    p = config.ROOT / name
-    return p if p.exists() else config.ROOT / "character.example.toml"
+    for folder in (config.DATA_DIR, config.DEFAULTS_DIR):
+        if (folder / name).exists():
+            return folder / name
+    return config.DEFAULTS_DIR / "character.example.toml"
 
 
 class LASTINPUTINFO(ctypes.Structure):
@@ -94,7 +97,7 @@ class Character:
         self.beh = self.cfg["behavior"]
         p = self.cfg.get("persona", {})
         self.name, self.user = p.get("name", "포피"), p.get("call_user", "")
-        self.images = p.get("images", "")  # 이미지 폴더 (없으면 assets)
+        self.images = p.get("images", "")  # 이미지 폴더 (없으면 내 이미지 폴더)
         self.ui = {k: v.format(name=self.name, user=self.user, n="{n}", msg="{msg}")
                    for k, v in {**UI_DEFAULTS, **self.cfg.get("ui", {})}.items()}
         self.advice = {**WEATHER_ADVICE_DEFAULTS, **self.cfg.get("weather_advice", {})}
