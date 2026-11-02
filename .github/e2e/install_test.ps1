@@ -71,6 +71,10 @@ try {
     $sc = (New-Object -ComObject WScript.Shell).CreateShortcut($startup)
     $sc.TargetPath = "notepad.exe"; $sc.WorkingDirectory = $old; $sc.Save()
 
+    # 새 버전 알림: GitHub에 묻지 않고 오늘 이미 확인한 것처럼 둔다 (앱이 켜지고 60초 뒤에 말한다)
+    New-Item -ItemType Directory -Force $data | Out-Null
+    Write-Utf8 (Join-Path $data "update-check.json") ('{"day": "' + (Get-Date -Format "yyyy-MM-dd") + '", "tag": "v99.0.0"}')
+
     # ── README 「설치」: 더블클릭과 같게 cmd로. 마지막 pause는 빈 입력으로 넘긴다 ──
     $inst = Start-Process cmd.exe -ArgumentList "/c install.bat <NUL >`"$out\install-console.txt`" 2>&1" -WorkingDirectory $root -PassThru
     $setup = Wait-Until "설정 창 또는 설치 종료" 1200 {
@@ -110,6 +114,13 @@ try {
     Check "시작프로그램이 새 폴더를 가리킴" ($sc.WorkingDirectory.TrimEnd('\') -eq $root.TrimEnd('\'))
     Check "바로가기 아이콘이 데이터 폴더를 가리킴" ($sc.IconLocation -like "$data*")
 
+    # ── 새 버전 알림: 말풍선과 트레이 메뉴까지 실제 앱에서 ──
+    Wait-Until "새 버전 알림" 120 { Select-String -Path (Join-Path $data "popme.log") -Pattern 'v99.0.0' -SimpleMatch -Quiet } | Out-Null
+    Start-Sleep 2
+    Shot "3-update-notice"
+    Check "알림 뒤에도 로그에 오류 없음" (-not (Select-String -Path (Join-Path $data "popme.log") -Pattern 'Traceback' -SimpleMatch -Quiet))
+    Copy-Item (Join-Path $data "popme.log"), (Join-Path $data "install.log") $out   # 제거하면 데이터 폴더가 없어진다
+
     # ── README 「지우기」: 데이터까지 ──
     $un = Start-Process cmd.exe -ArgumentList "/c (echo y)| uninstall.bat >`"$out\uninstall-console.txt`" 2>&1" -WorkingDirectory $root -PassThru
     Wait-Until "제거 끝" 120 { $un.HasExited } | Out-Null
@@ -119,5 +130,5 @@ try {
     Check "저장한 비밀번호 지워짐" ("$(cmdkey /list)" -notlike "*POPME/mail*")
     Write-Host "모두 통과"
 } finally {
-    Copy-Item (Join-Path $data "popme.log"), (Join-Path $data "install.log") $out -ErrorAction SilentlyContinue
+    if (Test-Path $data) { Copy-Item (Join-Path $data "popme.log"), (Join-Path $data "install.log") $out -ErrorAction SilentlyContinue }
 }
