@@ -73,6 +73,8 @@ def why(e):
         return "Chrome 창이 닫혔어요"
     if "net::err_internet_disconnected" in s or "getaddrinfo" in s or "urlopen error" in s or "network" in s:
         return "인터넷 연결이 불안정했어요"
+    if "net::err_aborted" in s:
+        return "페이지를 여는 도중에 끊겼어요"
     if "timeout" in s or "timed out" in s:
         return "페이지가 너무 오래 걸렸어요"
     if any(k in s for k in ("limit", "quota", "429", "rate")):
