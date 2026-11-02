@@ -105,6 +105,13 @@
   details.quiet { margin-top: 10px; }
   details.quiet input[type=time] { width: 140px; }
   #mail-host-note:empty { display: none; }
+  /* 캐릭터: 고르기 또는 새로 만들기 (이름 → 호칭 → 말투 → 모습 → 대사) */
+  #char-form h2.first { margin-top: 2px; }
+  #char-cards .card { text-align: center; }
+  #char-cards img { display: block; width: 72px; height: 72px; object-fit: contain; margin: 0 auto 2px; }
+  #char-face { width: 64px; height: 64px; object-fit: contain; }
+  #char-samples { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+  #char-samples:empty { display: none; }
   /* 관심사: ① 카드 고르기·직접 입력 → (관심사마다) 범위 › 사람 › 기업 › 궁금한 것 › 확인 */
   .icard { display: flex; gap: 10px; align-items: flex-start; }
   .icard .ck { flex: none; width: 20px; height: 20px; border: 2px solid var(--line); border-radius: 6px; margin-top: 2px; background: #fff;
@@ -319,13 +326,33 @@
   <!-- 관심사 (설계 4장) — 로그인 다음: ⑥에서 X 계정을 확인하려면 로그인이 먼저 -->
   <section data-step="관심사"><div id="int-sub" class="isub hidden"></div><div id="int-body"></div></section>
 
+  <!-- 캐릭터: 있는 캐릭터를 고르거나 새로 만든다 (popme/charmaker.py) -->
+  <section data-step="캐릭터">
+    <h1>어떤 캐릭터와 지낼까요?</h1>
+    <p class="lead">그대로 써도 되고, 이름과 말투를 정해 새로 만들 수도 있어요.</p>
+    <div class="cards two" id="char-cards"></div>
+    <div id="char-form" class="box hidden" style="margin-top:10px">
+      <h2 class="first">① 이름</h2>
+      <div class="row"><input type="text" id="char-name" maxlength="12" placeholder="예: 모모" autocomplete="off"></div>
+      <h2>② 나를 뭐라고 부를까요?</h2>
+      <div class="row"><input type="text" id="char-user" maxlength="12" placeholder="예: 주인님 (비워 두면 호칭 없이)" autocomplete="off"></div>
+      <h2>③ 말투</h2>
+      <div class="chips" id="char-tones"></div>
+      <div class="row"><input type="text" id="char-detail" maxlength="80" placeholder="더 적고 싶은 설정 (예: 커피를 좋아하는 바리스타, 부산 사투리)" autocomplete="off"></div>
+      <h2>④ 모습 <small style="display:inline">(없어도 돼요)</small></h2>
+      <div class="row"><img id="char-face" class="hidden" alt=""><button id="char-image">이미지 고르기</button></div>
+      <small class="hint" id="char-image-hint">흰 배경은 저절로 지워요. 없으면 기본 방울 모양으로 나와요.</small>
+      <h2>⑤ 대사</h2>
+      <small class="hint">인사·날씨·메일 알림 같은 대사를 AI가 이 말투로 써요. 설정을 바꾸면 다시 만들어 주세요.</small>
+      <div class="row"><button id="char-make">대사 만들기</button></div>
+      <div id="char-msg" class="msg"></div>
+      <div id="char-samples"></div>
+    </div>
+  </section>
+
   <!-- 4. 마무리 -->
   <section data-step="마무리">
     <h1>거의 다 됐어요</h1>
-    <div id="char-box" class="hidden">
-      <h2>캐릭터</h2>
-      <div class="cards two" id="char-cards"></div>
-    </div>
     <h2>아침 브리핑 시각</h2>
     <div class="row"><input type="time" id="time"> <span class="hint" style="display:inline">이후 PC가 켜져 있으면 자동으로 모아서 알려 줘요</span></div>
     <h2>날씨 지역</h2>
@@ -507,13 +534,19 @@ function init() {
     mailView();
   }
 
+  // 캐릭터
+  $("#char-cards").append(...D.characters.map(c => el("label", { className: "card", innerHTML:
+    `<input type="radio" name="char" value="${esc(c.file)}">${c.image ? `<img src="../../${esc(c.image)}" alt="">` : ""}<b>${esc(c.name)}</b><small>${esc(c.intro || c.file)}</small>` })),
+    el("label", { className: "card", innerHTML: `<input type="radio" name="char" value="${CHAR_NEW}"><b>+ 새로 만들기</b><small>이름과 말투를 정해요</small>` }));
+  setRadio("char", D.character);
+  document.querySelectorAll("input[name=char]").forEach(r => r.onchange = charView);
+  $("#char-tones").append(...Object.entries(D.tones).map(([k, name], i) => el("label", { className: "chip" },
+    el("input", { type: "radio", name: "char-tone", value: k, checked: !i, onchange: charView }), name)));
+  ["char-name", "char-user", "char-detail"].forEach(id => $("#" + id).addEventListener("input", charView));
+  $("#char-make").onclick = charMake;
+  $("#char-image").onclick = charImage;
+
   // 마무리
-  if (D.characters.length > 1) {
-    $("#char-box").classList.remove("hidden");
-    $("#char-cards").append(...D.characters.map(c => el("label", { className: "card", innerHTML:
-      `<input type="radio" name="char" value="${c.file}"><b>${c.name}</b><small>${c.file}</small>` })));
-    setRadio("char", D.character);
-  }
   $("#time").value = D.briefing_after;
   $("#winloc").checked = D.use_windows_location;
   $("#place").value = D.place;
@@ -998,6 +1031,58 @@ function intRender() {
   nav();
 }
 
+
+// --- 캐릭터: 새로 만들기. 대사(draft)는 만들 때의 설정(sig)과 같을 때만 쓴다 ---
+const CHAR_NEW = "__new__";
+const CHAR = { draft: null, sig: "", failed: "", busy: false };
+const charNew = () => radio("char") === CHAR_NEW;
+const charInfo = () => ({ name: $("#char-name").value.trim(), call_user: $("#char-user").value.trim(), tone: radio("char-tone"), detail: $("#char-detail").value.trim() });
+const charSig = () => JSON.stringify(charInfo());
+const charDrafted = () => !!CHAR.draft && CHAR.sig === charSig();
+function charView() {
+  $("#char-form").classList.toggle("hidden", !charNew());
+  if (CHAR.draft && !charDrafted()) {
+    CHAR.draft = null;
+    $("#char-samples").replaceChildren();
+    say($("#char-msg"), "설정이 바뀌었어요. 대사를 다시 만들어 주세요.", "warn-t");
+  }
+  $("#char-make").textContent = charDrafted() ? "다시 만들기" : "대사 만들기";
+  $("#char-make").disabled = CHAR.busy;
+  nav();
+}
+async function charMake() {
+  const info = charInfo();
+  if (!info.name) { $("#char-name").focus(); return say($("#char-msg"), "이름을 넣어 주세요.", "err-t"); }
+  const sig = charSig(), start = Date.now();
+  CHAR.busy = true; CHAR.draft = null; CHAR.failed = "";
+  $("#char-samples").replaceChildren();
+  charView();
+  const wait = () => say($("#char-msg"), `${info.name}의 대사를 쓰는 중이에요… ${Math.round((Date.now() - start) / 1000)}초째 · 보통 1분쯤`);
+  wait();
+  const tick = setInterval(wait, 1000);
+  const r = await api().character_draft(info, radio("ai"));
+  clearInterval(tick);
+  CHAR.busy = false;
+  if (r.ok && sig === charSig()) {
+    CHAR.draft = r; CHAR.sig = sig;
+    say($("#char-msg"), "이렇게 말해요. 마음에 안 들면 다시 만들 수 있어요.", "ok-t");
+    $("#char-samples").replaceChildren(...r.samples.map(t => el("div", { className: "bubble ai", textContent: t })));
+  } else if (!r.ok) {
+    CHAR.failed = sig;
+    say($("#char-msg"), r.error, "err-t");
+  } else say($("#char-msg"), "설정이 바뀌었어요. 대사를 다시 만들어 주세요.", "warn-t");
+  charView();
+}
+async function charImage() {
+  const r = await api().character_image();
+  if (r.error) return say($("#char-msg"), r.error, "err-t");
+  if (!r.ok) return;
+  $("#char-face").src = r.preview;
+  $("#char-face").classList.remove("hidden");
+  $("#char-image").textContent = "다른 이미지 고르기";
+  if (D.pet_image) $("#char-image-hint").textContent = "저장하면 지금 이미지는 assets\\backup 폴더로 옮겨 둬요.";
+}
+const charPayload = () => charNew() ? { ...charInfo(), ...(CHAR.draft ? { lines: CHAR.draft.lines, ui: CHAR.draft.ui } : {}) } : null;
 
 // --- 「생각 중」: 기다리는 동안 캐릭터가 살랑이고, 생각 말풍선의 한 줄이 바뀐다 (실제로 읽는 헤드라인도) ---
 let thinkTimer = null;
@@ -1518,6 +1603,7 @@ function canNext() {
   if (name === "캘린더") return !!calMode();
   if (name === "메일") return !!radio("mail-on");
   if (name === "관심사") return intCanNext();
+  if (name === "캐릭터") return !CHAR.busy;
   return true;
 }
 function nav() {
@@ -1527,7 +1613,8 @@ function nav() {
                                                               : INT.onlyNew && !INT.customs.length);
   const tasteDue = name === "관심사" && INT && intCur() && intSubName() === "taste" && tastePending(INT.data[intCur().key]);
   nx.textContent = tasteDue ? "취향 정리" : name === "마무리" || intLast ? "저장" : name === "끝" ? (D.exists ? "지금 한 번 모아 보기" : "첫 브리핑 받아 보기")
-                 : later ? "나중에 하기" : name === "메일" && D.mail.supported && !mailReady() ? "연결 확인하고 다음" : "다음";
+                 : later ? "나중에 하기" : name === "메일" && D.mail.supported && !mailReady() ? "연결 확인하고 다음"
+                 : name === "캐릭터" && charNew() && !charDrafted() && CHAR.failed !== charSig() ? "대사 만들기" : "다음";
   nx.className = later ? "later" : "primary";  // 아직 안 됐어도 넘어갈 수는 있지만 덜 눈에 띄게
   nx.disabled = !canNext();
   $("#prev").textContent = name === "끝" ? "닫기" : "이전";
@@ -1584,6 +1671,7 @@ async function next() {
       say($("#msg"), "");
     }
   }
+  if (name === "캐릭터" && charNew() && !charDrafted() && CHAR.failed !== charSig()) return charMake();  // 만든 대사를 보여 준 뒤 넘어간다
   if (name === "관심사" && !await intNext()) return;
   if (D.mode) return intSaveMode();  // 「관심사」만 연 창: 여기서 저장하고 닫는다
   if (name !== "마무리") return go(step + 1);
@@ -1595,7 +1683,7 @@ async function next() {
     caldav: { user: $("#dav-user").value, password: $("#dav-pw").value, calendars: davChosen() },
     mail: D.mail.supported ? { enabled: radio("mail-on") === "1", host: mailHost(), user: mailUser(),
                                password: $("#mail-pw").value, quiet_hours: quietHours() } : null,
-    character: radio("char") || D.character, briefing_after: $("#time").value,
+    character: charNew() ? D.character : radio("char") || D.character, new_character: charPayload(), briefing_after: $("#time").value,
     use_windows_location: $("#winloc").checked, place: $("#place").value,
     interests: intPayload(),
   });

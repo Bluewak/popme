@@ -724,7 +724,7 @@ def main(restart=False):
         ("설정 바꾸기", bg(open_settings)),
         ("종료", quit_app),
     ]
-    images = load_images()
+    images = load_images(api._char.images)
     try:
         write_icon(images["idle"])  # 이미지를 바꿨으면 바로가기 아이콘도
     except OSError:

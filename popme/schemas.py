@@ -36,6 +36,13 @@ class PrivacyVerdict(BaseModel):
     _reason = field_validator("reason", mode="before")(_text(60))
 
 
+class CharacterDraft(BaseModel):
+    """대사 작가 (popme/personas/character_writer.toml). 칸별 검사는 popme/charmaker.py."""
+    model_config = ConfigDict(extra="ignore")
+    lines: dict[str, list[str]]
+    ui: dict[str, str] = {}
+
+
 class Verdict(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str

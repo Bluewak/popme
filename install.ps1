@@ -163,8 +163,10 @@ function Install-Popme {
     if ($prev -and ($prev.TrimEnd('\') -ne $root.TrimEnd('\')) -and (Test-Path (Join-Path $prev "config.toml")) -and
         -not (Test-Path (Join-Path $root "config.toml"))) {
         Step "예전 설치($prev)의 설정 가져오기"
-        $files = @("config.toml", "character.toml") + @(Get-ChildItem (Join-Path $prev "assets") -Filter "pet*" -File -ErrorAction SilentlyContinue |
-                                                        ForEach-Object { "assets\" + $_.Name })
+        $files = @("config.toml", "character.toml") +
+                 @(Get-ChildItem $prev -Filter "character-*.toml" -File -ErrorAction SilentlyContinue | ForEach-Object { $_.Name }) +
+                 @(Get-ChildItem (Join-Path $prev "assets") -Filter "pet*" -File -ErrorAction SilentlyContinue |
+                   ForEach-Object { "assets\" + $_.Name })
         foreach ($f in $files) {
             $src = Join-Path $prev $f; $dst = Join-Path $root $f
             if ((Test-Path $src) -and -not (Test-Path $dst)) { Copy-Item $src $dst; Write-Host "가져옴: $f" }
