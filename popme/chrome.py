@@ -10,6 +10,7 @@ import os
 import subprocess
 import time
 import urllib.request
+import uuid
 from pathlib import Path
 
 from popme.config import CHROME_PROFILE
@@ -85,12 +86,15 @@ def _window_state(page):
 
 def new_page(ctx):
     """새 탭. ctx.new_page()는 최소화된 창을 다시 띄워서, 창이 최소화돼 있으면 배경 탭으로 연다.
-    (배경 탭도 렌더링 끄는 실행 옵션 덕에 스크롤·로딩이 돈다)"""
+    (배경 탭도 렌더링 끄는 실행 옵션 덕에 스크롤·로딩이 돈다)
+    수집 스레드들이 동시에 열어도 스레드마다 연결이 달라 서로의 새 탭 소식을 모두 받는다 → 주소 표식으로 자기 탭만 받는다
+    (안 그러면 둘이 같은 탭을 받아 서로의 이동을 끊고, 먼저 실패한 쪽이 탭을 닫아 나머지까지 ERR_ABORTED로 실패한다)."""
     try:
         if ctx.pages and _window_state(ctx.pages[0]) == "minimized":
-            with ctx.expect_page() as info:
+            mark = f"about:blank#popme-{uuid.uuid4().hex}"
+            with ctx.expect_page(lambda page: page.url == mark) as info:
                 ctx.browser.new_browser_cdp_session().send(
-                    "Target.createTarget", {"url": "about:blank", "background": True})
+                    "Target.createTarget", {"url": mark, "background": True})
             return info.value
     except Exception as e:
         log.warning("배경 탭 열기 실패: %s", e)

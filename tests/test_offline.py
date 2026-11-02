@@ -67,6 +67,12 @@ def test_fail_says_offline_not_x_changed(monkeypatch):
     assert msg == "인터넷이 끊겨서 X는 이번에 못 모았어요"
 
 
+def test_fail_says_page_interrupted_not_unknown(monkeypatch):
+    j = make(monkeypatch, {"up": True})
+    msg = j._fail("Threads", RuntimeError("Page.goto: net::ERR_ABORTED; maybe frame was detached?"))
+    assert msg == "Threads 수집 실패: 페이지를 여는 도중에 끊겼어요"
+
+
 def test_morning_waits_for_internet_then_runs_and_retries(monkeypatch):
     net = {"up": False}
     j = make(monkeypatch, net)
