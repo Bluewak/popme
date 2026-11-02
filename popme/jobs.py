@@ -6,8 +6,8 @@ import threading
 import time
 from datetime import datetime
 
-from popme import briefing, catalog, chrome, config, discovery, event_weather, llm, sources
-from popme.collectors import NeedLogin, caldav, ics, threads, timetree, x
+from popme import briefing, catalog, chrome, config, discovery, event_weather, fieldscale, llm, sources
+from popme.collectors import NeedLogin, caldav, ics, threads, timetree, x, youtube
 from popme.db import DB
 
 log = logging.getLogger(__name__)
@@ -73,6 +73,8 @@ def why(e):
         return "Chrome 창이 닫혔어요"
     if "net::err_internet_disconnected" in s or "getaddrinfo" in s or "urlopen error" in s or "network" in s:
         return "인터넷 연결이 불안정했어요"
+    if "net::err_aborted" in s:
+        return "페이지를 여는 도중에 끊겼어요"
     if "timeout" in s or "timed out" in s:
         return "페이지가 너무 오래 걸렸어요"
     if any(k in s for k in ("limit", "quota", "429", "rate")):
@@ -133,12 +135,18 @@ class Jobs:
 
         th = threading.Thread(target=threads_job, daemon=True)
         th.start()
+        videos = [f for f in catalog.active(self.cfg) if f.get("type") == "youtube"]
+        yt = threading.Thread(target=self._collect_youtube, args=(port, videos, warnings, progress("youtube")), daemon=True)
+        if videos:  # 유튜브도 사이트가 달라 동시에 (탭 하나)
+            yt.start()
         try:
             self._with_browser(port, lambda ctx: self._collect_calendar_x(ctx, warnings, progress("x")))
         except Exception as e:  # 붙기 전에 Chrome이 닫혔을 때 등 — 나머지(RSS·브리핑)는 이어서
             log.exception("X 실패")
             warnings.append(self._fail("X", e))
         th.join()
+        if videos:
+            yt.join()
 
     def _minimizing(self):
         """수집 중 전용 Chrome 창을 내려 둘까 (기본 켜짐 — config [chrome] minimize_while_collecting). 로그인 창은 해당 없음."""
@@ -195,6 +203,7 @@ class Jobs:
             x.collect(ctx, self.cfg, handles, progress, since, users, on_batch=self._saver(users))
             self.db.upsert_profiles(list(users.values()))  # 새 글 없이 끝난 페이지의 계정 규모도
             discovery.update(self.db, handles, self.cfg)
+            self._calibrate()
             self._check_candidates("x", ctx, warnings, progress)
         except NeedLogin as e:
             warnings.append(str(e))
@@ -218,6 +227,32 @@ class Jobs:
             log.exception("Threads 실패")
             warnings.append(self._fail("Threads", e))
         progress("Threads 완료")
+
+    def _collect_youtube(self, port, feeds, warnings, progress):
+        """유튜브 채널 새 영상 (popme/collectors/youtube.py) → RSS 글과 같은 표에."""
+        try:
+            since = briefing.window_start(self.db)
+            items = []
+
+            def run(ctx):
+                got, errs = youtube.collect(ctx, feeds, progress, since)
+                items.extend(got)
+                warnings.extend(f"유튜브 실패 — {e}" for e in errs)
+            self._with_browser(port, run)
+            self.db.upsert_items(items)
+        except Exception as e:
+            log.exception("유튜브 실패")
+            warnings.append(self._fail("유튜브", e))
+
+    def _calibrate(self):
+        """분야 발굴 기준 보정 (popme/fieldscale.py): 매주, 또는 기준이 아직 없는 관심사가 있으면 바로 — 방금 모은 계정 팔로워로."""
+        try:
+            if fieldscale.due() or fieldscale.missing(self.cfg):
+                done = fieldscale.calibrate(self.db, self.cfg)
+                if done:
+                    log.info("분야 발굴 기준 보정: %s", ", ".join(done))
+        except Exception:
+            log.exception("분야 발굴 기준 보정 실패")
 
     def _saver(self, users):
         def save(batch):

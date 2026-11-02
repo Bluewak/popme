@@ -244,10 +244,12 @@ def test_clean_questions_follows_template():
 
 def test_questions_never_ask_private_things():
     raw = {"type": "기타", "questions": [{"slot": "범위", "text": "지지 정당은?", "options": ["가", "나"]},
-                                        {"slot": "대상", "text": "관심 대상은?", "options": ["종교 단체 A", "B"]}]}
+                                        {"slot": "대상", "text": "관심 대상은?", "options": ["종교 단체 A", "B", "C"]}]}
     out = interests.clean_questions(raw, "target")
     assert all("정당" not in q["text"] for q in out["questions"])
-    assert out["questions"][1]["options"] == []  # 묻지 않는 것이 섞인 질문은 버리고 고정 질문으로
+    assert [o["label"] for o in out["questions"][1]["options"]] == ["B", "C"]  # 묻지 않는 보기만 빼고
+    raw["questions"][1]["options"] = ["종교 단체 A", "B"]
+    assert interests.clean_questions(raw, "target")["questions"][1]["options"] == []  # 절반 이상이 그런 보기면 질문을 버리고 고정 질문으로
 
 
 def test_questions_uses_headlines_and_checks_targets(monkeypatch):
@@ -344,10 +346,11 @@ def test_target_options_point_to_real_feeds_and_companies():
     for p in catalog.profiles():
         if p.get("custom"):
             continue
-        assert p.get("target", {}).get("options"), p["id"]
+        assert catalog.target_options(p), p["id"]
         used = {e["id"] for e in p["feeds"]}
         names = {e["name"] for e in p.get("companies", [])}
-        for o in p["target"]["options"]:
+        assert set(p["target"].get("options_by", {})) <= {x["label"] for x in p.get("subs", [])}, p["id"]
+        for o in catalog.target_options(p):
             assert set(o.get("feeds", [])) <= used & set(feeds), (p["id"], o["label"])
             assert set(o.get("companies", [])) <= names, (p["id"], o["label"])
 
@@ -389,3 +392,39 @@ def test_preset_view_and_save_uses():
     assert saved["news"]["picks"]["ai-coding"]["uses"] == ["Claude Code", "Codex", "Zed"]
     view = interests.preset_view("ai-coding", saved)
     assert [o["label"] for o in view["target"]["options"] if o["on"]] == ["Claude Code", "Codex", "Zed"]  # 직접 적은 것도
+
+
+# ---------------------------------------------------------------- 소분류 묶음: 세부·리그별 응원 팀 (설계 4-7)
+
+def test_pack_subs_filter_feeds_people_and_scope():
+    soccer = next(p for p in catalog.profiles() if p["id"] == "sports-soccer")
+    every = news(interests=["sports-soccer"])
+    assert catalog.subs(every, soccer) == ["해외축구", "K리그", "국가대표", "여자축구"]  # 고친 적 없으면 전부
+    assert catalog.scope(every, soccer) == "world"
+    names = {f["name"] for f in catalog.active(every)}
+    assert "인터풋볼 해외축구" in names
+    kl = news(interests=["sports-soccer"], picks={"sports-soccer": {"subs": ["K리그"], "uses": ["전북 현대"]}})
+    names = {f["name"] for f in catalog.active(kl)}
+    assert "인터풋볼 해외축구" not in names  # 고른 세부(K리그)의 출처만
+    assert catalog.scope(kl, soccer) == "kr"  # 국내 세부만 → 한국어 기사로
+    ents = catalog.entities(kl, soccer)
+    team = next(e for e in ents if e["name"] == "전북 현대")
+    assert team["kind"] == "target" and team["news"] == "전북 현대 축구"  # 고른 응원 팀도 뉴스로 받는다
+    assert all(catalog.in_subs(e, ["K리그"]) for e in ents if e["kind"] != "target")
+    crit = briefing.rules_for(kl)["criteria"]
+    assert "보는 범위: K리그만" in crit and "응원하는 팀: 전북 현대" in crit
+
+
+def test_pack_view_and_save_subs():
+    from popme import setup_window as sw
+    view = interests.preset_view("sports-soccer", news(interests=["sports-soccer"]))
+    assert [s["label"] for s in view["subs"] if s["on"]] == ["해외축구", "K리그", "국가대표", "여자축구"]
+    assert "K리그" in view["target"]["options_by"]
+    sw.write(sw.base_text())
+    assert sw.Api({"start": "edit", "pid": "sports-soccer"}).save_interests(
+        {"chosen": ["sports-soccer"], "picks": {"sports-soccer": {"subs": ["K리그"], "uses": ["전북 현대"]}}, "customs": []})["ok"]
+    saved = config.load()
+    assert saved["news"]["picks"]["sports-soccer"] == {"subs": ["K리그"], "uses": ["전북 현대"]}
+    view = interests.preset_view("sports-soccer", saved)
+    assert [s["label"] for s in view["subs"] if s["on"]] == ["K리그"]
+    assert [o["label"] for o in view["target"]["options_by"]["K리그"] if o["on"]] == ["전북 현대"]

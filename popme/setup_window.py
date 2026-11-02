@@ -387,7 +387,7 @@ def interest_choices(cfg):
         out.append({"id": p["id"], "name": p["name"], "tag": p["tag"], "summary": p.get("summary", ""),
                     "custom": bool(p.get("custom")), "count": len(on) or n_ent,
                     "examples": [feeds[i]["name"] for i in on[:3]] or [e["name"] for e in p.get("people", [])[:3]]})
-    return {"interests": out, "interests_on": [p["id"] for p in catalog.chosen(cfg)]}
+    return {"interests": out, "interests_on": [p["id"] for p in catalog.chosen(cfg)], "taxonomy": catalog.taxonomy()}
 
 
 def _check_url(url):
@@ -471,12 +471,15 @@ def validate_interests(it):
         out = {}
         if pk.get("scope") in ("kr", "world"):
             out["scope"] = pk["scope"]
-        for k in ("uses", "people", "companies", "topics"):
+        for k in ("subs", "uses", "people", "companies", "topics"):
             if k in pk:
                 out[k] = clean(pk[k], 40)
         if "extra" in pk:
             out["extra"] = [{k: str(e[k])[:40] for k in ("kind", "name", "why", "x", "region", "news", "news_en") if e.get(k)}
                             for e in pk["extra"][:10] if e.get("name")]
+        if isinstance(pk.get("taste"), dict):  # ④ 취향 문답 결과 → taste(한두 문장)·likes·less
+            t = taste_of(pk["taste"])
+            out.update(taste=t["summary"], likes=t["likes"], less=t["less"])
         picks[pid] = out
     customs = []
     for c in (it.get("customs") or [])[:5]:
@@ -484,7 +487,9 @@ def validate_interests(it):
         if not str(c.get("field") or "").strip() or not f:
             continue
         ans = c.get("answers") if isinstance(c.get("answers"), dict) else {}
-        customs.append({"field": str(c["field"]).strip()[:40], "scope": "kr" if c.get("scope") == "kr" else "world",
+        customs.append({"domain": c.get("domain") if isinstance(c.get("domain"), dict) else None,
+                        "taste": taste_of(c["taste"]) if isinstance(c.get("taste"), dict) else None,
+                        "field": str(c["field"]).strip()[:40], "scope": "kr" if c.get("scope") == "kr" else "world",
                         "lens": c.get("lens") if c.get("lens") in ("overview", "target", "both") else "target",
                         "type": str(c.get("type") or "기타")[:10],
                         "answers": {str(k)[:6]: clean(v, 20)[:10] for k, v in list(ans.items())[:3]},
@@ -496,11 +501,17 @@ def validate_interests(it):
     return {"interests": {"chosen": chosen, "picks": picks, "customs": customs}}
 
 
+def taste_of(t):
+    """④ 취향 문답 결과 정리: {summary(80자), likes·less(소식 종류 6개까지)}."""
+    names = lambda xs: [str(x)[:16] for x in (xs if isinstance(xs, list) else []) if str(x).strip()][:6]
+    return {"summary": str(t.get("summary") or "")[:80], "likes": names(t.get("likes")), "less": names(t.get("less"))}
+
+
 def apply_interests(text, ids, picks):
     """고른 관심사 + 미리 만든 관심사에서 고친 것(고친 칸만)을 config 텍스트에."""
     text = set_value(text, "news", "interests", ids, before=("llm",))
     for pid, pk in (picks or {}).items():
-        for k in ("uses", "scope", "people", "companies", "topics", "extra"):
+        for k in ("subs", "uses", "scope", "people", "companies", "topics", "extra", "taste", "likes", "less"):
             if k in pk:
                 text = set_value(text, f"news.picks.{pid}", k, pk[k], before=("llm",))
     return text
@@ -508,10 +519,17 @@ def apply_interests(text, ids, picks):
 
 def save_interest_choices(it):
     """관심사 단계 값(validate_interests 거친 것) 저장: 새 관심사 파일 → 고른 관심사·고친 칸. 반환: 고른 관심사 id."""
-    from popme import interests
-    made = [interests.save_custom(c["field"], c.get("scope", "world"), c.get("verified", []), c.get("topics", []),
-                                  c["final"], c.get("lens"), c.get("type"), c.get("answers"))
-            for c in it["customs"] if c.get("field") and c.get("final")]
+    from popme import fieldcard, interests
+    # 분야 카드가 화면에 없으면(사람 추천이 기다리다 넘어감) 뒤에서 끝난 것을 그때 받는다
+    made = []
+    for c in it["customs"]:
+        if not (c.get("field") and c.get("final")):
+            continue
+        pid = interests.save_custom(c["field"], c.get("scope", "world"), c.get("verified", []), c.get("topics", []),
+                                    c["final"], c.get("lens"), c.get("type"), c.get("answers"),
+                                    c.get("domain") or fieldcard.verified(c["field"], wait=0), c.get("taste"))
+        fieldcard.attach(c["field"], pid)  # 발굴 기준(대표 계정 팔로워)은 재는 대로 카드에
+        made.append(pid)
     return list(dict.fromkeys(it["chosen"] + made))
 
 
@@ -1001,13 +1019,25 @@ class Api:
         from popme import interests
         return interests.research(field)
 
-    def interest_questions(self, field, lens, provider, headlines=None):
+    def interest_questions(self, field, lens, provider, headlines=None, context=""):
         from popme import interests
-        return interests.questions(self._cfg(provider), field, lens, headlines)
+        return interests.questions(self._cfg(provider), field, lens, headlines, context)
 
-    def interest_suggest(self, field, scope, provider, lens=None, answers=None, headlines=None):
+    def interest_taste_heads(self, field, provider, domain=None, scope="world", subs=None, targets=None, extra=None, exclude=None, names=None):
+        """④ 취향 문답: 고른 세부·대상의 최근 소식에서 편집자가 고른 서로 다른 종류의 헤드라인 [{title, category, group}].
+        subs·targets: [{label, news, en, region}] 또는 이름."""
+        from popme import taste
+        return taste.headlines(self._cfg(provider), field, domain, scope, subs or [], targets or [], extra or [], exclude or [],
+                               names=names if isinstance(names, dict) else None)
+
+    def interest_taste(self, field, provider, domain=None, shown=None, liked=None, answers=None):
+        """④ 누른 헤드라인 → {likes, less, summary}. answers: ③까지 고른 것 (줄이지 않는다)."""
+        from popme import taste
+        return taste.analyze(self._cfg(provider), field, domain, shown or [], liked or [], answers or [])
+
+    def interest_suggest(self, field, scope, provider, lens=None, answers=None, headlines=None, context="", domain=None):
         from popme import interests
-        return interests.suggest(self._cfg(provider), field, scope, lens, answers, headlines)
+        return interests.suggest(self._cfg(provider), field, scope, lens, answers, headlines, context, domain)
 
     def interest_verify(self, entities, scope):
         from popme import interests

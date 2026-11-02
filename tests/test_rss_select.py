@@ -152,3 +152,54 @@ def test_fetch_reads_gzip_body(monkeypatch):
 ])
 def test_matches_topics(title, topic, want):
     assert topics.matches({"title": title, "summary": ""}, topic) is want
+
+
+def test_euc_kr_feed_is_read(monkeypatch):
+    """EUC-KR로 선언된 피드(스타뉴스 등)도 읽는다 — ElementTree는 멀티바이트 인코딩을 못 읽음."""
+    body = '<?xml version="1.0" encoding="euc-kr" ?><rss version="2.0"><channel><item><title>컴백 소식</title><link>https://e/1</link></item></channel></rss>'.encode("cp949")
+
+    class R:
+        headers = {}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+        def read(self):
+            return body
+    monkeypatch.setattr(rss.urllib.request, "urlopen", lambda req, timeout=20: R())
+    assert [i["title"] for i in rss.fetch({"name": "스타뉴스", "url": "https://e/rss"})] == ["컴백 소식"]
+
+
+def test_cookie_redirect_loop_retried_with_cookies(monkeypatch):
+    """쿠키를 심고 다시 보내는 곳(국토교통부 보도자료): 쿠키 없이 307이 반복되면 쿠키를 들고 새 요청으로 한 번 더."""
+    import urllib.error
+    body = '<rss><channel><item><title>9월 주택통계</title><link>https://m/1</link></item></channel></rss>'.encode()
+
+    def loop(req, timeout=20):
+        req.redirect_dict = {"x": 10}  # urllib가 첫 요청에 남기는 「들른 주소」 기록
+        raise urllib.error.HTTPError(req.full_url, 307, "loop", {}, None)
+
+    class R:
+        headers = {}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+        def read(self):
+            return body
+    seen = {}
+
+    class Opener:
+        def open(self, req, timeout=20):
+            seen["fresh"] = not hasattr(req, "redirect_dict")
+            return R()
+    monkeypatch.setattr(rss.urllib.request, "urlopen", loop)
+    monkeypatch.setattr(rss.urllib.request, "build_opener", lambda *h: Opener())
+    assert [i["title"] for i in rss.fetch({"name": "국토부", "url": "https://m/rss"})] == ["9월 주택통계"]
+    assert seen["fresh"]

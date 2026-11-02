@@ -17,6 +17,7 @@ discovery = 'LLM 서빙·학습·GPU 인프라에 실질 정보를 주는 사람
 topics = ['보안 권고', '서빙·추론 프레임워크', '오픈 웨이트 모델', 'GPU·클라우드 비용', '학습·파인튜닝']   # 「특히 궁금한 것」 보기 (관심사 설정 ⑤)
 
 [caps]                        # 묶음별 상한 (이 관심사 몫)
+'업계 뉴스' = 8
 '공식 변경내역' = 25
 '공식 발표' = 15
 '플랫폼 변경내역' = 5
@@ -25,6 +26,10 @@ topics = ['보안 권고', '서빙·추론 프레임워크', '오픈 웨이트 �
 '해외 커뮤니티' = 10
 '한국 커뮤니티' = 10
 '한국 테크블로그' = 3
+
+[[feeds]]
+id = 'theinformation'
+why = '단독 보도 — 인수·투자·내부 소식이 먼저'
 
 [[feeds]]
 id = 'pytorch-releases'
@@ -49,10 +54,6 @@ why = 'TensorRT-LLM 변경'
 [[feeds]]
 id = 'ollama-releases'
 why = 'Ollama 변경'
-
-[[feeds]]
-id = 'llama-cpp-releases'
-why = 'llama.cpp 정식 릴리스'
 
 [[feeds]]
 id = 'dynamo-releases'
@@ -351,7 +352,7 @@ companies = ['NVIDIA AI Developer']
 
 [[target.options]]
 label = 'Ollama·llama.cpp'
-feeds = ['ollama-releases', 'ollama-blog', 'llama-cpp-releases']
+feeds = ['ollama-releases', 'ollama-blog']
 
 [[target.options]]
 label = 'Ray'

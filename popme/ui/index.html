@@ -92,16 +92,21 @@
   .chip { font-size: 11px; border-radius: 999px; padding: 0 7px; background: #f3ebdb; color: #6b5646; line-height: 18px; }
   .chip.me { background: #e5f3ea; color: #2f7a52; } .chip.no { background: #eee; color: #999; }
   .chip.do { background: #fde3d6; color: #b6522a; } .chip.cat { background: transparent; border: 1px solid var(--line); color: var(--muted); }
-  /* 관심사 태그 줄: [AI 코딩 ✕][데이터 ✕][+] — 이름을 누르면 그 관심사 카드만, ✕는 빼기(되돌리기 있음) */
+  /* 관심사 태그 줄: 평소 [AI 코딩][데이터] 편집하기 — 이름을 누르면 그 관심사 카드만
+     「편집하기」를 누르면 [AI 코딩 ✎ ✕][데이터 ✎ ✕][+] 완료 — 이름은 고치기, ✕는 빼기(되돌리기 있음) */
   #news-head { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; margin-bottom: 7px; position: relative; }
   #news-head .hint { font-size: 11.5px; color: var(--muted); }
   .ipill { display: inline-flex; border: 1.5px solid var(--brown); border-radius: 999px; overflow: hidden; background: #fff; }
-  .ipill button { border: none; border-radius: 0; padding: 0 3px 0 10px; font-size: 12.5px; background: transparent; }
+  .ipill button { border: none; border-radius: 0; padding: 0 10px; font-size: 12.5px; background: transparent; }
+  .ipill.edit { border-style: dashed; }
+  .ipill.edit .ip-name { padding: 0 3px 0 10px; }
   .ipill .ip-x { padding: 0 8px 0 4px; color: var(--muted); }
-  .ipill.ask { background: #fdeaea; border-color: var(--err); }  /* ✕ 한 번: 「빼기?」 — 한 번 더 눌러야 빠진다 */
-  .ipill.ask .ip-x { color: var(--err); font-weight: 600; padding: 0 10px 0 4px; }
+  .ipill .ip-x:hover { color: var(--err); }
   .ipill.on { background: #5b6f86; border-color: #3e5068; } .ipill.on button { color: #fff; }
   .ip-add { padding: 0 10px; font-size: 12.5px; border-width: 1.5px; border-style: dashed; }
+  .ip-edit { border: none; background: transparent; color: var(--muted); padding: 0 4px; font-size: 12px; }
+  .ip-edit:hover { background: transparent; color: var(--ink); }
+  .ip-done { padding: 0 10px; font-size: 12.5px; border-width: 1.5px; }
   .ip-menu { position: absolute; top: 100%; left: 0; right: 0; z-index: 5; margin-top: 4px; padding: 6px;
     background: var(--paper); border: 2px solid var(--brown); border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,.12); }
   .ip-menu button { display: block; width: 100%; text-align: left; border: none; border-radius: 8px; padding: 5px 8px; }
@@ -332,7 +337,7 @@ function agendaHtml(rows) {
 
 const CATS = ["전체", "혜택·비용", "보안·장애", "규제·정책", "업데이트·단종", "새 모델·도구", "방법·흐름", "사례·커뮤니티", "발굴"];
 let briefCat = "전체", briefLow = false, briefData = null, briefTag = "", briefGone = false, ipMenu = false;
-let askOff = "", askTimer = null;  // ✕를 한 번 누른 관심사 (「빼기?」)
+let headEdit = false;  // 태그 줄 「편집하기」: 이때만 태그를 고치고 빼고 더한다
 const openCards = new Set();  // 다시 그려도 펼친 카드는 펼친 채로
 const onTags = () => (briefData?.news?.interests || []).filter(x => x.on).map(x => x.tag);
 const showTags = () => onTags().length >= 2;  // 관심사가 하나면 태그는 다 같으니 안 보인다
@@ -385,42 +390,39 @@ function renderHead() {
   const on = n.interests.filter(x => x.on), off = n.interests.filter(x => !x.on);
   let h = n.notice ? `<div class="notice"><span>${esc(n.notice)}</span><button id="notice-ok">확인</button></div>` : "";
   $("#notice-box").innerHTML = h;
-  h = on.map(x => `<span class="ipill ${showTags() && briefTag === x.tag ? "on" : ""} ${askOff === x.id ? "ask" : ""}"><button class="ip-name" data-tag="${esc(x.tag)}"
-      title="${esc(x.name)}${showTags() ? " — 누르면 이 관심사 카드만" : ""} · 우클릭: 이 태그 고치기">${esc(x.tag)}</button><button class="ip-x" data-off="${x.id}"
-      title="관심사에서 빼기 (한 번 더 눌러야 빠져요)">${askOff === x.id ? "빼기?" : "✕"}</button></span>`).join("");
-  h += `<button class="ip-add" id="ip-add" title="관심사 더하기·만들기·고치기">+${on.length ? "" : " 관심사 고르기"}</button>`;
-  if (!on.length) h += `<span class="hint">관심사를 고르면 그 분야 소식 출처를 챙겨요</span>`;
+  if (!on.length) headEdit = false;
+  h = on.map(x => headEdit
+    ? `<span class="ipill edit"><button class="ip-name" data-edit="${x.id}" title="${esc(x.name)} — 사람·기업·궁금한 것 고치기">${esc(x.tag)} ✎</button><button class="ip-x" data-off="${x.id}"
+        title="관심사에서 빼기">✕</button></span>`
+    : `<span class="ipill ${showTags() && briefTag === x.tag ? "on" : ""}"><button class="ip-name" data-tag="${esc(x.tag)}"
+        title="${esc(x.name)}${showTags() ? " — 누르면 이 관심사 카드만" : ""}">${esc(x.tag)}</button></span>`).join("");
+  if (!on.length) h += `<button class="ip-add" id="ip-add" title="관심사 더하기·만들기">+ 관심사 고르기</button><span class="hint">관심사를 고르면 그 분야 소식 출처를 챙겨요</span>`;
+  else if (headEdit) h += `<button class="ip-add" id="ip-add" title="관심사 더하기·만들기">+</button><button class="ip-done" id="ip-edit">완료</button>`;
+  else h += `<button class="ip-edit" id="ip-edit" title="관심사 태그 고치기·빼기·더하기">편집하기</button>`;
   if (ipMenu) h += `<div class="ip-menu">${off.map(x => `<button data-on="${x.id}"><b>${esc(x.name)}</b><span>${esc(x.summary)}</span></button>`).join("")}
     ${off.length ? `<div class="sep"></div>` : ""}
     <button data-open="custom"><b>직접 만들기…</b><span>축구·반도체·K-pop … 무엇이든 — 몇 가지 여쭤보고 출처를 만들어요</span></button>
-    ${on.length ? `<button data-open="pick"><b>기존 태그 고치기…</b><span>고른 관심사의 사람·기업·궁금한 것을 고쳐요 (태그를 우클릭해도 돼요)</span></button>` : ""}
     <div class="foot">출처는 다음 수집부터 바뀌어요</div></div>`;
   $("#news-head").innerHTML = h;
   $("#notice-ok")?.addEventListener("click", async () => { await api.dismiss_notice(); n.notice = ""; renderHead(); });
   $("#ip-add")?.addEventListener("click", e => { e.stopPropagation(); ipMenu = !ipMenu; renderHead(); });
+  $("#ip-edit")?.addEventListener("click", () => { headEdit = !headEdit; ipMenu = false; renderHead(); });
   $("#news-head").querySelectorAll("[data-on]").forEach(b => b.onclick = () => {
     const x = n.interests.find(i => i.id === b.dataset.on);
     ipMenu = false;
     setInterests([...on.map(i => i.id), x.id], `「${x.tag}」 더했어요 · 다음 수집부터 받아요`, on.map(i => i.id));
   });
-  $("#news-head").querySelectorAll("[data-off]").forEach(b => b.onclick = e => {
+  $("#news-head").querySelectorAll("[data-off]").forEach(b => b.onclick = e => {  // 「편집하기」 안에서만 보인다 → 한 번에 빼고 되돌리기
     e.stopPropagation();
     const x = n.interests.find(i => i.id === b.dataset.off);
-    if (askOff !== x.id) {  // 한 번 눌러서는 안 빠진다: 「빼기?」로 바꾸고 3초 안에 한 번 더 누르면 뺀다
-      askOff = x.id; clearTimeout(askTimer);
-      askTimer = setTimeout(() => { askOff = ""; renderHead(); }, 3000);
-      return renderHead();
-    }
-    askOff = ""; clearTimeout(askTimer);
     setInterests(on.filter(i => i.id !== x.id).map(i => i.id), `「${x.tag}」 뺐어요 · 다음 수집부터 안 받아요`, on.map(i => i.id));
   });
   $("#news-head").querySelectorAll("[data-open]").forEach(b => b.onclick = () => {
     ipMenu = false; renderHead(); api.open_interests(b.dataset.open, "");
-    toast(b.dataset.open === "custom" ? "관심사 만들기 창을 열었어요" : "태그 고치기 창을 열었어요");
+    toast("관심사 만들기 창을 열었어요");
   });
-  $("#news-head").querySelectorAll(".ip-name").forEach(b => b.oncontextmenu = e => {  // 우클릭: 그 관심사만 고치기
-    e.preventDefault();
-    const x = n.interests.find(i => i.tag === b.dataset.tag);
+  $("#news-head").querySelectorAll("[data-edit]").forEach(b => b.onclick = () => {  // 그 관심사만 고치기
+    const x = n.interests.find(i => i.id === b.dataset.edit);
     if (x) { api.open_interests("edit", x.id); toast(`「${x.tag}」 고치기 창을 열었어요`); }
   });
   $("#news-head").querySelectorAll("[data-tag]").forEach(b => b.onclick = () => {

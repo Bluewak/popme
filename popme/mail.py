@@ -284,6 +284,8 @@ class Watcher:
             self._connected = False
             try:
                 self._session()
+            except imaplib.IMAP4.abort as e:  # 연결이 끊긴 것 (IMAP4.error의 하위라 먼저 잡는다)
+                delay = self._lost(e, delay)
             except imaplib.IMAP4.error as e:  # 로그인 실패 등 — 비밀번호를 고치기 전엔 계속 실패하니 천천히
                 msg = str(e)
                 auth = any(k in msg.upper() for k in ("AUTHENTICATIONFAILED", "INVALID CREDENTIALS", "LOGIN"))
@@ -291,12 +293,14 @@ class Watcher:
                 self.state.update(status="로그인 실패 — 앱 비밀번호 확인" if auth else "오류", error=msg[:200])
                 delay = 1800 if auth else max(delay, 300)
             except Exception as e:  # 네트워크 끊김·절전 복귀 → 점점 길게 기다렸다 다시 연결
-                log.info("메일 연결 끊김: %s", e)
-                self.state.update(status="다시 연결 중", error=str(e)[:200])
-                if self._connected:  # 잘 붙어 있다가 끊긴 거면 금방 다시
-                    delay = 30
+                delay = self._lost(e, delay)
             time.sleep(delay)
             delay = min(delay * 2, 600)
+
+    def _lost(self, e, delay):
+        log.info("메일 연결 끊김: %s", e)
+        self.state.update(status="다시 연결 중", error=str(e)[:200])
+        return 30 if self._connected else delay  # 잘 붙어 있다가 끊긴 거면 금방 다시
 
     def _session(self):
         s = self.s

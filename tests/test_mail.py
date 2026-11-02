@@ -1,4 +1,5 @@
 """중요 메일 알림 (popme/mail.py): 메일 해석, 규칙·AI 판단, 새 메일 확인·중복 알림 방지, IDLE."""
+import imaplib
 import json
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
@@ -186,6 +187,30 @@ def test_uidvalidity_change_restarts_position(watcher):
     M.msgs = {1: raw_mail(sender="boss@example.com")}
     assert w.check(M, "v2", True) == []
     assert w.db.mail_state(mail.account(w.s)) == {"account": mail.account(w.s), "uidvalidity": "v2", "last_uid": 1}
+
+
+class StopLoop(BaseException):
+    pass
+
+
+def test_lost_connection_retries_soon(watcher, monkeypatch):
+    """서버가 끊은 것(IMAP4.abort)은 30초 뒤 다시. IMAP4.error로 잡히면 5~10분 동안 새 메일을 못 본다."""
+    w, _ = watcher
+    waits = []
+
+    def session():
+        w._connected = True
+        raise imaplib.IMAP4.abort("연결 끊김")
+
+    def sleep(sec):
+        waits.append(sec)
+        raise StopLoop
+
+    monkeypatch.setattr(w, "_session", session)
+    monkeypatch.setattr(mail.time, "sleep", sleep)
+    with pytest.raises(StopLoop):
+        w.run()
+    assert waits == [30] and w.state["status"] == "다시 연결 중"
 
 
 class FakeSock:
