@@ -53,7 +53,7 @@ source = "caldav"
 [caldav]
 server = "https://caldav.icloud.com"
 user = "Apple 계정 이메일"
-password = "앱 암호"                # config.toml에 평문 저장. 같은 페이지에서 언제든 지울 수 있음
+password = "앱 암호"                # 켤 때 Windows 자격 증명 관리자로 옮기고 이 칸은 비움. 같은 페이지에서 언제든 지울 수 있음
 calendars = [{ name = "집", url = "https://pNN-caldav.icloud.com/.../calendars/home/" }]
 ```
 

@@ -6,7 +6,7 @@ import pytest
 
 from popme import setup_window as sw
 
-EXAMPLE = (Path(__file__).resolve().parent.parent / "config.example.toml").read_text(encoding="utf-8")
+EXAMPLE = (Path(__file__).resolve().parent.parent / "popme/defaults/config.example.toml").read_text(encoding="utf-8")
 
 
 def choices(**kw):
@@ -79,9 +79,8 @@ def test_mail_off_does_not_add_section(monkeypatch):
 
 def test_default_character_is_not_pinned(tmp_path, monkeypatch):
     """기본 캐릭터(예시)를 골라도 config에는 character.toml — 나중에 만들면 바로 쓰이게."""
-    monkeypatch.setattr(sw.config, "ROOT", tmp_path)
     assert choices(character="character.example.toml")["character"] == "character.toml"
-    (tmp_path / "character.toml").write_text('[persona]\nname = "나만의"\n', encoding="utf-8")
+    (sw.config.DATA_DIR / "character.toml").write_text('[persona]\nname = "나만의"\n', encoding="utf-8")
     assert choices(character="character.example.toml")["character"] == "character.example.toml"  # 있으면 고른 대로
     assert choices(character="other.toml")["character"] == "other.toml"
 
@@ -281,7 +280,7 @@ def test_check_mail_network_errors_are_plain(monkeypatch):
     monkeypatch.setattr(imaplib, "IMAP4_SSL", FakeIMAP)
     monkeypatch.setattr(sw, "base_text", lambda: "")
     FakeIMAP.behavior = socket.gaierror(11001, "getaddrinfo failed")
-    with pytest.raises(ValueError, match="메일 서버\(imap.nowhere.kr\)를 찾지 못했어요") as e:
+    with pytest.raises(ValueError, match=r"메일 서버\(imap.nowhere.kr\)를 찾지 못했어요") as e:
         sw.check_mail("imap.nowhere.kr", "me@example.com", "pw")
     assert "Errno" not in str(e.value)
     FakeIMAP.behavior = TimeoutError()

@@ -536,7 +536,7 @@ function init() {
 
   // 캐릭터
   $("#char-cards").append(...D.characters.map(c => el("label", { className: "card", innerHTML:
-    `<input type="radio" name="char" value="${esc(c.file)}">${c.image ? `<img src="../../${esc(c.image)}" alt="">` : ""}<b>${esc(c.name)}</b><small>${esc(c.intro || c.file)}</small>` })),
+    `<input type="radio" name="char" value="${esc(c.file)}">${c.image ? `<img src="${esc(c.image)}" alt="">` : ""}<b>${esc(c.name)}</b><small>${esc(c.intro || c.file)}</small>` })),
     el("label", { className: "card", innerHTML: `<input type="radio" name="char" value="${CHAR_NEW}"><b>+ 새로 만들기</b><small>이름과 말투를 정해요</small>` }));
   setRadio("char", D.character);
   document.querySelectorAll("input[name=char]").forEach(r => r.onchange = charView);
@@ -1080,7 +1080,7 @@ async function charImage() {
   $("#char-face").src = r.preview;
   $("#char-face").classList.remove("hidden");
   $("#char-image").textContent = "다른 이미지 고르기";
-  if (D.pet_image) $("#char-image-hint").textContent = "저장하면 지금 이미지는 assets\\backup 폴더로 옮겨 둬요.";
+  if (D.pet_image) $("#char-image-hint").textContent = "저장하면 지금 이미지는 backup 폴더로 옮겨 둬요.";
 }
 const charPayload = () => charNew() ? { ...charInfo(), ...(CHAR.draft ? { lines: CHAR.draft.lines, ui: CHAR.draft.ui } : {}) } : null;
 

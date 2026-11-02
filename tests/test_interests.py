@@ -35,7 +35,7 @@ def test_preset_profiles_have_people_companies_topics():
             assert e["name"] and e["region"] in ("kr", "world")
             assert not e.get("x") or interests.HANDLE_RE.match(e["x"]), e
     ai = next(p for p in catalog.profiles() if p["id"] == "ai-coding")
-    ex = tomllib.loads((config.ROOT / "config.example.toml").read_text(encoding="utf-8"))
+    ex = tomllib.loads(config.EXAMPLE_CONFIG.read_text(encoding="utf-8"))
     assert {a["handle"] for a in ex["x"]["accounts"]} <= {e.get("x") for e in ai["people"]}  # 예시의 핵심 계정 = AI 코딩 사람들
 
 

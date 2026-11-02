@@ -1,0 +1,33 @@
+# 릴리스와 같은 zip을 깨끗한 Windows에 실제로 설치해 본다 (CI와 Release가 불러 쓴다). 자세한 순서: .github/e2e/install_test.ps1
+name: Install test
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      PYTHONUTF8: "1"   # 시험 스크립트가 한국어를 콘솔에 찍을 때 cp1252로 깨지지 않게
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 릴리스와 같은 zip 만들기
+        shell: bash
+        run: git archive --format=zip --prefix=POPME/ -o POPME.zip HEAD
+
+      - name: 설치 → 예전 설정 이관 → 캐릭터 켜기 → 제거
+        shell: powershell
+        run: .\.github\e2e\install_test.ps1 -Zip "$PWD\POPME.zip"
+
+      - name: 결과 올리기 (화면 캡처·로그)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: install-test
+          path: e2e-out

@@ -2,7 +2,7 @@
 #   설치: install.bat 더블클릭   제거: uninstall.bat 더블클릭   (직접: powershell -ExecutionPolicy Bypass -File .\install.ps1 [-Uninstall])
 #
 # 설치 순서: 압축 푼 폴더인지 확인 → Python 3.11~3.13 찾기(없으면 winget으로 3.12 설치) → WebView2 확인
-#   → 켜져 있는 POPME 끄기 → %LOCALAPPDATA%\POPME\venv에 패키지 설치 → 예전 설치 폴더의 설정 가져오기
+#   → 켜져 있는 POPME 끄기 → %LOCALAPPDATA%\POPME\venv에 패키지 설치 → 앱 폴더의 예전 개인 파일을 %LOCALAPPDATA%\POPME로 옮기기
 #   → 설정 창 → 바로가기(시작프로그램·바탕화면) → POPME 켜기
 # 기록: %LOCALAPPDATA%\POPME\install.log (문제가 생기면 이 파일을 보내 주세요)
 param([switch]$Uninstall)
@@ -91,18 +91,19 @@ function Uninstall-Popme {
     }
     # 패키지 환경은 다른 폴더의 POPME가 아직 쓰고 있지 않을 때만 지운다
     if (-not (Test-Path $startupLnk) -and (Test-Path $venv)) { Remove-Item -Recurse -Force $venv -ErrorAction SilentlyContinue; Write-Host "지움: $venv" }
-    $ans = Read-Host "브리핑 기록·메일 목록·전용 Chrome 로그인 같은 데이터($data)도 지울까요? (y/N)"
+    $ans = Read-Host "설정·브리핑 기록·메일 목록·전용 Chrome 로그인·저장한 앱 비밀번호 같은 데이터($data)도 지울까요? (y/N)"
     if ($ans -match '^[yY]') {
         # 전용 Chrome이 켜져 있으면 프로필 파일이 잠겨 있다
         Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" | Where-Object { $_.CommandLine -like "*$data*" } |
             ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+        foreach ($name in "mail", "caldav") { cmdkey "/delete:POPME/$name" 2>&1 | Out-Null }   # 자격 증명 관리자 (popme/vault.py)
         try { Stop-Transcript | Out-Null } catch {}
         Start-Sleep -Seconds 1
         Remove-Item -Recurse -Force $data -ErrorAction SilentlyContinue
         Write-Host "지움: $data"
     }
     Write-Host ""
-    Write-Host "제거 끝. 남은 건 이 폴더뿐이에요 — 폴더째 지우면 돼요 (config.toml에 설정·메일 앱 비밀번호가 있어요)." -ForegroundColor Green
+    Write-Host "제거 끝. 남은 건 이 폴더뿐이에요 — 폴더째 지우면 돼요." -ForegroundColor Green
     Write-Host "설정 창에서 설치한 AI 도구(Claude Code·Codex·Gemini CLI)와 Python은 그대로 둬요."
 }
 
@@ -112,7 +113,7 @@ function Install-Popme {
     if (-not $env:POPME_TEST -and $root.StartsWith($tmp, [StringComparison]::OrdinalIgnoreCase)) {
         throw "압축 파일 안에서 바로 실행한 것 같아요. zip을 우클릭 → '모두 압축 풀기'로 푼 뒤, 풀린 폴더의 install.bat을 실행해 주세요."
     }
-    foreach ($f in "requirements.txt", "popme\__main__.py", "config.example.toml") {
+    foreach ($f in "requirements.lock", "popme\__main__.py", "popme\defaults\config.example.toml") {
         if (-not (Test-Path (Join-Path $root $f))) { throw "$f 파일이 없어요. zip을 다시 받아 전체를 압축 풀어 주세요." }
     }
     # 인터넷에서 받은 zip의 파일 표시(MOTW)를 지워 실행할 때마다 경고가 뜨지 않게
@@ -154,35 +155,31 @@ function Install-Popme {
     if (-not (Test-Path $py)) {
         if ((Invoke-Native $base @("-m", "venv", $venv)) -ne 0) { throw "Python 환경(venv)을 만들지 못했어요." }
     }
-    if ((Invoke-Native $py @("-m", "pip", "install", "--disable-pip-version-check", "-r", (Join-Path $root "requirements.txt"))) -ne 0) {
+    # 잠금 파일: 언제 설치해도 시험을 통과한 그 패키지가 그대로 깔리고, 내용이 바뀌었으면 hash가 달라 멈춘다
+    if ((Invoke-Native $py @("-m", "pip", "install", "--disable-pip-version-check", "--require-hashes", "-r", (Join-Path $root "requirements.lock"))) -ne 0) {
         throw "패키지 설치에 실패했어요 (위 메시지 참고). 인터넷 연결을 확인하고 다시 실행해 주세요."
     }
 
-    # 새 폴더에 업데이트로 설치했으면 예전 폴더의 개인 설정·캐릭터를 가져온다 (이미 있으면 건드리지 않음)
+    # 예전 버전은 개인 설정·캐릭터를 앱 폴더에 뒀다 → %LOCALAPPDATA%\POPME로 옮긴다 (이미 있으면 건드리지 않음)
     $prev = Get-LinkDir $startupLnk
-    if ($prev -and ($prev.TrimEnd('\') -ne $root.TrimEnd('\')) -and (Test-Path (Join-Path $prev "config.toml")) -and
-        -not (Test-Path (Join-Path $root "config.toml"))) {
-        Step "예전 설치($prev)의 설정 가져오기"
-        $files = @("config.toml", "character.toml") +
-                 @(Get-ChildItem $prev -Filter "character-*.toml" -File -ErrorAction SilentlyContinue | ForEach-Object { $_.Name }) +
-                 @(Get-ChildItem (Join-Path $prev "assets") -Filter "pet*" -File -ErrorAction SilentlyContinue |
-                   ForEach-Object { "assets\" + $_.Name })
-        foreach ($f in $files) {
-            $src = Join-Path $prev $f; $dst = Join-Path $root $f
-            if ((Test-Path $src) -and -not (Test-Path $dst)) { Copy-Item $src $dst; Write-Host "가져옴: $f" }
+    Push-Location $root
+    try {
+        Step "POPME $(& $py -c "from popme import __version__; print(__version__)")"
+        foreach ($old in @($prev, $root | Where-Object { $_ -and (Test-Path $_) } | Select-Object -Unique)) {
+            Invoke-Native $py @("-c", "import sys; from popme import config; print('moved', config.adopt_old_files(sys.argv[1]), 'files from', sys.argv[1])", $old) | Out-Null
         }
-    }
+    } finally { Pop-Location }
 
     Step "설정 창을 열어요 — 다 고르고 저장하면 설치가 이어져요"
     Push-Location $root
     try { & $py -m popme.setup_window } finally { Pop-Location }
-    if (-not (Test-Path (Join-Path $root "config.toml"))) {   # 창을 그냥 닫았으면 예시 설정으로 (나중에 트레이 > 설정 바꾸기)
-        Copy-Item (Join-Path $root "config.example.toml") (Join-Path $root "config.toml")
+    if (-not (Test-Path (Join-Path $data "config.toml"))) {   # 창을 그냥 닫았으면 예시 설정으로 (나중에 트레이 > 설정 바꾸기)
+        Copy-Item (Join-Path $root "popme\defaults\config.example.toml") (Join-Path $data "config.toml")
         Write-Host "만듦: config.toml (설정 창을 닫아서 기본값으로. 트레이 > 설정 바꾸기에서 다시 고를 수 있어요)"
     }
 
     # 바로가기 아이콘(pet.ico): 캐릭터 이미지, 없으면 기본 방울. 이미지를 나중에 바꾸면 POPME가 켜질 때 다시 만든다
-    $ico = Join-Path $root "assets\pet.ico"
+    $ico = Join-Path $data "assets\pet.ico"
     Push-Location $root
     try { Invoke-Native $py @("-c", "from popme import pet; pet.write_icon(pet.load_images()['idle'])") | Out-Null } finally { Pop-Location }
 

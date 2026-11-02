@@ -1,2 +1,12 @@
 # 배치 파일은 CRLF여야 cmd가 제대로 읽는다 (git archive 릴리스 zip에도 적용)
 *.bat text eol=crlf
+
+# 릴리스 zip(git archive)에 넣지 않는 개발용 파일
+.gitattributes export-ignore
+.gitignore export-ignore
+.github export-ignore
+pyproject.toml export-ignore
+requirements.txt export-ignore
+tests export-ignore
+tools export-ignore
+docs/INTERESTS-DESIGN.md export-ignore

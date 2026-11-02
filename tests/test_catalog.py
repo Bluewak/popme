@@ -162,7 +162,7 @@ def test_migrate_file_backs_up_once(tmp_path, monkeypatch):
 
 
 def test_example_config_is_new_format():
-    cfg = tomllib.loads((config.ROOT / "config.example.toml").read_text(encoding="utf-8"))
+    cfg = tomllib.loads(config.EXAMPLE_CONFIG.read_text(encoding="utf-8"))
     assert cfg["news"]["interests"] == [] and "rss" not in cfg
 
 

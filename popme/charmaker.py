@@ -3,14 +3,13 @@
 대사는 기본 캐릭터(character.example.toml)를 바탕으로 AI(personas/character_writer.toml)가 말투에 맞게 다시 쓴다.
 AI가 답하지 못하거나 규칙에 어긋난 칸은 기본 대사를 그대로 쓴다 — AI 때문에 캐릭터를 못 만드는 일은 없다.
 """
-import importlib.util
 import re
 import shutil
 import string
 import tomllib
 from datetime import datetime
 
-from popme import config, setup_window
+from popme import config, prepare, setup_window
 
 NEW_PET = "new-pet.png"  # 저장 전 미리 보기용 이미지 (config.DATA_DIR)
 MAX_LINE = 80
@@ -32,7 +31,7 @@ HEADER = "# 설정 창에서 만든 캐릭터. 메모장으로 고쳐도 돼요.
 
 
 def base():
-    return tomllib.loads((config.ROOT / "character.example.toml").read_text(encoding="utf-8"))
+    return tomllib.loads((config.DEFAULTS_DIR / "character.example.toml").read_text(encoding="utf-8"))
 
 
 def _text(v, n):
@@ -150,10 +149,10 @@ def dump(cfg):
 
 def new_file():
     """쓸 파일 이름: character.toml이 비어 있으면 그것, 있으면 character-2.toml… (있는 파일은 덮어쓰지 않는다)."""
-    if not (config.ROOT / "character.toml").exists():
+    if not (config.DATA_DIR / "character.toml").exists():
         return "character.toml"
     n = 2
-    while (config.ROOT / f"character-{n}.toml").exists():
+    while (config.DATA_DIR / f"character-{n}.toml").exists():
         n += 1
     return f"character-{n}.toml"
 
@@ -166,29 +165,25 @@ def save(nc, image=None):
     text = dump(b)
     tomllib.loads(text)
     name = new_file()
-    (config.ROOT / name).write_text(text, encoding="utf-8", newline="\n")
+    (config.DATA_DIR / name).write_text(text, encoding="utf-8", newline="\n")
     if image:
         install_image(image)
     return name
 
 
 def prepare_image(src):
-    """고른 이미지 → 배경을 따서 임시 파일로 (assets/prepare.py). 이미지가 아니면 ValueError."""
-    spec = importlib.util.spec_from_file_location("popme_prepare", config.ROOT / "assets" / "prepare.py")
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    """고른 이미지 → 배경을 따서 임시 파일로 (popme/prepare.py). 이미지가 아니면 ValueError."""
     out = config.DATA_DIR / NEW_PET
     try:
-        mod.prepare(src, "pet", out=out)
+        prepare.prepare(src, "pet", out=out)
     except Exception as e:
         raise ValueError(f"이미지를 열지 못했어요: {str(e)[:80]}")
     return out
 
 
 def install_image(path):
-    """평소 모습으로 넣는다. 예전 이미지는 지우지 않고 assets/backup/으로 — 새 캐릭터에 옛 표정이 섞이지 않게 모두 옮긴다."""
-    assets = config.ROOT / "assets"
+    """평소 모습으로 넣는다. 예전 이미지는 지우지 않고 내 이미지 폴더의 backup/으로 — 새 캐릭터에 옛 표정이 섞이지 않게 모두 옮긴다."""
+    assets = config.ASSETS_DIR
     old = [p for p in assets.glob("pet*") if p.suffix.lower() in (".png", ".webp", ".gif")]
     if old:
         keep = assets / "backup" / datetime.now().strftime("%Y%m%d-%H%M%S")

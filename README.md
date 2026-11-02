@@ -35,20 +35,22 @@ cd popme
 설치 스크립트가 하는 일:
 1. Python 3.11~3.13을 찾고(3.12 우선), 없으면 winget으로 3.12 설치. WebView2가 없으면 설치
 2. 켜져 있는 POPME를 끄고, 패키지를 `%LOCALAPPDATA%\POPME\venv`에 따로 설치 (PC의 다른 Python과 안 섞이고, 깊은 경로 제한에도 안 걸림)
-3. 새 버전을 다른 폴더에 풀어 설치하면 예전 폴더의 `config.toml`·`character.toml`·캐릭터 이미지를 가져옴
+3. 예전 버전이 앱 폴더에 뒀던 설정·캐릭터·이미지를 `%LOCALAPPDATA%\POPME`로 옮기고, 평문 비밀번호는 Windows 자격 증명 관리자로 옮김
 4. **설정 창** → 시작프로그램·바탕화면 바로가기 → POPME 켜기
 5. 과정은 `%LOCALAPPDATA%\POPME\install.log`에 남음 (설치가 멈추면 이 파일 확인)
 
-**지우기**: `uninstall.bat` 더블클릭 → POPME를 끄고 바로가기·패키지 환경을 지움. 데이터(브리핑 기록·전용 Chrome 로그인)는 물어보고 지움. 그다음 폴더를 지우면 끝.
+**업데이트**: 새 버전이 나오면 캐릭터가 알려 주고, 트레이 메뉴에 **새 버전 받기**가 생깁니다. zip을 받아 아무 폴더에나 풀고 `install.bat`을 실행하면 됩니다. 설정·캐릭터는 앱 폴더 밖에 있어서 그대로 이어지고, 예전 폴더는 지워도 됩니다.
 
-**설정 창** 순서: 준비물 확인 → 브리핑 AI(설치·로그인) → 캘린더 → 메일 알림 → 로그인(전용 Chrome) → 날씨·브리핑 시각 → 첫 브리핑 받아 보기. 고른 값은 `config.toml`에 저장됩니다(주석·다른 설정은 그대로). 나중에 바꾸려면 트레이 아이콘(또는 캐릭터) 우클릭 → **설정 바꾸기**. 저장하면 POPME가 다시 켜집니다.
+**지우기**: `uninstall.bat` 더블클릭 → POPME를 끄고 바로가기·패키지 환경을 지움. 데이터(설정·브리핑 기록·전용 Chrome 로그인·저장한 앱 비밀번호)는 물어보고 지움. 그다음 폴더를 지우면 끝.
+
+**설정 창** 순서: 준비물 확인 → 브리핑 AI(설치·로그인) → 캘린더 → 메일 알림 → 로그인(전용 Chrome) → 날씨·브리핑 시각 → 첫 브리핑 받아 보기. 고른 값은 `%LOCALAPPDATA%\POPME\config.toml`에 저장됩니다(주석·다른 설정은 그대로). 나중에 바꾸려면 트레이 아이콘(또는 캐릭터) 우클릭 → **설정 바꾸기**. 저장하면 POPME가 다시 켜집니다.
 
 계정·주소는 **평소 브라우저에서 만들고 복사만** 하면 됩니다: 설정 창의 「Apple 페이지 열기」·「구글 캘린더 설정 열기」·「앱 비밀번호 만들기」 뒤 15분 동안, 클립보드가 앱 암호·캘린더 주소 모양일 때만 가져와 채우고 클립보드에서 지웁니다. 막히면 **AI한테 해결 요청하기** → 자주 막히는 곳은 고르면 바로 정해진 답, 목록에 없는 상황은 적어서 요청하면 고른 AI가 그 단계 안내 안에서만 답합니다 (`popme/setup_window.py` `HELP`). **로그인** 단계는 사이트별 「로그인 열기」로 전용 Chrome에 직접 로그인하면 저절로 ✓가 켜집니다.
 
 ## 처음 한 번
 설정 창의 **로그인** 단계에서 X, Threads(, TimeTree)에 로그인하고 마지막에 **첫 브리핑 받아 보기**를 누르면 끝입니다. 건너뛰었다면:
 1. 트레이 아이콘 우클릭 → **전용 Chrome 열기 (로그인)** → X, Threads(, TimeTree)에 로그인 (평소 Chrome과 별개 프로필)
-2. (선택) `config.toml`에서 볼 X 계정·Threads 태그·RSS를 내 관심사로 수정
+2. (선택) `%LOCALAPPDATA%\POPME\config.toml`에서 볼 X 계정·Threads 태그·RSS를 내 관심사로 수정
 3. 캐릭터 우클릭 → **지금 수집**
 
 ## 사용
@@ -62,8 +64,8 @@ cd popme
 09:00 이후 앱이 켜져 있고 오늘 브리핑이 없으면 자동으로 수집·브리핑합니다 (`config.toml` `briefing_after`).
 
 ## 캐릭터 바꾸기
-1. **이미지**: `assets` 폴더에 `pet.png`를 넣습니다 (상황별 `pet_busy` `pet_happy` `pet_sleepy` `pet_alert`는 선택). 배경이 투명한 정사각형이 가장 예쁩니다
-2. **이름·말투·대사**: 설정 창의 **캐릭터** 단계에서 **+ 새로 만들기**를 고르면 AI가 대사를 써 줍니다. 직접 고치려면 `character.example.toml`을 복사해 `character.toml`로 이름을 바꾸고 메모장으로 고칩니다. 예시 파일은 직접 고치지 마세요 (업데이트하면 원래대로 돌아감)
+1. **이미지**: `%LOCALAPPDATA%\POPME\assets` 폴더에 `pet.png`를 넣습니다 (상황별 `pet_busy` `pet_happy` `pet_sleepy` `pet_alert`는 선택). 배경이 투명한 정사각형이 가장 예쁩니다
+2. **이름·말투·대사**: 설정 창의 **캐릭터** 단계에서 **+ 새로 만들기**를 고르면 AI가 대사를 써 줍니다. 직접 고치려면 `popme\defaults\character.example.toml`을 `%LOCALAPPDATA%\POPME\character.toml`로 복사해 메모장으로 고칩니다. 앱 폴더의 기본 파일은 직접 고치지 마세요 (업데이트하면 원래대로 돌아감)
 3. 캐릭터 우클릭 → 종료 → 다시 실행. 말투가 그대로면 트레이 우클릭 → **설정 바꾸기**에서 새 캐릭터를 고르고 저장
 
 바탕화면·트레이 아이콘은 켜질 때 새 이미지로 바뀌고, AI가 만드는 '오늘의 멘트'는 다음 브리핑부터 새 말투를 따릅니다. 흰 배경 따기, 대사 칸 설명 등 자세한 방법은 [docs/CHARACTER.md](docs/CHARACTER.md).
@@ -71,31 +73,33 @@ cd popme
 ## 설정 파일
 | 파일 | 내용 | 저장소 |
 |---|---|---|
-| `config.toml` | 수집 계정·태그·RSS·캘린더·날씨 지역 | 제외 (예시: `config.example.toml`) |
-| `character.toml` | 캐릭터 이름·말투·대사·행동 | 제외 (예시: `character.example.toml`) |
-| `assets/pet*.png` | 캐릭터 이미지 | 제외 |
-| `%LOCALAPPDATA%\POPME` | DB, 브리핑 Markdown, 로그, 전용 Chrome 프로필, 파서 디버깅용 원본 응답 | — |
+| `%LOCALAPPDATA%\POPME\config.toml` | 수집 계정·태그·RSS·캘린더·날씨 지역 | 제외 (기본값: `popme/defaults/config.example.toml`) |
+| `%LOCALAPPDATA%\POPME\character*.toml` | 내 캐릭터 이름·말투·대사·행동 | 제외 (기본 캐릭터: `popme/defaults/`) |
+| `%LOCALAPPDATA%\POPME\assets` | 내 캐릭터 이미지 | 제외 |
+| `%LOCALAPPDATA%\POPME` | DB, 브리핑 Markdown, 로그, 전용 Chrome 프로필, 파서 디버깅용 원본 응답 | 제외 |
+| Windows 자격 증명 관리자 `POPME/…` | 메일·캘린더 앱 비밀번호 | 제외 |
 
 ## 꼭 알아둘 점
 - **계정 위험**: X·Threads·TimeTree를 브라우저 자동화로 읽습니다. 사람 속도로 읽기만 하도록 만들었지만, 각 서비스 약관상 자동화는 제한될 수 있고 계정 제재 가능성이 0은 아닙니다. 본인 책임으로 쓰세요.
 - **잘 깨지는 부분**: 서비스들이 내부 API를 자주 바꿉니다. 수집이 0개가 되면 `%LOCALAPPDATA%\POPME\raw\`의 원본 응답을 보고 `popme/collectors/*.py` 파서를 고치세요 (X는 이름이 아니라 내용으로 트윗을 찾게 해 둠).
-- **보내는 데이터**: 요약·해석은 고른 AI(Claude·ChatGPT·Gemini, 내 구독)로. 현재 위치·일정 장소는 약 1km로 반올림한 좌표를 OpenStreetMap Nominatim(지명)과 Open-Meteo(날씨)로 보냅니다. 끄려면 `config.toml` `[weather] use_windows_location = false`.
-- **메일** (켰을 때만): 메일은 내 PC가 메일 서버에서 직접 받고, 규칙으로 못 정한 메일의 보낸사람·제목·본문 앞 300자만 고른 AI로 보냅니다 (`[mail] ai = false`면 안 보냄). 앱 비밀번호는 `config.toml`에 평문으로 저장됩니다.
+- **보내는 데이터**: 요약·해석은 고른 AI(Claude·ChatGPT·Gemini, 내 구독)로. 현재 위치·일정 장소는 약 1km로 반올림한 좌표를 OpenStreetMap Nominatim(지명)과 Open-Meteo(날씨)로 보냅니다. 끄려면 `config.toml` `[weather] use_windows_location = false`. 하루 한 번 GitHub에 최신 버전 번호를 물어봅니다 (끄려면 `[update] check = false`).
+- **메일** (켰을 때만): 메일은 내 PC가 메일 서버에서 직접 받고, 규칙으로 못 정한 메일의 보낸사람·제목·본문 앞 300자만 고른 AI로 보냅니다 (`[mail] ai = false`면 안 보냄). 앱 비밀번호는 Windows 자격 증명 관리자에 저장됩니다 (`config.toml`에 넣어도 켤 때 옮기고 그 칸을 비웁니다). 자격 증명 관리자를 쓸 수 없는 PC에서는 `config.toml`에 평문으로 남습니다.
 - **프롬프트 인젝션 대비**: 수집한 글을 요약하는 단계에는 도구 권한이 없고(`claude -p --tools ""` / Codex는 셸·코드 실행·브라우저 등 도구를 전부 끄고 빈 폴더·읽기 전용으로 실행 / Gemini는 빈 폴더 설정으로 내장 도구·MCP·확장을 전부 끄고 실행), 일정 추가처럼 쓰기 동작은 사용자가 승인 카드를 눌러야만 실행됩니다.
 
 ## 개발
-- 테스트: `python -m pip install pytest` → `python -m pytest -q tests`
-- **개인 정보 지킴이**: 이 저장소는 개인용 POPME 폴더에서 바로 올립니다. 개인 파일은 `.gitignore`로 빼고, 실수로 섞이지 않게 두 겹으로 검사합니다 (`tools/check_private.py`)
+- 테스트: `python -m pip install --require-hashes -r requirements.lock` → `python -m pip install pytest` → `python -m pytest -q tests`
+- **패키지**: `requirements.txt`는 받아 주는 범위, `requirements.lock`은 실제로 깔리는 버전·hash입니다. 범위를 바꾸면 `requirements.txt` 맨 위의 명령으로 잠금 파일을 다시 만듭니다. CI가 받아 주는 Python(3.11~3.13) 전부와 실제 설치(`.github/e2e/install_test.ps1`)를 시험하고, `Audit`이 잠금 파일 취약점을 매주 검사합니다
+- **개인 정보 지킴이**: 개인 파일은 앱 폴더 밖(`%LOCALAPPDATA%\POPME`)에 있고, 그래도 실수로 섞이지 않게 두 겹으로 검사합니다 (`tools/check_private.py`)
   - 커밋 직전(pre-commit 훅): `python tools/check_private.py --install`로 한 번 설치
   - 푸시마다(GitHub Actions `CI`): 같은 검사 + 테스트 + 문법 검사
   - 막는 것: 개인 설정·캐릭터 파일, 이미지·DB·로그·zip, 개인 이메일, 개인 단어(목록은 공개하지 않음 — 로컬 `.private-words.txt` / Secret `PRIVATE_WORDS`)
-- 배포: `git tag v1.1.0` → `git push origin v1.1.0` 하면 Actions `Release`가 검사·테스트 후 zip을 Releases에 올림
+- 배포: `popme/__init__.py`의 `__version__`을 올려 main에 머지 → `git tag v1.7.0` → `git push origin v1.7.0` 하면 Actions `Release`가 검사·테스트·취약점 검사·설치 시험을 통과했을 때만 zip과 SHA256을 Releases에 올림
 
 ## 디버깅
 - `python -m popme run-once`: 위젯 없이 수집+브리핑 1회
 - 로그: `%LOCALAPPDATA%\POPME\popme.log`
 
 ## 라이선스·출처
-- 폰트: [주아체](https://fonts.google.com/specimen/Jua) (SIL Open Font License, `assets/fonts/Jua-OFL.txt`)
+- 폰트: [주아체](https://fonts.google.com/specimen/Jua) (SIL Open Font License, `popme/ui/fonts/Jua-OFL.txt`)
 - 날씨: [Open-Meteo](https://open-meteo.com/) · 지명: [OpenStreetMap Nominatim](https://nominatim.org/) (© OpenStreetMap contributors)
 - 코드: [MIT License](LICENSE)

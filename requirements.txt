@@ -1,9 +1,12 @@
+# Direct dependencies and the versions we accept. install.ps1 and CI install requirements.lock, not this file.
+# After changing this file, regenerate the lock:
+#   uv pip compile --universal --python-version 3.11 --generate-hashes --no-header --no-annotate requirements.txt -o requirements.lock
 # Upper bounds: a new major version may break things. Raise them together after testing.
 # (ASCII only: pip reads this file in the system code page, e.g. cp949 on Korean Windows)
 playwright>=1.50,<2
 pywebview>=5.0,<7
 pystray>=0.19,<1
-pillow>=10.0,<13
+pillow>=13.0,<14
 markdown>=3.5,<4
 python-dateutil>=2.8,<3
 icalendar>=6,<8

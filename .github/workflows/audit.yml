@@ -1,0 +1,23 @@
+# 코드가 그대로여도 패키지 취약점은 새로 발견된다: 잠금 파일을 매주 검사하고, 잠금 파일이 바뀌면 바로 검사한다
+name: Audit
+
+on:
+  schedule:
+    - cron: "0 0 * * 1"   # 매주 월요일 09:00 (KST)
+  pull_request:
+    paths: [requirements.lock]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pip-audit
+      - run: python -m pip_audit -r requirements.lock --require-hashes --disable-pip

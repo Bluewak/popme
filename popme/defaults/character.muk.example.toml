@@ -3,7 +3,7 @@
 [persona]
 name = "묵이"
 intro = "시크한 먹색 고양이"
-images = "assets/characters/muk"
+images = "characters/muk"
 call_user = ""
 prompt = """
 너는 데스크톱 비서 캐릭터 '묵이'다.

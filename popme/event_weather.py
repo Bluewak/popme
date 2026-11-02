@@ -6,7 +6,6 @@
 import json
 import logging
 import re
-from datetime import datetime, timedelta
 
 from popme import agenda, llm, location, weather
 

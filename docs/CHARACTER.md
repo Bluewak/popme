@@ -1,22 +1,22 @@
 # 나만의 캐릭터 만들기
 
-가장 쉬운 방법은 설정 창의 **캐릭터** 단계입니다. 설치할 때, 또는 트레이 아이콘 우클릭 → **설정 바꾸기**에서 **+ 새로 만들기**를 고르고 이름·호칭·말투·이미지를 정하면 AI가 대사를 그 말투로 써 줍니다. AI가 답하지 못하면 기본 대사로 만들어지고, '오늘의 멘트'는 정한 말투로 나옵니다. 기본 캐릭터(포피·토리·묵이)는 자기 이미지가 따로 있고, 직접 만든 캐릭터는 `assets/pet*` 한 벌을 함께 씁니다. 새 이미지를 고르면 그 한 벌은 `assets/backup`으로 옮겨집니다.
+가장 쉬운 방법은 설정 창의 **캐릭터** 단계입니다. 설치할 때, 또는 트레이 아이콘 우클릭 → **설정 바꾸기**에서 **+ 새로 만들기**를 고르고 이름·호칭·말투·이미지를 정하면 AI가 대사를 그 말투로 써 줍니다. AI가 답하지 못하면 기본 대사로 만들어지고, '오늘의 멘트'는 정한 말투로 나옵니다. 기본 캐릭터(포피·토리·묵이)는 자기 이미지가 따로 있고, 직접 만든 캐릭터는 `%LOCALAPPDATA%\POPME\assets`의 `pet*` 한 벌을 함께 씁니다. 새 이미지를 고르면 그 한 벌은 같은 폴더의 `backup`으로 옮겨집니다.
 
 더 고치고 싶으면 아래처럼 파일을 직접 고칩니다. POPME의 캐릭터는 **파일 두 종류**로 정해지고, 코드는 고칠 필요 없습니다.
 
 | 무엇 | 파일 | 없으면 |
 |---|---|---|
-| 이름·호칭·말투·대사·행동 수치 | `character.toml`, `character-2.toml`… (config.toml `[character] file`로 지정) | `character.example.toml` (기본 캐릭터 "포피") |
-| 이미지 | `[persona] images` 폴더, 없으면 `assets`의 `pet.png` 외 | 주황 방울 모양 |
+| 이름·호칭·말투·대사·행동 수치 | `%LOCALAPPDATA%\POPME\character.toml`, `character-2.toml`… (config.toml `[character] file`로 지정) | 기본 캐릭터 "포피" |
+| 이미지 | `[persona] images` 폴더, 없으면 `%LOCALAPPDATA%\POPME\assets`의 `pet.png` 외 | 주황 방울 모양 |
 
-둘 다 `.gitignore`에 들어 있어서 저장소에 올라가지 않고, 새 버전을 설치할 때 예전 폴더에서 가져옵니다. **`character.example.toml`은 직접 고치지 마세요** — 업데이트하면 원래대로 돌아갑니다. **다른 작품의 캐릭터를 쓴다면 개인 PC에서만 쓰고 공개하지 마세요.**
+둘 다 앱 폴더 밖에 있어서 저장소에 올라가지 않고, 새 버전을 설치해도 그대로입니다. **앱 폴더의 `popme\defaults`는 직접 고치지 마세요** — 업데이트하면 원래대로 돌아갑니다. **다른 작품의 캐릭터를 쓴다면 개인 PC에서만 쓰고 공개하지 마세요.**
 
 ## 1. 말투·대사
 POPME 폴더에서:
 ```powershell
-copy character.example.toml character.toml
+copy popme\defaults\character.example.toml "$env:LOCALAPPDATA\POPME\character.toml"
 ```
-`character.toml`을 메모장으로 열어 고칩니다. `[persona] name`도 바꿔 두면 설정 창에서 기본 캐릭터와 구분됩니다.
+`%LOCALAPPDATA%\POPME\character.toml`을 메모장으로 열어 고칩니다. `[persona] name`도 바꿔 두면 설정 창에서 기본 캐릭터와 구분됩니다. 내 이미지를 쓰려면 `[persona]`의 `images` 줄을 지웁니다.
 
 - `[persona]`: `name`(이름표·메뉴), `intro`(설정 창 카드 소개), `images`(이미지 폴더), `call_user`(호칭, 대사에서 `{user}`), `prompt`(AI가 아침 브리핑 때 '오늘의 멘트'를 만들 때 따르는 말투 설명)
 - `[ui]`: 말풍선·패널의 고정 문구
@@ -30,7 +30,7 @@ copy character.example.toml character.toml
 - 브리핑 카드 본문과 질문 탭 답변은 캐릭터 말투를 따르지 않습니다.
 
 ## 2. 이미지
-`assets` 폴더에 넣습니다. 기본 캐릭터(포피·토리·묵이)는 자기 그림을 쓰므로, 여기 넣은 이미지는 직접 만든 캐릭터에서 보입니다. `.png` `.webp` `.gif` 모두 되고, 배경이 투명한 정사각형(256px 이상)이 가장 예쁩니다.
+`%LOCALAPPDATA%\POPME\assets` 폴더에 넣습니다. 기본 캐릭터(포피·토리·묵이)는 자기 그림을 쓰므로, 여기 넣은 이미지는 직접 만든 캐릭터에서 보입니다. `.png` `.webp` `.gif` 모두 되고, 배경이 투명한 정사각형(256px 이상)이 가장 예쁩니다.
 
 | 파일 | 언제 |
 |---|---|
@@ -42,10 +42,10 @@ copy character.example.toml character.toml
 
 흰 배경 이미지는 배경을 따서 맞춰 줍니다. POPME 폴더의 PowerShell에서, 설치 때 만든 Python으로 실행하세요 (그냥 `python`에는 이미지 라이브러리가 없습니다):
 ```powershell
-& "$env:LOCALAPPDATA\POPME\venv\Scripts\python.exe" assets\prepare.py "C:\경로\내캐릭터.png" pet
-& "$env:LOCALAPPDATA\POPME\venv\Scripts\python.exe" assets\prepare.py "C:\경로\열심.png" pet_busy
+& "$env:LOCALAPPDATA\POPME\venv\Scripts\python.exe" -m popme.prepare "C:\경로\내캐릭터.png" pet
+& "$env:LOCALAPPDATA\POPME\venv\Scripts\python.exe" -m popme.prepare "C:\경로\열심.png" pet_busy
 ```
-바탕화면·트레이 아이콘(`assets/pet.ico`)은 POPME가 켜질 때 `pet.png`로 다시 만듭니다. 바탕화면 아이콘은 윈도우가 늦게 바꿀 수 있습니다.
+바탕화면·트레이 아이콘(`pet.ico`)은 POPME가 켜질 때 `pet.png`로 다시 만듭니다. 바탕화면 아이콘은 윈도우가 늦게 바꿀 수 있습니다.
 
 ## 3. 적용
 캐릭터 우클릭 → 종료 → 바탕화면 **POPME**로 다시 실행.

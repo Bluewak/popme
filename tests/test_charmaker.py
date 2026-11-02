@@ -1,6 +1,5 @@
 """설정 창에서 캐릭터 만들기 (popme/charmaker.py) — AI가 무엇을 주든 앱이 켜지는 캐릭터 파일만 나온다."""
 import tomllib
-from pathlib import Path
 
 import pytest
 from PIL import Image
@@ -8,24 +7,21 @@ from PIL import Image
 from popme import character, charmaker as cm, config, persona
 from popme import setup_window as sw
 
-REPO = Path(__file__).resolve().parent.parent
 INFO = {"name": "모모", "call_user": "주인님", "tone": "bright", "detail": "복숭아를 좋아하는 강아지"}
 
 
 @pytest.fixture
 def folder(tmp_path, monkeypatch):
-    """임시 POPME 폴더 (예시 캐릭터·prepare.py만 있음)."""
+    """임시 사용자 폴더 (캐릭터 파일·이미지가 생기는 곳)."""
     (tmp_path / "assets").mkdir()
-    for name in ("character.example.toml", "assets/prepare.py"):
-        (tmp_path / name).write_bytes((REPO / name).read_bytes())
-    monkeypatch.setattr(config, "ROOT", tmp_path)
     monkeypatch.setattr(config, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(config, "ASSETS_DIR", tmp_path / "assets")
     return tmp_path
 
 
 def loaded(monkeypatch, file):
     """앱이 하듯 캐릭터 파일을 읽는다."""
-    monkeypatch.setattr(character, "character_path", lambda: config.ROOT / file)
+    monkeypatch.setattr(character, "character_path", lambda: config.DATA_DIR / file)
     return character.Character()
 
 
@@ -147,8 +143,7 @@ def test_bad_image_says_so(folder):
 
 
 def test_wizard_save_creates_character_and_points_config(folder, monkeypatch, tmp_path):
-    (folder / "config.example.toml").write_bytes((REPO / "config.example.toml").read_bytes())
-    monkeypatch.setattr(sw, "base_text", lambda: (folder / "config.example.toml").read_text(encoding="utf-8"))
+    monkeypatch.setattr(sw, "base_text", lambda: config.EXAMPLE_CONFIG.read_text(encoding="utf-8"))
     written = {}
     monkeypatch.setattr(sw, "write", lambda t: written.update(text=t))
     r = sw.Api().save({"provider": "claude", "plan": "Claude Pro", "tools": "Claude Code", "briefing_after": "09:00",

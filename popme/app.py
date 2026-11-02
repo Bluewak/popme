@@ -24,7 +24,7 @@ import markdown
 import pystray
 import webview
 
-from popme import agenda, briefing, catalog, chrome, config, discovery, event_weather, mail, planner, character, weather
+from popme import __version__, agenda, briefing, catalog, chrome, config, discovery, event_weather, mail, planner, character, update, weather
 from popme.collectors import timetree
 from popme.jobs import CHROME_CLOSED, Jobs, calendar_source
 from popme.pet import PetWindow, icon_image, load_images, write_icon
@@ -95,6 +95,7 @@ class Api:
     def __init__(self):
         self._jobs = None
         self._mail = None  # mail.Watcher — config [mail]을 켰을 때만
+        self._new_version = None  # 새 버전 태그 (update.py)
         self._window = None
         self._tray = None
         self._pet = None
@@ -646,6 +647,24 @@ class Api:
                 f"{' · ' + esc(x['why']) if x['why'] else ''}</span>" for x in mails[:3]]
         self._alert("mail", "", lead=(lead or "중요한 메일이 왔어요.") + "<br>", items=rows)
 
+    def _update_loop(self):
+        """새 버전이 나왔으면 한 번 말하고 메뉴에 「새 버전 받기」를 띄운다 (config [update] check)."""
+        time.sleep(60)  # 켜자마자 말이 겹치지 않게
+        while True:
+            try:
+                tag = update.check() if config.load().get("update", {}).get("check", True) else None
+                if tag:
+                    self._new_version = tag
+                    self._tray.update_menu()
+                    if update.first_notice(tag):
+                        self._show_chat(self._char.line("update", version=tag))
+            except Exception:
+                log.exception("새 버전 확인 실패")
+            time.sleep(6 * 3600)
+
+    def open_update(self):
+        webbrowser.open(update.PAGE)
+
     def _alert_loop(self):
         notified = set()
         while True:
@@ -722,13 +741,14 @@ def main(restart=False):
         None,
         (f"{name} 숨기기 (트레이에서 다시 보이기)", api._hide_all),
         ("설정 바꾸기", bg(open_settings)),
+        *([(f"새 버전 받기 ({api._new_version})", api.open_update)] if api._new_version else []),
         ("종료", quit_app),
     ]
     images = load_images(api._char.images)
     try:
         write_icon(images["idle"])  # 이미지를 바꿨으면 바로가기 아이콘도
     except OSError:
-        log.warning("캐릭터 아이콘(assets/pet.ico)을 못 만들었어요", exc_info=True)
+        log.warning("캐릭터 아이콘(pet.ico)을 못 만들었어요", exc_info=True)
     pet = PetWindow(images, api._pet_anchor, on_click=bg(api._on_pet_click), on_moved=bg(api._on_pet_moved),
                     menu_items=pet_menu, on_petted=bg(api._on_petted), on_bubble_click=bg(api._on_bubble_click))
     pet.name = name  # 말풍선 이름표
@@ -743,6 +763,9 @@ def main(restart=False):
         pystray.MenuItem("전용 Chrome 열기 (로그인)", lambda i, _: api.open_chrome_login()),
         pystray.MenuItem("브리핑 폴더 열기", lambda i, _: api.open_folder()),
         pystray.MenuItem("설정 바꾸기", lambda i, _: threading.Thread(target=open_settings, daemon=True).start()),
+        pystray.MenuItem(lambda i: f"새 버전 받기 ({api._new_version})", lambda i, _: api.open_update(),
+                         visible=lambda i: bool(api._new_version)),
+        pystray.MenuItem(f"POPME v{__version__}", None, enabled=False),
         pystray.MenuItem("종료", quit_app),
     ))
     api._tray = tray
@@ -776,8 +799,8 @@ def main(restart=False):
             jobs.run_full()
 
         mail_watch = [api._mail.run] if api._mail else []
-        for target in (tray.run, jobs.morning_loop, api._alert_loop, api._behavior_loop, warm_up, first_briefing,
-                       *mail_watch):
+        for target in (tray.run, jobs.morning_loop, api._alert_loop, api._behavior_loop, api._update_loop, warm_up,
+                       first_briefing, *mail_watch):
             threading.Thread(target=target, daemon=True).start()
 
     webview.start(background)

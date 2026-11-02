@@ -18,9 +18,18 @@ def korea_pc(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def no_personal_config(monkeypatch, tmp_path):
-    """테스트는 내 config.toml을 읽지도 고치지도 않는다 (config.load가 예전 형식을 옮기므로) — 없는 경로로 돌려 example을 쓰게."""
-    from popme import config
-    monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.toml")
+    """테스트는 내 설정·캐릭터·이미지·저장한 비밀번호를 읽지도 고치지도 않는다 — 빈 임시 폴더와 메모리로 돌려 기본값을 쓰게."""
+    from popme import config, vault
+    data = tmp_path / "data"
+    (data / "assets").mkdir(parents=True)
+    monkeypatch.setattr(config, "DATA_DIR", data)
+    monkeypatch.setattr(config, "ASSETS_DIR", data / "assets")
+    monkeypatch.setattr(config, "CONFIG_PATH", data / "config.toml")
+    saved = {}
+    monkeypatch.setattr(vault, "get", lambda name: saved.get(name, ""))
+    monkeypatch.setattr(vault, "put", lambda name, value: saved.update({name: value}) or True)
+    monkeypatch.setattr(vault, "delete", lambda name: saved.pop(name, None) is not None)
+    monkeypatch.setattr(vault, "saved", saved, raising=False)
 
 
 @pytest.fixture(autouse=True)

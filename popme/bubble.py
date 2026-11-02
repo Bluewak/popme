@@ -6,11 +6,11 @@
 """
 import math
 
-from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from popme import config
 
-FONT_PATH = config.ROOT / "assets" / "fonts" / "Jua-Regular.ttf"
+FONT_PATH = config.ROOT / "popme" / "ui" / "fonts" / "Jua-Regular.ttf"
 CREAM, BROWN, ORANGE, INK = (255, 246, 222), (59, 34, 25), (232, 134, 90), (82, 56, 42)
 SS = 3  # 슈퍼샘플링 배율
 
