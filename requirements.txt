@@ -3,7 +3,7 @@
 #   uv pip compile --universal --python-version 3.11 --generate-hashes --no-header --no-annotate requirements.txt -o requirements.lock
 # Upper bounds: a new major version may break things. Raise them together after testing.
 # (ASCII only: pip reads this file in the system code page, e.g. cp949 on Korean Windows)
-playwright>=1.50,<2
+playwright>=1.64.1,<2
 pywebview>=5.0,<7
 pystray>=0.19,<1
 pillow>=13.0,<14
