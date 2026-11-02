@@ -10,6 +10,7 @@ import os
 import subprocess
 import time
 import urllib.request
+import uuid
 from pathlib import Path
 
 from popme.config import CHROME_PROFILE
@@ -83,35 +84,18 @@ def _window_state(page):
     return cdp.send("Browser.getWindowBounds", {"windowId": win["windowId"]})["bounds"]["windowState"]
 
 
-def _target_id(page):
-    cdp = page.context.new_cdp_session(page)
-    try:
-        return cdp.send("Target.getTargetInfo")["targetInfo"]["targetId"]
-    finally:
-        cdp.detach()
-
-
 def new_page(ctx):
     """새 탭. ctx.new_page()는 최소화된 창을 다시 띄워서, 창이 최소화돼 있으면 배경 탭으로 연다.
     (배경 탭도 렌더링 끄는 실행 옵션 덕에 스크롤·로딩이 돈다)
-    X·Threads는 따로 붙어서 동시에 탭을 여니, 「다음에 생긴 탭」이 아니라 내가 만든 탭(targetId)을 찾아 쓴다.
-    전에는 둘이 같은 탭을 잡아 서로의 이동을 끊었다 (Threads·일정 수집 실패: net::ERR_ABORTED)"""
+    수집 스레드들이 동시에 열어도 스레드마다 연결이 달라 서로의 새 탭 소식을 모두 받는다 → 주소 표식으로 자기 탭만 받는다
+    (안 그러면 둘이 같은 탭을 받아 서로의 이동을 끊고, 먼저 실패한 쪽이 탭을 닫아 나머지까지 ERR_ABORTED로 실패한다)."""
     try:
         if ctx.pages and _window_state(ctx.pages[0]) == "minimized":
-            seen = set(ctx.pages)
-            cdp = ctx.browser.new_browser_cdp_session()
-            try:
-                tid = cdp.send("Target.createTarget", {"url": "about:blank", "background": True})["targetId"]
-            finally:
-                cdp.detach()
-            for _ in range(100):  # 새 탭이 Playwright에 알려지기까지 (보통 바로)
-                for page in ctx.pages:
-                    if page not in seen:
-                        seen.add(page)
-                        if _target_id(page) == tid:
-                            return page
-                ctx.pages[0].wait_for_timeout(50)
-            raise RuntimeError("새로 연 배경 탭을 못 찾았어요")
+            mark = f"about:blank#popme-{uuid.uuid4().hex}"
+            with ctx.expect_page(lambda page: page.url == mark) as info:
+                ctx.browser.new_browser_cdp_session().send(
+                    "Target.createTarget", {"url": mark, "background": True})
+            return info.value
     except Exception as e:
         log.warning("배경 탭 열기 실패: %s", e)
     return ctx.new_page()

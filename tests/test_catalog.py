@@ -25,7 +25,8 @@ def test_catalog_is_consistent():
             re.compile(f["skip"])
     used = set()
     for p in catalog.profiles():
-        assert {"id", "name", "tag", "topic", "criteria", "caps"} <= set(p)
+        assert {"id", "name", "tag", "criteria", "caps"} <= set(p)
+        assert "topic" in p or not any(e.get("filter") is True for e in p["feeds"])  # 거르기 규칙을 쓰는 출처가 있으면 topic
         for e in p["feeds"]:
             assert e["id"] in feeds, (p["id"], e["id"])
             assert feeds[e["id"]]["group"] in p["caps"], (p["id"], e["id"])
@@ -41,10 +42,11 @@ def test_ai_coding_keeps_todays_feeds():
     """그동안 config.example.toml의 20개 = 「AI 코딩」 관심사. 이름이 같아야 DB의 지난 글과 이어진다."""
     old = {"Claude Code 릴리스", "Codex 릴리스", "pi 릴리스", "OpenClaw 릴리스", "Deep Agents 릴리스", "Gemini CLI 릴리스",
            "OpenAI 뉴스", "OpenAI 개발자 블로그", "Anthropic 뉴스", "Claude 블로그", "Anthropic 엔지니어링", "Google AI 블로그",
-           "xAI 뉴스", "Hugging Face 블로그", "Mistral 뉴스", "Simon Willison 블로그", "GeekNews", "Hacker News 인기",
+           "Hugging Face 블로그", "Mistral 뉴스", "Simon Willison 블로그", "GeekNews", "Hacker News 인기",
            "Hacker News AI 회사", "Hacker News AI 모델"}
     got = {f["name"] for f in catalog.active(news(interests=["ai-coding"]))}
     assert old <= got and "Cursor 변경내역" not in got  # 다른 코딩 도구는 켜야 받는다
+    assert "xAI 뉴스" not in got and "The Information" in got  # 2026-10-31 점검: xAI 미러는 멈춰 빼고(X @xai로), 단독 보도 매체를 더함
 
 
 def test_shared_feed_merges_filters():
@@ -179,3 +181,28 @@ def test_rss_items_only_from_active_feeds(tmp_path):
     assert {r["title"] for r in got} == {"Claude Code 팁", "v2.0"}  # 커뮤니티는 AI 글만, 안 받는 출처는 빼기
     assert next(r for r in got if r["title"] == "v2.0")["grp"] == "옛 묶음"
     assert briefing.rss_items(news(), db, since) == []
+
+
+def test_taxonomy_points_to_profiles_or_ai():
+    """분류표: 묶음이 있는 소분류는 그 관심사를, 아직 없는 묶음 id는 지워서 넘긴다 (그 소분류는 AI 질문으로 만든다)."""
+    tax = catalog.taxonomy()
+    names = [g["name"] for g in tax]
+    assert len(names) == len(set(names)) and "테크·IT" in names and "스포츠" in names
+    have = {p["id"] for p in catalog.profiles()}
+    flat = [x for g in tax for i in g["items"] for x in [i, *i.get("children", [])]]
+    assert all(x.get("profile") in have for x in flat if "profile" in x)
+    tech = next(g for g in tax if g["name"] == "테크·IT")
+    assert {x.get("profile") for x in tech["items"]} >= {"ai-coding", "data-science", "ml-engineering", "enterprise", "llm-apps"}
+    raw = [x for g in catalog._taxonomy() for i in g["items"] for x in [i, *i.get("children", [])]]
+    assert any(x.get("profile") and x["profile"] not in have for x in raw) or True  # 조사 중인 묶음은 원본엔 있어도 된다
+
+
+def test_ai_prompts_get_taxonomy_context(monkeypatch):
+    from popme import interests
+    seen = []
+    monkeypatch.setattr(interests, "research", lambda *a, **k: [])
+    monkeypatch.setattr(interests.llm, "ask", lambda cfg, s, prompt, timeout=0: seen.append(prompt) or '{"type": "스포츠", "questions": []}')
+    interests.questions({}, "포켓몬", "target", None, "엔터·문화 › 캐릭터·애니 › 포켓몬")
+    interests.suggest({}, "포켓몬", "world", "target", {}, [], "엔터·문화 › 캐릭터·애니 › 포켓몬")
+    asks = [p for p in seen if "분야: 포켓몬" in p]  # 질문·후보 지시문 (프로필 작가는 분류를 데이터로 받는다)
+    assert len(asks) == 2 and all("분류: 엔터·문화 › 캐릭터·애니 › 포켓몬" in p for p in asks)

@@ -19,6 +19,7 @@ discovery = '에이전트·Claude Code·Codex·개발 도구에 실질 정보를
 topics = ['요금·한도·혜택', '장애·보안', '새 기능·바뀐 기본값', '에이전트 사용법', '새 도구·오픈소스']   # 「특히 궁금한 것」 보기 (관심사 설정 ⑤)
 
 [caps]                        # 묶음별 상한 (이 관심사 몫)
+'업계 뉴스' = 12
 '공식 변경내역' = 45
 '공식 발표' = 30
 '장애' = 5
@@ -26,6 +27,18 @@ topics = ['요금·한도·혜택', '장애·보안', '새 기능·바뀐 기본
 '실사용 검증' = 20
 '새 오픈소스·화제' = 20
 '한국 커뮤니티' = 20
+
+[[feeds]]
+id = 'theinformation'
+why = '단독 보도 — 인수·투자·내부 소식이 먼저'
+
+[[feeds]]
+id = 'techcrunch-ai'
+why = 'AI 인수·투자·서비스 정책'
+
+[[feeds]]
+id = 'verge-ai'
+why = 'AI 제품 출시·분석'
 
 [[feeds]]
 id = 'claude-code-releases'
@@ -115,10 +128,6 @@ why = 'Anthropic의 에이전트 설계·평가 글'
 [[feeds]]
 id = 'google-ai-blog'
 why = 'Google·Gemini 공식 발표'
-
-[[feeds]]
-id = 'xai-news'
-why = 'xAI·Grok 공식 발표'
 
 [[feeds]]
 id = 'hf-blog'
@@ -261,6 +270,12 @@ why = '큰 흐름'
 x = 'karpathy'
 region = 'world'
 
+[[people]]
+name = 'Logan Kilpatrick'
+why = 'Gemini 출시 첫 공지'
+x = 'OfficialLoganK'
+region = 'world'
+
 [[companies]]
 name = 'Anthropic'
 why = 'Claude·Claude Code 공식'
@@ -290,7 +305,6 @@ name = 'Google DeepMind'
 why = 'Gemini 모델'
 x = 'GoogleDeepMind'
 region = 'world'
-default = false
 
 [[companies]]
 name = 'Cursor'
@@ -347,3 +361,15 @@ feeds = ['pi-releases']
 [[target.options]]
 label = 'OpenClaw'
 feeds = ['openclaw-releases']
+
+[[companies]]
+name = 'Claude Developers'
+why = 'Claude API·Claude Code 개발자 공지'
+x = 'ClaudeDevs'
+region = 'world'
+
+[[companies]]
+name = 'xAI'
+why = 'Grok 모델 (공식 블로그 RSS가 멈춤)'
+x = 'xai'
+region = 'world'
