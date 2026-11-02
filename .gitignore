@@ -2,6 +2,7 @@
 config.toml
 config.toml.bak-*
 character.toml
+character-*.toml
 shisa.toml
 PLAN.md
 .private-words.txt

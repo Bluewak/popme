@@ -1,4 +1,4 @@
-"""설정 창: 준비물 → 브리핑 AI → 캘린더 → (메일) → 로그인 → 날씨·시각을 차례로 고르면 config.toml에 써 준다.
+"""설정 창: 준비물 → 브리핑 AI → 캘린더 → (메일) → 로그인 → 관심사 → 캐릭터 → 날씨·시각을 차례로 고르면 config.toml에 써 준다.
 
 install.ps1이 설치할 때 띄우고, 나중엔 트레이(또는 캐릭터 우클릭) > "설정 바꾸기"로 다시 연다.
 config.toml의 주석·다른 설정은 그대로 두고 고른 값의 줄만 바꾼다 (파일이 없으면 config.example.toml에서 시작).
@@ -320,7 +320,7 @@ def base_text():
 
 
 def characters():
-    """폴더의 캐릭터 파일들 [{file, name}] ([persona]가 있는 *.toml)."""
+    """폴더의 캐릭터 파일들 [{file, name, intro, image}] ([persona]가 있는 *.toml)."""
     out = []
     for p in sorted(config.ROOT.glob("*.toml")):
         try:
@@ -328,8 +328,15 @@ def characters():
         except (tomllib.TOMLDecodeError, OSError):
             continue
         if persona is not None:
-            out.append({"file": p.name, "name": persona.get("name") or p.stem})
+            image = config.ROOT / persona.get("images", "assets") / "pet.png"
+            out.append({"file": p.name, "name": persona.get("name") or p.stem, "intro": persona.get("intro", ""),
+                        "image": image.relative_to(config.ROOT).as_posix() if image.exists() else ""})
     return out
+
+
+def charmaker_tones():
+    from popme import charmaker
+    return charmaker.TONES
 
 
 def mail_supported():
@@ -364,6 +371,7 @@ def current():
         "mail_domains": MAIL_DOMAINS,
         "character": char,
         "characters": chars,
+        "tones": {k: v[0] for k, v in charmaker_tones().items()},
         "ais": AIS,
         "calendar_apps": CALENDAR_APPS,
         "help": HELP,
@@ -449,6 +457,9 @@ def validate(ch):
     if char == "character.example.toml" and not (config.ROOT / "character.toml").exists():
         # 기본 캐릭터는 이름을 박지 않는다: character.toml을 나중에 만들면 그대로 쓰이고, 없으면 예시로 넘어간다
         char = "character.toml"
+    if ch.get("new_character"):
+        from popme import charmaker
+        ch = {**ch, "new_character": charmaker.clean(ch["new_character"])}
     return {**ch, "briefing_after": t, "ics": rows, "caldav": dav, "mail": mail, "character": char,
             "plan": (ch.get("plan") or "").strip(), "tools": (ch.get("tools") or "").strip(),
             **validate_interests(ch.get("interests"))}
@@ -901,6 +912,7 @@ class Api:
         self._window = None
         self._saved = False
         self._mode = mode  # {"start": pick|custom|edit, "pid"} — 브리핑 탭에서 「관심사」만 열 때
+        self._char_image = None  # 새 캐릭터로 고른 이미지 (저장할 때 assets로)
 
     def get(self):
         return {**current(), "chrome": chrome_found(), "mode": self._mode}
@@ -995,6 +1007,10 @@ class Api:
             if ch.get("interests"):  # 새 관심사 파일을 먼저 만들고, 고른 관심사 목록에 그 id를 넣는다
                 ch["interest_ids"] = save_interest_choices(ch["interests"])
                 ch["picks"] = ch["interests"]["picks"]
+            if ch.get("new_character"):  # 다른 값을 다 확인한 뒤에: 저장을 다시 눌러도 파일이 늘지 않게
+                from popme import charmaker
+                ch["character"] = charmaker.save(ch["new_character"], self._char_image)
+                self._char_image = None
             write(apply(base_text(), ch))
         except ValueError as e:
             return {"ok": False, "error": str(e)}
@@ -1003,6 +1019,31 @@ class Api:
             return {"ok": False, "error": f"저장하지 못했어요: {e}"}
         self._saved = True
         return {"ok": True}
+
+    # --- 캐릭터 단계 (popme/charmaker.py) ---
+    def character_draft(self, info, provider):
+        from popme import charmaker
+        try:
+            return {"ok": True, **charmaker.draft(self._cfg(provider), info)}
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
+        except Exception as e:
+            log.exception("캐릭터 대사 만들기 실패")
+            return {"ok": False, "error": f"대사를 만들지 못했어요: {str(e)[:120]}"}
+
+    def character_image(self):
+        """이미지 고르기 창 → 배경을 딴 미리 보기. 고르지 않고 닫으면 {"ok": False} (error 없음)."""
+        import base64
+        import webview
+        from popme import charmaker
+        picked = self._window.create_file_dialog(webview.OPEN_DIALOG, file_types=("이미지 (*.png;*.jpg;*.jpeg;*.webp;*.gif)",))
+        if not picked:
+            return {"ok": False}
+        try:
+            self._char_image = charmaker.prepare_image(picked[0])
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
+        return {"ok": True, "preview": "data:image/png;base64," + base64.b64encode(self._char_image.read_bytes()).decode()}
 
     # --- 관심사 단계 (popme/interests.py) ---
     def _cfg(self, provider):

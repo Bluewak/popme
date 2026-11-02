@@ -34,8 +34,8 @@ BLOCKED_FILES = [
 # 캐릭터 파일은 공개 예시(character.example.toml)만. 그 밖의 *.toml 캐릭터는 개인 것
 ALLOWED_TOML = {"config.example.toml", "character.example.toml"}
 # 앱이 챙기는 소식 출처·관심사 목록 (개인 설정 아님 — 내용의 개인 단어 검사는 그대로 한다)
-ALLOWED_TOML_PATHS = ["popme/feeds.toml", "popme/profiles/*.toml", "popme/taxonomy.toml", "popme/personas/*.toml"]
-ALLOWED_IMAGES = set()  # 공개해도 되는 이미지를 추가할 때 여기에 경로를 적는다
+ALLOWED_TOML_PATHS = ["character.*.example.toml", "popme/feeds.toml", "popme/profiles/*.toml", "popme/taxonomy.toml", "popme/personas/*.toml"]
+ALLOWED_IMAGES = ["assets/characters/*/pet*.png"]  # 공개해도 되는 이미지 (직접 만든 기본 캐릭터 그림)
 SKIP_CONTENT = {".gitignore"}  # 올리지 않을 파일 이름을 적는 곳이라 단어 검사에서 뺀다
 TEXT_EXT = {".py", ".md", ".toml", ".html", ".ps1", ".txt", ".json", ".yml", ".yaml", ".js", ".css", ".cfg", ""}
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
@@ -93,8 +93,8 @@ def check(items, words, allow=(), hits=None):
     problems = []
     for path, data in items:
         name = path.rsplit("/", 1)[-1]
-        if path not in ALLOWED_IMAGES and any(fnmatch.fnmatch(path, p) or fnmatch.fnmatch(name, p)
-                                              for p in BLOCKED_FILES):
+        if (not any(fnmatch.fnmatch(path, p) for p in ALLOWED_IMAGES)
+                and any(fnmatch.fnmatch(path, p) or fnmatch.fnmatch(name, p) for p in BLOCKED_FILES)):
             problems.append(f"{path}: 올리면 안 되는 파일")
             continue
         if (path.endswith(".toml") and name not in ALLOWED_TOML

@@ -16,8 +16,11 @@ except ImportError:  # 그냥 python으로 돌리면 Pillow가 없다 (POPME 패
 HERE = Path(__file__).resolve().parent
 
 
-def prepare(src, name, size=320):
+def prepare(src, name, size=320, out=None):
     img = Image.open(src).convert("RGBA")
+    img.thumbnail((1024, 1024), Image.LANCZOS)  # 사진처럼 큰 이미지는 아래 픽셀 반복이 오래 걸린다
+    if img.getchannel("A").getextrema()[0] < 250:  # 이미 배경이 투명하다
+        return finish(img, name, size, out)
     w, h = img.size
     mask_src = img.convert("RGB")
     for corner in ((0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)):
@@ -31,9 +34,13 @@ def prepare(src, name, size=320):
                 a[x, y] = 0
     alpha = alpha.filter(ImageFilter.GaussianBlur(0.8))  # 외곽 계단 현상 완화
     img.putalpha(alpha)
+    finish(img, name, size, out)
+
+
+def finish(img, name, size, out):
     img = img.crop(img.getbbox())
     img.thumbnail((size, size), Image.LANCZOS)
-    out = HERE / f"{name}.png"
+    out = out or HERE / f"{name}.png"
     img.save(out)
     print(out, img.size)
 

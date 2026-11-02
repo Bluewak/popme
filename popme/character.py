@@ -94,6 +94,7 @@ class Character:
         self.beh = self.cfg["behavior"]
         p = self.cfg.get("persona", {})
         self.name, self.user = p.get("name", "포피"), p.get("call_user", "")
+        self.images = p.get("images", "")  # 이미지 폴더 (없으면 assets)
         self.ui = {k: v.format(name=self.name, user=self.user, n="{n}", msg="{msg}")
                    for k, v in {**UI_DEFAULTS, **self.cfg.get("ui", {})}.items()}
         self.advice = {**WEATHER_ADVICE_DEFAULTS, **self.cfg.get("weather_advice", {})}
@@ -112,7 +113,7 @@ class Character:
             return None
         self._used.add(pick)
         try:
-            return pick.format(**kw)
+            return pick.format(**{"user": self.user, **kw})
         except (KeyError, IndexError):
             return None
 

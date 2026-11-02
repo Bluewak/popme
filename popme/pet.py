@@ -52,12 +52,14 @@ WM_DESTROY, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEMOVE, WM_TIMER = 0x2, 0x201, 0
 WM_RBUTTONUP = 0x205
 
 
-def load_images():
-    """assets/pet*.{png,webp,gif} → {"idle": PIL.Image, ...}. 평소 이미지가 없으면 주황 방울."""
+def load_images(folder=""):
+    """pet*.{png,webp,gif} → {"idle": PIL.Image, ...}. folder: 캐릭터 파일 [persona] images (없으면 assets).
+    평소 이미지가 없으면 주황 방울."""
     imgs = {}
+    base = config.ROOT / folder if folder else ASSETS
     for state, name in FILES.items():
         for ext in ("png", "webp", "gif"):
-            p = ASSETS / f"{name}.{ext}"
+            p = base / f"{name}.{ext}"
             if p.exists():
                 imgs[state] = Image.open(p).convert("RGBA")
                 break
