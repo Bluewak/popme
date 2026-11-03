@@ -46,6 +46,25 @@ def test_answer_reports_stages_and_search(tmp_path, monkeypatch):
     assert "높임말" in systems[1] and "반말" in briefing.SYSTEM  # 답은 높임말, 브리핑 카드는 반말 그대로
 
 
+RECENT = "# X 핵심 계정\n## @simonw\n- MCP 새 버전\n- 점심\n## @other\n- 날씨\n# RSS\n- mcp 표준 | https://r.dev/1"
+
+
+def test_ask_data_keeps_only_matching_recent_lines_when_search_finds(tmp_path, monkeypatch):
+    """검색에 걸리면 72시간 자료는 검색어가 든 줄만 (통째로면 질문마다 26만 자였다), 안 걸리면 통째로."""
+    db = DB(tmp_path / "t.db")
+    db.upsert_tweets([{"id": "1", "author": "simonw", "text": "MCP server", "created_at": "2026-09-10T03:00:00+00:00",
+                       "likes": 5, "via": "user:simonw", "kind": "post"}])
+    monkeypatch.setattr(briefing, "build_data", lambda *a, **k: RECENT)
+    data, counts = briefing.ask_data({}, db, ["MCP"])
+    assert "# 질문 관련 기록 검색" in data and "# 일정 (TimeTree)" in data
+    assert data.endswith("# 최근 72시간 자료 중 검색어가 든 것\n# X 핵심 계정\n## @simonw\n- MCP 새 버전\n"
+                         "# RSS\n- mcp 표준 | https://r.dev/1")  # 계정 이름이 든 제목은 같이, 안 걸린 계정은 제목도 빠짐
+    assert counts["posts"] == 1
+    for kw in (["없는말"], []):  # 걸린 게 없거나, 최근 소식 전반을 묻는 질문 (검색어 없음)
+        data, _ = briefing.ask_data({}, db, kw)
+        assert data == RECENT
+
+
 def test_character_ask_defaults(tmp_path, monkeypatch):
     f = tmp_path / "c.toml"
     f.write_text('[persona]\nname = "X"\ncall_user = "님"\n[behavior]\nchatter_bubble_sec = 5\n'

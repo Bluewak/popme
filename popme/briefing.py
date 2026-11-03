@@ -88,12 +88,15 @@ __TITLE_RULES__
 __LIST__"""
 
 QA_RULES = """아래 데이터와 오늘 브리핑만 근거로 질문에 답하라.
-"# 질문 관련 기록 검색"은 수집해 둔 전체 기간에서 이 질문의 검색어로 찾은 기록이고, 그 아래는 최근 72시간 자료다.
+"# 질문 관련 기록 검색"은 수집해 둔 전체 기간에서 이 질문의 검색어로 찾은 기록이고, 그 아래는 최근 72시간 자료다
+(검색에 걸린 게 있으면 그중 검색어가 든 줄만).
 출력은 JSON 하나만. 코드블록·설명 없이.
 {"found": true, "summary": "...", "points": [{"date": "2026-09-08", "text": "...", "status": "확인됨",
   "links": [{"label": "원문", "url": "https://..."}]}]}
 - summary: 질문에 대한 답을 한두 문장으로. 평문(마크다운 금지), 높임말(해요체, "~했어요").
 - points: 답의 근거가 되는 핵심 2~4개, 중요한 순. 장황하게 늘어놓지 말 것.
+  중요한 것 = 반응(♥)이 큰 글, 당사자 공식 발표, 여러 글이 같이 다룬 소식. 가장 최근이라는 이유만으로 고르지 말 것
+  (♥는 X가 Threads보다 훨씬 크게 나오니 같은 곳끼리 비교).
   text는 "누가/무엇이 + 어떻게 했어요" 한 문장(60자 이내), 높임말. date는 그 글·소식의 날짜(YYYY-MM-DD).
   status는 공식 출처(RSS 공식 변경내역·공식 계정)로 확인되면 "확인됨", 사람 말뿐이면 "미확인".
   links는 1~2개, URL은 데이터에 있는 것을 글자 그대로만.
@@ -599,23 +602,35 @@ def clean_answer(raw, data):
             "summary": summary, "points": points}
 
 
-def answer(cfg, db, question, progress=lambda stage, info=None: None):
-    """질문 → 검색어·기간을 뽑아 전체 기록에서 찾고, 최근 72시간 자료·오늘 브리핑과 함께 답한다.
-    progress(stage, info): "plan" → "search"({keywords, since, until}) → "write"({counts}) 순으로 알린다.
-    반환: {"found", "summary", "points": [{"date", "text", "status", "links"}], "search": {...}}"""
-    since = (datetime.now(timezone.utc) - timedelta(hours=72)).isoformat()
-    progress("plan")
-    kw, lo, hi = plan_search(cfg, question)
-    progress("search", {"keywords": kw, "since": lo, "until": hi})
-    found, counts = search.find(db, kw, lo, hi)
-    log.info("질문 검색: %s (%s~%s) → %s", kw, lo, hi, counts)
-    progress("write", {"counts": counts})
-    data = build_data(cfg, db, since, with_events=True)
+def ask_data(cfg, db, kw, since=None, until=None):
+    """질문 답변에 넘길 자료 → (데이터 블록, 찾은 개수). 오늘 브리핑에, 검색에 걸린 게 있으면 그 기록·일정과
+    최근 72시간 자료 중 검색어가 든 줄만, 없으면 (최근 소식 전반을 묻는 질문 등) 72시간 자료를 통째로.
+    예전엔 둘 다 통째로 넣어 질문마다 26만 자였다 (2026-11). 시험 세트(tools/ask_eval.py) 18문항에서
+    자료는 76% 줄고 근거로 실린 정답 글은 903 → 918개. 72시간 자료를 아예 빼면 846개로 줄었다."""
+    found, counts = search.find(db, kw, since, until)
+    recent = build_data(cfg, db, (datetime.now(timezone.utc) - timedelta(hours=72)).isoformat(), with_events=not found)
     if found:
-        data = f"{found}\n\n{data}"
+        _, ev = events_block(db, cfg)  # 일정은 검색어와 상관없이 통째로 (짧다)
+        hits = search.lines_with(recent, kw)
+        data = f"{found}\n\n# 일정 (TimeTree)\n{ev}" + (f"\n\n# 최근 72시간 자료 중 검색어가 든 것\n{hits}" if hits else "")
+    else:
+        data = recent
     b = db.latest_briefing()
     if b:
         data = f"# 오늘 브리핑\n{b['markdown']}\n\n{data}"
+    return data, counts
+
+
+def answer(cfg, db, question, progress=lambda stage, info=None: None):
+    """질문 → 검색어·기간을 뽑아 전체 기록에서 찾고 (ask_data), 그 자료로 답한다.
+    progress(stage, info): "plan" → "search"({keywords, since, until}) → "write"({counts}) 순으로 알린다.
+    반환: {"found", "summary", "points": [{"date", "text", "status", "links"}], "search": {...}}"""
+    progress("plan")
+    kw, lo, hi = plan_search(cfg, question)
+    progress("search", {"keywords": kw, "since": lo, "until": hi})
+    data, counts = ask_data(cfg, db, kw, lo, hi)
+    log.info("질문 검색: %s (%s~%s) → %s", kw, lo, hi, counts)
+    progress("write", {"counts": counts})
     prompt = QA_RULES.replace("__QUESTION__", question) + f"\n<data>\n{data}\n</data>"
     text = llm.ask(cfg, QA_SYSTEM, prompt, timeout=300)
     try:
