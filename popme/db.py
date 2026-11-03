@@ -1,6 +1,9 @@
+import logging
 import sqlite3
 import threading
 from datetime import datetime, timezone
+
+log = logging.getLogger(__name__)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS tweets (
@@ -102,6 +105,10 @@ class DB:
     def __init__(self, path):
         self.path = path
         self._local = threading.local()
+        try:  # WAL: 수집이 쓰는 동안에도 질문 검색이 기다리지 않고, 긴 검색이 수집 저장을 막지 않는다 (DB 파일에 남는 설정)
+            self.conn().execute("PRAGMA journal_mode=WAL")
+        except sqlite3.OperationalError:  # 다른 프로세스가 붙잡고 있으면 다음 실행 때 바뀐다
+            log.warning("DB WAL 모드 전환 실패 (이번엔 예전 방식으로)", exc_info=True)
         self.conn().executescript(SCHEMA)
         for m in MIGRATIONS:
             try:
