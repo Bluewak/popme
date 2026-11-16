@@ -73,6 +73,26 @@ def test_x_saves_each_page_even_if_cut_off(monkeypatch):
     assert [t["id"] for t in saved] == ["t1", "t2"]
 
 
+def test_x_rotating_accounts_scroll_deeper_and_record_only_seen(monkeypatch):
+    """돌아가며 보는 계정(since_by)은 그 시각까지·DEEP_SCROLLS번까지, 나머지는 since·설정 스크롤.
+    visited에는 글을 받아 온 계정만, 중간에 끊겨도 그때까지."""
+    calls = []
+
+    def fake_visit(page, url, via, scrolls, out, ops_seen, owner, since, users):
+        calls.append((owner, scrolls, since))
+        if owner == "c":
+            raise RuntimeError("Target page, context or browser has been closed")
+        return 0 if owner == "b" else 3
+    monkeypatch.setattr(x, "_visit", fake_visit)
+    monkeypatch.setattr(x.random, "uniform", lambda a, b: 0)
+    monkeypatch.setattr(x.random, "shuffle", lambda l: None)
+    visited = []
+    with pytest.raises(RuntimeError):
+        x.collect(FakeCtx(), {"x": {}}, ["A", "b", "c"], since="S", since_by={"a": "OLD"}, visited=visited)
+    assert calls[0] == ("A", x.DEEP_SCROLLS, "OLD") and calls[1] == ("b", 3, "S")
+    assert visited == ["A"]  # b는 글이 없었고 c는 끊김
+
+
 def test_menu_label_and_busy_line():
     from popme.app import Api
     state = {"running": False, "status": ""}

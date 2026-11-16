@@ -111,6 +111,17 @@ def test_x_active_account_scrolls_until_old(monkeypatch):
     assert page.scrolls == 2 and len(out) == 15
 
 
+def test_x_logs_when_scrolls_run_out_before_since(monkeypatch, caplog):
+    """스크롤을 다 써도 since까지 못 닿으면 (돌아가며 보는 계정의 사이 글이 잘림) 로그를 남긴다."""
+    import logging
+    monkeypatch.setattr(x, "dump_raw", lambda *a, **k: None)
+    page = FakePage([x_batch(0, NEW), x_batch(10, NEW), x_batch(20, NEW)])
+    page.goto = lambda url, **_: (setattr(page, "url", GQL), page.emit())
+    with caplog.at_level(logging.INFO, logger="popme.collectors.x"):
+        x._visit(page, "https://x.com/me", "user:me", 2, [], set(), "me", SINCE)
+    assert page.scrolls == 2 and "못 내려감" in caplog.text
+
+
 def test_x_search_page_always_scrolls(monkeypatch):
     monkeypatch.setattr(x, "dump_raw", lambda *a, **k: None)
     page = FakePage([x_batch(0, OLD)] * 4)

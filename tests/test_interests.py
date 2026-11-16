@@ -81,20 +81,100 @@ def _db():
 
 
 def test_x_rotation_keeps_mine_and_rotates_the_rest(monkeypatch):
-    """내 핵심 계정은 늘, 발굴로 추가한 계정·관심사 계정은 남은 자리만큼 오래 안 본 것부터."""
+    """내 핵심 계정은 늘, 발굴로 추가한 계정·관심사 계정은 남은 자리만큼 오래 안 본 것부터.
+    본 시각은 실제로 본 뒤(mark_x_visited)에만 남는다 — 못 본 날은 다음에도 그 계정부터."""
     mine = [{"handle": f"me{i}", "name": "", "group": "", "focus": ""} for i in range(14)]
     found = [{"handle": f"d{i}", "name": "", "group": "발굴로 추가", "focus": ""} for i in range(40)]
     many = [{"handle": f"i{i}", "name": "", "group": "", "focus": "", "interest": "x"} for i in range(10)]
     cfg = {"x": {"accounts": mine}}
+    since = datetime.now(timezone.utc).isoformat()
     monkeypatch.setattr(briefing, "core_accounts", lambda cfg, db: mine + found + many)
-    first = briefing.x_to_visit(cfg, None)
+    first = briefing.x_plan(cfg, None, since)[0]
     assert first[:14] == [a["handle"] for a in mine] and len(first) == briefing.X_VISIT_LIMIT  # 62개 → 30개
-    second = briefing.x_to_visit(cfg, None)
+    assert briefing.x_plan(cfg, None, since)[0] == first  # 수집이 실패해 기록을 안 남겼으면 같은 계정을 다시
+    briefing.mark_x_visited(first)
+    second = briefing.x_plan(cfg, None, since)[0]
     assert set(first[14:]).isdisjoint(second[14:])  # 다음 수집은 아직 안 본 계정부터
     big = {"x": {"accounts": mine + found[:20]}}  # 내 계정이 30개를 넘어도 돌아가는 쪽은 10개는 본다
-    assert len(briefing.x_to_visit(big, None)) == 34 + 10
+    assert len(briefing.x_plan(big, None, since)[0]) == 34 + 10
     monkeypatch.setattr(briefing, "core_accounts", lambda cfg, db: mine[:3] + many[:5])
-    assert len(briefing.x_to_visit(cfg, None)) == 8  # 넘지 않으면 다 본다
+    assert briefing.x_plan(cfg, None, since) == ([a["handle"] for a in mine[:3] + many[:5]], {})  # 넘지 않으면 다 본다
+
+
+def test_x_plan_scrolls_rotating_accounts_back_to_last_visit(monkeypatch):
+    """돌아가며 보는 계정은 지난번에 본 시각까지 (최대 X_LOOKBACK). 처음 보는 계정·내 계정·최근 본 계정은 since까지."""
+    mine = [{"handle": "me", "name": "", "group": "", "focus": ""}]
+    rot = [{"handle": f"R{i}", "name": "", "group": "", "focus": ""} for i in range(12)]
+    monkeypatch.setattr(briefing, "core_accounts", lambda cfg, db: mine + rot)
+    now = datetime.now(timezone.utc)
+    visits = {f"r{i}": (now - timedelta(hours=1)).isoformat() for i in range(2, 12)}
+    visits |= {"r0": (now - timedelta(days=5)).isoformat(), "r1": (now - timedelta(days=30)).isoformat()}
+    briefing.X_VISITS.write_text(json.dumps(visits), encoding="utf-8")
+    since = (now - timedelta(hours=20)).isoformat()
+    handles, since_by = briefing.x_plan({"x": {"accounts": mine}}, None, since, limit=11)
+    assert handles[:3] == ["me", "R1", "R0"] and len(handles) == 11  # 자리 10개, 오래 안 본 것부터
+    assert abs(datetime.fromisoformat(since_by["r0"]) - (now - timedelta(days=5, hours=1))) < timedelta(minutes=1)
+    assert abs(datetime.fromisoformat(since_by["r1"]) - (now - briefing.X_LOOKBACK)) < timedelta(minutes=1)  # 7일까지만
+    assert set(since_by) == {"r0", "r1"}  # 1시간 전에 본 계정은 since(20시간 전)까지면 충분
+
+
+def test_build_data_includes_late_seen_posts_of_rotating_accounts(monkeypatch):
+    """며칠 만에 연 계정의 사이 글: 지난 브리핑 뒤에 처음 받은 것은 구간 전 글이라도 넣는다.
+    지난 브리핑 전에 받은 글(이미 실렸을 글)·처음 연 계정의 지난 글·남에게 단 답글은 넣지 않고,
+    반응 큰 X_LATE_PER_ACCOUNT개까지, 구간 글 25개 자르기와는 따로. 질문 답변(late_since 없음)에는 안 넣는다."""
+    db = _db()
+    now = datetime.now(timezone.utc)
+    prev = now - timedelta(hours=20)       # 지난 브리핑을 만든 시각
+    since = prev - timedelta(hours=1)      # window_start: 지난 브리핑 1시간 전
+    monkeypatch.setattr(briefing, "core_accounts", lambda cfg, db: [
+        {"handle": h, "name": h, "group": "", "focus": ""} for h in ("old", "fresh", "busy")])
+    monkeypatch.setattr(briefing, "threads_accounts", lambda cfg, db: [])
+    monkeypatch.setattr(briefing, "rss_items", lambda cfg, db, s: [])
+    monkeypatch.setattr(briefing.discovery, "candidates", lambda db, limit=5: [])
+
+    def tw(i, author, created, collected, likes=100, kind="post", ref=None, via=None):
+        db.upsert_tweets([{"id": i, "author": author, "text": f"글 {i} 끝", "created_at": created.isoformat(),
+                           "lang": "en", "likes": likes, "urls": "[]", "kind": kind, "ref_author": ref,
+                           "via": via or f"user:{author}"}])
+        db.conn().execute("UPDATE tweets SET collected_at=? WHERE id=?", (collected.isoformat(), i))
+        db.conn().commit()
+    seen = now - timedelta(hours=1)        # 오늘 수집에서 처음 받음
+    long_ago = now - timedelta(days=9)
+    tw("1", "old", long_ago, long_ago)                                   # 예전에 이 계정 페이지를 열었음
+    tw("2", "old", now - timedelta(days=4), seen)                        # 사이 글을 오늘 처음 봄 → 넣음
+    tw("2b", "old", now - timedelta(days=4), prev - timedelta(minutes=30))  # 지난 브리핑 직전에 받음 → 또 넣지 않음
+    tw("3", "old", now - timedelta(days=12), seen)                       # 처음 봤지만 X_LOOKBACK보다 오래됨
+    tw("4", "old", now - timedelta(hours=2), seen, likes=0)              # 구간 안 → 반응과 상관없이 넣음
+    tw("7", "old", now - timedelta(days=2), seen, kind="reply", ref="someone")  # 남에게 단 답글 → 안 넣음
+    tw("8", "old", now - timedelta(days=2), seen, kind="reply", ref="old")      # 자기 글타래 → 넣음
+    for n in range(4):  # 사이 글이 많으면 반응 큰 것만
+        tw(f"9{n}", "old", now - timedelta(days=3), seen, likes=50 + n)
+    tw("99", "old", now - timedelta(days=3), seen, likes=1)
+    tw("5q", "fresh", long_ago, long_ago, via="user:old")                # 남의 페이지에 인용으로 실렸던 글 — 방문 아님
+    tw("5", "fresh", now - timedelta(days=3), seen)                      # 처음 연 계정의 지난 글 → 안 넣음
+    tw("6", "fresh", now - timedelta(hours=3), seen)
+    tw("b0", "busy", long_ago, long_ago)
+    tw("bl", "busy", now - timedelta(days=2), seen, likes=999)           # 구간 글이 30개여도 사이 글은 남는다
+    for n in range(30):
+        tw(f"bw{n}", "busy", now - timedelta(minutes=10 + n), seen)
+    data = briefing.build_data({}, db, since.isoformat(), late_since=prev.isoformat())
+    assert all(f"글 {i} 끝" in data for i in ("2", "4", "6", "8", "91", "92", "93", "bl"))
+    assert all(f"글 {i} 끝" not in data for i in ("1", "2b", "3", "5", "7", "90", "99"))
+    # 늦게 본 글은 반응 큰 순 5개: 2·8(100) + 93·92·91 — 90(50)·99(1)은 밀림
+    assert sum(f"글 bw{n} 끝" in data for n in range(30)) == 25
+    ask = briefing.build_data({}, db, since.isoformat())
+    assert "글 2 끝" not in ask and "글 bl 끝" not in ask and "글 4 끝" in ask
+
+
+def test_prev_briefing_at_is_last_briefing_before_today():
+    """사이 글 기준: 오늘 전 마지막 브리핑을 만든 시각 — 오늘 브리핑을 다시 만들어도 같은 기준."""
+    from popme import clock
+    db = _db()
+    assert briefing.prev_briefing_at(db) is None
+    db.save_briefing("2000-01-01", "예전")
+    old = db.briefing_for("2000-01-01")["created_at"]
+    db.save_briefing(clock.now().strftime("%Y-%m-%d"), "오늘")
+    assert briefing.prev_briefing_at(db) == old
 
 
 def test_news_capped_per_person(monkeypatch, tmp_path):
