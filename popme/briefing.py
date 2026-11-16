@@ -184,32 +184,61 @@ def core_accounts(cfg, db):
 
 
 X_VISIT_LIMIT = 30
-X_VISITS = config.DATA_DIR / "x-visits.json"  # 관심사 계정을 마지막으로 본 시각 (돌아가며 보기)
+X_VISITS = config.DATA_DIR / "x-visits.json"  # 계정 페이지를 마지막으로 본 시각 (돌아가며 보기) {handle 소문자: UTC ISO}
+# 돌아가며 보는 계정은 며칠에 한 번 열린다 (2026-11: 89개를 16개씩 → 5~6일). 그 사이 글을 이만큼 거슬러 받고 브리핑에도 넣는다.
+# 예전엔 수집도 브리핑도 「지난 브리핑 이후」만 봐서 사이 글이 빠졌다 — 2026-11-16 한 번에 226개
+# (@sundarpichai의 Gemini 4 Carbon·TPU 발표, @deepseek_ai의 API 공개 등)
+X_LOOKBACK = timedelta(days=7)
+X_LATE_PER_ACCOUNT = 5  # 사이 글은 계정당 반응 큰 이만큼만 (다 넣으면 2026-11-16 브리핑의 X 글이 42개 → 426개)
 
 
-def x_to_visit(cfg, db, limit=X_VISIT_LIMIT):
-    """이번 수집에서 열 X 계정 handle. 내 핵심 계정([x] accounts)은 늘 보고, 발굴로 추가한 계정·관심사 계정은
-    남은 자리만큼 오래 안 본 것부터 (사람 속도는 그대로 두고, 계정을 늘려도 수집 시간이 늘지 않게 — 설계 6-3).
-    발굴 계정도 돌아가며: 2026-10-19 발굴 40개가 늘 보는 쪽에 있어서 한 번에 62개를 봤다."""
+def _visits():
+    try:
+        return json.loads(X_VISITS.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def x_plan(cfg, db, since, limit=X_VISIT_LIMIT):
+    """이번 수집에서 열 X 계정 → (handle들, {handle(소문자): 그 계정 페이지를 어디까지 내려 볼지 UTC ISO}).
+    내 핵심 계정([x] accounts)은 늘 보고, 발굴로 추가한 계정·관심사 계정은 남은 자리만큼 오래 안 본 것부터
+    (사람 속도는 그대로 두고, 계정을 늘려도 수집 시간이 늘지 않게 — 설계 6-3). 발굴 계정도 돌아가며:
+    2026-10-19 발굴 40개가 늘 보는 쪽에 있어서 한 번에 62개를 봤다.
+    돌아가며 고른 계정은 지난번에 본 시각까지 내려 본다 (X_LOOKBACK 안에서). 나머지·처음 보는 계정은 since까지.
+    본 시각은 실제로 연 뒤에 mark_x_visited가 남긴다 — 로그인이 풀려 못 본 날을 「봤다」로 치지 않게."""
     accts = core_accounts(cfg, db)
     mine = {a["handle"].lower() for a in cfg.get("x", {}).get("accounts", [])}
     fixed = [a["handle"] for a in accts if a["handle"].lower() in mine]
     rotating = [a["handle"] for a in accts if a["handle"].lower() not in mine]
     room = max(10, limit - len(fixed))
     if len(rotating) <= room:
-        return fixed + rotating
-    try:
-        seen = json.loads(X_VISITS.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        seen = {}
+        return fixed + rotating, {}
+    seen = _visits()
     pick = sorted(rotating, key=lambda h: seen.get(h.lower(), ""))[:room]
+    floor = datetime.now(timezone.utc) - X_LOOKBACK
+    s = datetime.fromisoformat(since)
+    since_by = {}
+    for h in pick:
+        try:
+            start = max(datetime.fromisoformat(seen[h.lower()]) - timedelta(hours=1), floor)
+        except (KeyError, TypeError, ValueError):
+            continue  # 처음 보는 계정
+        if start < s:
+            since_by[h.lower()] = start.isoformat()
+    return fixed + pick, since_by
+
+
+def mark_x_visited(handles):
+    """실제로 글을 받아 온 계정 페이지의 본 시각을 남긴다 (x_plan이 다음에 오래 안 본 것부터 고르고, 어디까지 내려 볼지 정할 때)."""
+    if not handles:
+        return
+    seen = _visits()
     now = datetime.now(timezone.utc).isoformat()
-    seen.update({h.lower(): now for h in pick})
+    seen.update({h.lower(): now for h in handles})
     try:
         X_VISITS.write_text(json.dumps(seen), encoding="utf-8")
     except OSError:
         log.warning("X 돌아가며 보기 기록 저장 실패", exc_info=True)
-    return fixed + pick
 
 
 def threads_accounts(cfg, db):
@@ -255,19 +284,43 @@ def events_block(db, cfg):
     return out, "\n".join(lines) or "(일정 데이터 없음)"
 
 
-def build_data(cfg, db, since_iso, with_events=False):
+def prev_briefing_at(db):
+    """사이 글(late_posts)을 고를 기준: 오늘 전 마지막 브리핑을 만든 시각. 그 뒤에 처음 받은 글은 어느 브리핑에도 안 들어갔다.
+    (window_start처럼 1시간을 당기면 브리핑 직전 수집에서 받은 글이 다음 날 또 들어간다.) 오늘 다시 만들 때도 같은 기준. 처음이면 None."""
+    rows = db.q("SELECT created_at FROM briefings WHERE date < ? ORDER BY date DESC LIMIT 1", clock.now().strftime("%Y-%m-%d"))
+    return rows[0]["created_at"] if rows else None
+
+
+def late_posts(db, handle, since_iso, seen_after):
+    """돌아가며 보는 계정의 사이 글: since_iso 전에 올라왔지만 seen_after 뒤에 처음 받은 글 (X_LOOKBACK 안).
+    그 계정 페이지를 seen_after 전에 연 적이 있을 때만 (via = user:<handle>) — 처음 연 계정의 지난 글이 쏟아지지 않게.
+    리트윗·인용 원문이나 발굴 확인으로 들어온 글은 그 페이지를 본 게 아니라 치지 않는다.
+    며칠 지난 글은 큰 것만: 반응 큰 X_LATE_PER_ACCOUNT개, 남에게 단 답글은 빼고. 시간순으로."""
+    early = (datetime.fromisoformat(since_iso) - X_LOOKBACK).isoformat()
+    rows = db.q("SELECT * FROM tweets WHERE platform='x' AND author = ? COLLATE NOCASE AND created_at < ? AND created_at >= ? "
+                "AND collected_at > ? AND NOT (kind = 'reply' AND COALESCE(ref_author, '') <> author COLLATE NOCASE) "
+                "AND EXISTS (SELECT 1 FROM tweets o WHERE o.author = ? COLLATE NOCASE AND o.via = ? COLLATE NOCASE AND o.collected_at <= ?) "
+                "ORDER BY likes DESC LIMIT ?",
+                handle, since_iso, early, seen_after, handle, f"user:{handle}", seen_after, X_LATE_PER_ACCOUNT)
+    return sorted(rows, key=lambda t: t["created_at"] or "")
+
+
+def build_data(cfg, db, since_iso, with_events=False, late_since=None):
+    """브리핑·질문 답변에 넘길 자료. late_since(브리핑만): 돌아가며 보는 계정의 사이 글을 이 시각 뒤에 처음 받은 것까지 넣는다."""
     parts = []
     if with_events:  # 질문 답변용. 브리핑 글에는 일정을 넣지 않는다 (위젯이 실시간 표시)
         _, ev = events_block(db, cfg)
         parts.append("# 일정 (TimeTree)\n" + ev)
 
-    parts.append("# X 핵심 계정")
+    parts.append("# X 핵심 계정" + (" (돌아가며 보는 계정은 며칠에 한 번 열어서, 이번에 처음 본 며칠 전 글도 있다"
+                                    " — 앞의 날짜를 보고 쓴다)" if late_since else ""))
     for a in core_accounts(cfg, db):
         rows = db.q("SELECT * FROM tweets WHERE platform='x' AND author = ? COLLATE NOCASE AND created_at >= ? "
                     "ORDER BY created_at", a["handle"], since_iso)
-        if rows:
+        late = late_posts(db, a["handle"], since_iso, late_since) if late_since else []
+        if rows or late:
             parts.append(f"## @{a['handle']} ({a['name']}) — {a['group']} / {a['focus']}")
-            parts += [_tweet_line(t) for t in rows[-25:]]
+            parts += [_tweet_line(t) for t in late + rows[-25:]]  # 사이 글은 25개 자르기와 따로 (구간 글에 밀리지 않게)
 
     ko = db.q("SELECT * FROM tweets WHERE via LIKE 'search:%' AND lang='ko' AND created_at >= ? "
               "ORDER BY likes DESC LIMIT 15", since_iso)
@@ -491,7 +544,7 @@ def window_start(db):
 
 def make_briefing(cfg, db):
     """반환: (날짜, Markdown, 카드 JSON)"""
-    data = build_data(cfg, db, window_start(db).isoformat())
+    data = build_data(cfg, db, window_start(db).isoformat(), late_since=prev_briefing_at(db))
     ch = Character()
     user = cfg.get("user", {})
     prompt = _fill(BRIEFING_RULES, **rules_for(cfg), title_rules=TITLE_RULES, plan=user.get("plan", ""),

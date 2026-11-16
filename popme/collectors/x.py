@@ -18,6 +18,9 @@ log = logging.getLogger(__name__)
 # 그래서 이름을 고정하지 않고 모든 GraphQL 응답에서 트윗을 찾되, 다른 사람 글이 섞이는 곁가지만 뺀다.
 SKIP_OPS = ("Sidebar", "Explore", "Recommendation", "Trends", "Spotlights")
 BLOCK_MARKERS = ("/login", "/i/flow/login", "/account/access", "/i/flow/consent")
+# 돌아가며 보는 계정(since_by)은 며칠 치를 내려가야 해서 스크롤 상한을 따로. 5~6일에 한 번 여는 계정이라
+# 하루로 나누면 매일 열어 1번 스크롤하던 때와 요청 수가 같다. 그래도 못 닿으면 로그를 남긴다
+DEEP_SCROLLS = 6
 
 
 def _unwrap(t):
@@ -150,6 +153,8 @@ def _visit(page, url, via, scrolls, sink, ops_seen, owner=None, since=None, user
             done += 1
     finally:
         page.remove_listener("response", handler)
+    if owner and since and done == scrolls and not reached_since(drain(), owner, since):
+        log.info("X %s: 스크롤 %d번으로 %s까지 못 내려감 (그 사이 앞쪽 글은 빠짐)", via, scrolls, since[:16])
     drain()
 
     got = 0
@@ -179,8 +184,11 @@ def check_profiles(ctx, handles, progress=lambda s: None, users=None):
     return out
 
 
-def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None, on_batch=None):
+def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None, on_batch=None, since_by=None,
+            visited=None):
     """accounts: 핵심 계정 handle 목록. since(UTC ISO): 계정 페이지는 이 시각 이전 글까지만 스크롤.
+    since_by({handle 소문자: UTC ISO}): 그 계정만 다른 시각까지, 스크롤도 DEEP_SCROLLS번까지 (돌아가며 보는 계정 — 지난번에 본 시각).
+    visited(list): 글을 받아 온 계정 페이지의 handle을 차례로 넣는다 (중간에 실패해도 그때까지 본 것).
     users(dict): 응답에 실린 계정 규모(팔로워 등)를 모아 둘 곳. 반환: 파싱된 트윗 리스트.
     on_batch(새 트윗들): 페이지 하나를 볼 때마다 — 중간에 끊겨도 모은 데까지 저장되게."""
     xcfg = cfg.get("x", {})
@@ -204,7 +212,11 @@ def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None,
             progress(f"X 수집 중 {i + 1}/{len(targets)}")
             owner = via[5:] if via.startswith("user:") else None  # 검색 결과는 시간순이 아니라 멈추지 않음
             before = len(out)
-            got = _visit(page, url, via, scrolls, out, ops_seen, owner, since, users)
+            deep = bool(owner and owner.lower() in (since_by or {}))
+            stop = since_by[owner.lower()] if deep else since
+            got = _visit(page, url, via, max(scrolls, DEEP_SCROLLS) if deep else scrolls, out, ops_seen, owner, stop, users)
+            if owner and got and visited is not None:
+                visited.append(owner)
             if on_batch and len(out) > before:
                 on_batch(out[before:])
             empty_streak = empty_streak + 1 if got == 0 else 0

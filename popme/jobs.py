@@ -196,13 +196,20 @@ class Jobs:
             log.exception("일정 수집 실패")
             warnings.append(self._fail("일정", e))
         try:
-            handles = briefing.x_to_visit(self.cfg, self.db)  # 30개가 넘으면 관심사 계정은 돌아가며
             since = briefing.window_start(self.db).isoformat()  # 이보다 오래된 글까지 내려오면 스크롤 멈춤
+            # 30개가 넘으면 관심사 계정은 돌아가며 — 그 계정들은 지난번에 본 시각까지 내려 본다 (since_by)
+            handles, since_by = briefing.x_plan(self.cfg, self.db, since)
             users = {}  # 응답에 실려 오는 계정 규모 (발굴 인기 기준용)
-            # 페이지 하나 볼 때마다 저장 — 중간에 Chrome이 닫혀도 모은 데까지는 남는다
-            x.collect(ctx, self.cfg, handles, progress, since, users, on_batch=self._saver(users))
+            visited = []  # 실제로 글을 받아 온 계정 — 로그인이 풀리거나 창이 닫혀 못 본 계정은 「봤다」로 남기지 않는다
+            try:
+                # 페이지 하나 볼 때마다 저장 — 중간에 Chrome이 닫혀도 모은 데까지는 남는다
+                x.collect(ctx, self.cfg, handles, progress, since, users, on_batch=self._saver(users),
+                          since_by=since_by, visited=visited)
+            finally:
+                briefing.mark_x_visited(visited)
             self.db.upsert_profiles(list(users.values()))  # 새 글 없이 끝난 페이지의 계정 규모도
-            discovery.update(self.db, handles, self.cfg)
+            # 발굴은 이번에 연 계정만이 아니라 보는 계정 전체를 「이미 보는 계정」으로 (돌아가며 안 연 계정이 후보로 오르지 않게)
+            discovery.update(self.db, [a["handle"] for a in briefing.core_accounts(self.cfg, self.db)], self.cfg)
             self._calibrate()
             self._check_candidates("x", ctx, warnings, progress)
         except NeedLogin as e:
