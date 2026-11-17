@@ -68,7 +68,7 @@ def test_bom_config_reads():
 
 
 def test_load_has_no_side_effects(monkeypatch):
-    """읽기만 한다 — 옮기기·비밀번호 숨기기는 prepare (켤 때 한 번)."""
+    """읽기만 한다 — 옮기기·비밀번호 숨기기는 catalog.prepare_config (켤 때 한 번)."""
     config.CONFIG_PATH.write_text('[user]\nplan = "Pro"\n', encoding="utf-8")
     before = os.stat(config.CONFIG_PATH).st_mtime_ns
     monkeypatch.setattr(config, "hide_passwords", lambda: pytest.fail("load가 파일을 고침"))

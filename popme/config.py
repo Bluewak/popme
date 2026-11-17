@@ -115,25 +115,11 @@ def adopt_old_files(folder=None):
     return moved
 
 
-def prepare():
-    """앱이 켜질 때와 설정을 저장한 뒤에 한 번: 평문 비밀번호를 자격 증명 관리자로 옮기고,
-    예전 형식(관심사 없이 [[rss]]만)이면 새 형식으로 옮긴다 (백업: config.toml.bak-날짜).
-    예전엔 load()가 부를 때마다 이 일을 해서, 설정을 읽기만 하는 곳(6시간마다 업데이트 확인, 캐릭터 읽기 등)도 디스크를 썼다."""
-    from popme import catalog
-    hide_passwords()
-    try:
-        note = catalog.migrate_file()
-        if note:
-            logging.getLogger(__name__).info(note)
-    except Exception:
-        logging.getLogger(__name__).exception("소식 출처 옮기기 실패 — 예전 형식 그대로 씀")
-
-
 LOAD_ERROR = None  # 사용자 설정을 못 읽어 대신 쓴 경우 그 이유 (app이 켜질 때 말풍선으로 알린다)
 
 
 def load() -> dict:
-    """개인 설정 config.toml (DATA_DIR) → 없으면 기본 예시. 읽기만 한다 (옮기기·비밀번호 숨기기는 prepare).
+    """개인 설정 config.toml (DATA_DIR) → 없으면 기본 예시. 읽기만 한다 (옮기기·비밀번호 숨기기는 catalog.prepare_config).
     파일이 깨졌으면(메모장으로 고치다 따옴표가 빠지는 등) 마지막으로 앱이 저장한 설정(last-good), 그것도 없으면 기본 예시로 켜고
     LOAD_ERROR에 이유를 남긴다. 예전엔 예외가 나서 pythonw 앱이 아무 표시 없이 켜지지 않았다. 사용자 파일은 덮어쓰지 않는다.
     돌려주는 값에는 자격 증명 관리자의 비밀번호를 채워 준다."""

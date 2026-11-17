@@ -351,6 +351,19 @@ def migrate(text, interests=("ai-coding",)):
     return out, note
 
 
+def prepare_config():
+    """앱이 켜질 때 한 번: 평문 비밀번호를 자격 증명 관리자로 옮기고, 예전 형식(관심사 없이 [[rss]]만)이면 새 형식으로
+    (백업: config.toml.bak-날짜). 예전엔 config.load()가 부를 때마다 이 일을 해서 설정을 읽기만 하는 곳도 디스크를 썼고,
+    config → catalog → config 순환이 생겼다."""
+    config.hide_passwords()
+    try:
+        note = migrate_file()
+        if note:
+            log.info(note)
+    except Exception:
+        log.exception("소식 출처 옮기기 실패 — 예전 형식 그대로 씀")
+
+
 def migrate_file():
     """config.toml이 예전 형식이면 백업하고 옮긴다. 옮겼으면 알림 문구, 아니면 None."""
     path = config.CONFIG_PATH
