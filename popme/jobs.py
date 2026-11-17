@@ -195,7 +195,7 @@ class Jobs:
             holidays = cal.get("holidays", True)
             if source == "ics":
                 self.db.upsert_events(*ics.collect(self.cfg, progress, warnings))
-                keep = {f"ics{i}" for i, c in enumerate(cal.get("ics", [])) if (c.get("url") or "").strip()}
+                keep = {ics.calendar_id(c).split(":", 1)[0] for c in cal.get("ics", []) if (c.get("url") or "").strip()}
                 self.db.retire_calendars("ics", keep, holidays)
             elif source == "caldav":
                 self.db.upsert_events(*caldav.collect(self.cfg, progress, warnings))

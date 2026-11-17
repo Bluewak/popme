@@ -138,6 +138,8 @@ def load() -> dict:
         LOAD_ERROR = f"설정 파일(config.toml)을 읽지 못해 마지막으로 저장한 설정으로 켰어요 ({e})"
         alt = last_good() if last_good().exists() else EXAMPLE_CONFIG
         cfg = tomllib.loads(alt.read_text(encoding="utf-8-sig"))
+    if LOAD_ERROR:  # 대신 켠 설정의 계정(예전 메일 주소 등)에 지금 저장된 비밀번호를 붙여 다른 서버로 보내지 않는다
+        return cfg
     for s in SECRET_SECTIONS:
         if s in cfg and not cfg[s].get("password"):
             cfg[s]["password"] = vault.get(s)

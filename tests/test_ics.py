@@ -114,6 +114,6 @@ def test_empty_url_skipped_and_failure_reported(monkeypatch):
     warnings = []
     events, synced = ics.collect(cfg, warnings=warnings)
     assert calls == ["https://broken", "https://ok"]
-    assert synced == ["ics2:정상"]  # 실패한 캘린더는 빠짐 → 기존 일정이 '지워짐'이 되지 않음
+    assert synced == [ics.calendar_id({"url": "https://ok"}, "정상")]  # 실패한 캘린더는 빠짐 → 기존 일정이 '지워짐'이 되지 않음
     assert len(warnings) == 1 and "고장" in warnings[0]
     assert events

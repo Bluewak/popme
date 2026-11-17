@@ -43,3 +43,17 @@ def test_timetree_keeps_its_calendars(tmp_path):
     db = DB(tmp_path / "t.db")
     db.upsert_events([ev("1", "555:가족"), ev("2", "777:회사"), ev("cd1:x", "cd1a2b3c4d:아이클라우드")], ["555:가족", "777:회사"])
     assert db.retire_calendars("timetree") == 1 and titles(db) == ["1", "2"]
+
+
+def test_ics_id_follows_the_address_not_the_order():
+    """앞 캘린더를 빼도 뒤 캘린더의 id가 그대로 — 지운 캘린더의 일정과 섞이지 않는다."""
+    from popme.collectors import ics
+    a, b = {"url": "https://a/x.ics", "name": "집"}, {"url": "https://b/y.ics", "name": "회사"}
+    assert ics.calendar_id(b) == ics.calendar_id(b, "회사") != ics.calendar_id(a)
+    assert ics.calendar_id({**b, "name": "회사2"}).split(":")[0] == ics.calendar_id(b).split(":")[0]
+
+
+def test_old_order_ids_are_dropped_after_switching_to_address_ids(tmp_path):
+    db = DB(tmp_path / "t.db")
+    db.upsert_events([ev("ics0:a", "ics0:집"), ev("ics1a2b3c4d:a", "ics1a2b3c4d:집")], ["ics1a2b3c4d:집"])
+    assert db.retire_calendars("ics", {"ics1a2b3c4d"}) == 1 and titles(db) == ["ics1a2b3c4d:a"]

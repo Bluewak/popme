@@ -81,3 +81,21 @@ def test_broken_character_file_uses_default(monkeypatch, tmp_path):
     bad.write_text("[persona\n", encoding="utf-8")
     monkeypatch.setattr(character, "character_path", lambda: bad)
     assert character.Character().name
+
+
+def test_fallback_config_gets_no_saved_password():
+    """대신 켠 설정(예전 메일 계정일 수 있다)에 지금 저장된 비밀번호를 붙이지 않는다."""
+    from popme import vault
+    vault.put("mail", "new-secret")
+    config.CONFIG_PATH.write_text('[mail]\nuser = "a@example.com"\npassword = ""\n', encoding="utf-8")
+    assert config.load()["mail"]["password"] == "new-secret"
+    config.last_good().write_text('[mail]\nuser = "old@example.com"\npassword = ""\n', encoding="utf-8")
+    config.CONFIG_PATH.write_text('[mail\n', encoding="utf-8")
+    cfg = config.load()
+    assert cfg["mail"]["user"] == "old@example.com" and not cfg["mail"].get("password")
+
+
+def test_last_good_has_no_plaintext_password():
+    config.CONFIG_PATH.write_text('[mail]\nuser = "a@example.com"\npassword = "typed-by-hand"\n', encoding="utf-8")
+    tomledit.save_config('[mail]\nuser = "a@example.com"\npassword = ""\n')
+    assert "typed-by-hand" not in config.last_good().read_text(encoding="utf-8")

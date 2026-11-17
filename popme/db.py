@@ -213,7 +213,7 @@ class DB:
                     )
             seen = {e["id"] for e in events}
             for cal in synced_calendars:
-                # 캘린더는 이름 앞 부분(ics0·cd1a2b3c4d·TimeTree id)으로 — 이름을 고친 뒤 원본에서 지운 일정도 찾는다
+                # 캘린더는 이름 앞 부분(ics1a2b3c4d·cd1a2b3c4d·TimeTree id)으로 — 이름을 고친 뒤 원본에서 지운 일정도 찾는다
                 prefix = cal.split(":", 1)[0]
                 for r in c.execute("SELECT id FROM events WHERE (calendar_id=? OR substr(calendar_id, 1, ?)=?) "
                                    "AND deleted=0", (cal, len(prefix) + 1, prefix + ":")).fetchall():
@@ -229,7 +229,7 @@ class DB:
         「지워짐」 표시 대신 행을 지운다 (출처를 바꿀 때 「최근 지워짐」이 한꺼번에 뜨지 않게)."""
         def owner(cal_id):
             p = cal_id.split(":", 1)[0]
-            if re.fullmatch(r"ics\d+", p):
+            if re.fullmatch(r"ics(\d+|[0-9a-f]{8})", p):  # ics0… (예전 순서 id) · ics1a2b3c4d (주소 id)
                 return "ics", p
             if re.fullmatch(r"cd[0-9a-f]{8}", p):
                 return "caldav", p

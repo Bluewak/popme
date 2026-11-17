@@ -173,6 +173,7 @@ def save_config(text):
         try:
             tomllib.loads(path.read_text(encoding="utf-8-sig"))
             shutil.copyfile(path, config.last_good())
+            config._hide(config.last_good(), overwrite=False)  # 복사본에도 평문 비밀번호를 두지 않는다
         except (OSError, ValueError):
             pass  # 지금 파일이 이미 깨졌으면 last-good을 덮지 않는다
     atomic_write_text(path, text)

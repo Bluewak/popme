@@ -356,6 +356,7 @@ def prepare_config():
     (백업: config.toml.bak-날짜). 예전엔 config.load()가 부를 때마다 이 일을 해서 설정을 읽기만 하는 곳도 디스크를 썼고,
     config → catalog → config 순환이 생겼다."""
     config.hide_passwords()
+    config._hide(config.last_good(), overwrite=False)  # 대신 켤 때 쓰는 복사본도
     try:
         note = migrate_file()
         if note:
