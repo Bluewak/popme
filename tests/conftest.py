@@ -76,3 +76,25 @@ def no_background_fieldcard(monkeypatch):
     from popme import fieldcard
     monkeypatch.setattr(fieldcard, "BACKGROUND", False)
     fieldcard._jobs.clear()
+
+
+@pytest.fixture(autouse=True, scope="session")
+def never_touch_my_folder():
+    """테스트가 끝난 뒤 실제 사용자 폴더(%LOCALAPPDATA%/POPME)에 새 파일이 생기지 않았는지.
+    2026-11-18 상수 경로 하나를 conftest가 바꿔 끼우지 않아 테스트가 예시 설정을 내 폴더에 저장한 적이 있다.
+    (있던 파일이 바뀐 것은 보지 않는다 — 같은 PC에서 앱이 돌며 상태 파일을 고칠 수 있어 흔들린다)"""
+    from popme import config
+    root = config.DATA_DIR
+    skip = ("popme.db", "popme.log", "chrome-profile", "raw", "venv", "llm-empty")
+
+    def snap():
+        out = {}
+        for p in root.glob("*") if root.exists() else ():
+            if p.is_file() and not p.name.startswith(skip):
+                out[p.name] = p.stat().st_mtime_ns
+        return out
+    before = snap()
+    yield
+    after = snap()
+    new = sorted(set(after) - set(before))
+    assert not new, f"테스트가 실제 사용자 폴더에 파일을 만들었어요: {new}"

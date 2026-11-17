@@ -47,7 +47,7 @@ def test_save_config_refuses_broken_text_and_keeps_last_good():
         tomledit.save_config("[news\n")
     assert config.CONFIG_PATH.read_text(encoding="utf-8") == good
     tomledit.save_config(tomledit.set_value(good, "user", "plan", "Max"))
-    assert config.LAST_GOOD.read_text(encoding="utf-8") == good
+    assert config.last_good().read_text(encoding="utf-8") == good
 
 
 def test_broken_config_falls_back_to_last_good_and_says_so():

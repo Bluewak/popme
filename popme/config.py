@@ -14,7 +14,6 @@ EXAMPLE_CONFIG = DEFAULTS_DIR / "config.example.toml"
 DATA_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "POPME"
 # 사용자 파일은 앱 폴더 밖에: 새 버전을 어디에 풀어도 그대로고, 저장소에 섞이지 않는다
 CONFIG_PATH = DATA_DIR / "config.toml"
-LAST_GOOD = DATA_DIR / "config.toml.last-good"  # 마지막으로 앱이 저장한 읽히는 설정 (tomledit.save_config)
 ASSETS_DIR = DATA_DIR / "assets"    # 직접 만든 캐릭터의 이미지 (pet.png 외)
 DB_PATH = DATA_DIR / "popme.db"
 CHROME_PROFILE = DATA_DIR / "chrome-profile"
@@ -118,6 +117,12 @@ def adopt_old_files(folder=None):
 LOAD_ERROR = None  # 사용자 설정을 못 읽어 대신 쓴 경우 그 이유 (app이 켜질 때 말풍선으로 알린다)
 
 
+def last_good():
+    """마지막으로 앱이 저장한 읽히는 설정 (tomledit.save_config). 상수로 두지 않는다 — CONFIG_PATH를 바꿔 끼운 테스트가
+    실제 사용자 폴더에 쓰지 않게 (2026-11-18 상수로 뒀다가 테스트가 예시 설정을 내 폴더에 저장했다)."""
+    return CONFIG_PATH.with_name("config.toml.last-good")
+
+
 def load() -> dict:
     """개인 설정 config.toml (DATA_DIR) → 없으면 기본 예시. 읽기만 한다 (옮기기·비밀번호 숨기기는 catalog.prepare_config).
     파일이 깨졌으면(메모장으로 고치다 따옴표가 빠지는 등) 마지막으로 앱이 저장한 설정(last-good), 그것도 없으면 기본 예시로 켜고
@@ -131,7 +136,7 @@ def load() -> dict:
     except ValueError as e:
         logging.getLogger(__name__).exception("설정 파일을 못 읽음: %s", path)
         LOAD_ERROR = f"설정 파일(config.toml)을 읽지 못해 마지막으로 저장한 설정으로 켰어요 ({e})"
-        alt = LAST_GOOD if LAST_GOOD.exists() else EXAMPLE_CONFIG
+        alt = last_good() if last_good().exists() else EXAMPLE_CONFIG
         cfg = tomllib.loads(alt.read_text(encoding="utf-8-sig"))
     for s in SECRET_SECTIONS:
         if s in cfg and not cfg[s].get("password"):

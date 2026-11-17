@@ -172,7 +172,7 @@ def save_config(text):
     if path.exists():
         try:
             tomllib.loads(path.read_text(encoding="utf-8-sig"))
-            shutil.copyfile(path, config.LAST_GOOD)
+            shutil.copyfile(path, config.last_good())
         except (OSError, ValueError):
             pass  # 지금 파일이 이미 깨졌으면 last-good을 덮지 않는다
     atomic_write_text(path, text)
