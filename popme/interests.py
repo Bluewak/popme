@@ -91,7 +91,7 @@ FINAL = """분야: {field} / 범위: {scope} / 보는 방식: {lens}
 특히 궁금한 것: {topics}
 이 사람의 아침 브리핑에서 이 분야 소식을 고를 기준을 만들어라.
 출력: {{"name": "관심사 이름 12자 이내", "tag": "짧은 태그 6자 이내", "summary": "한 줄 설명 30자 이내",
- "criteria": ["고르는 기준 문장 3~5개 — 무엇을 먼저, 무엇을 버리는지. 같은 소식은 카드 하나, 공식 발표 전은 「~라는 보도」"],
+ "criteria": ["기준 문장 2~4개 — 「범위: …」 한 문장(공식 발표와 사람들의 화제·평가를 모두 포함), 「버린다: …」 한 문장(홍보·가십 등), 필요하면 「쓸 때: …」(공식 발표 전은 「~라는 보도」). 「~만」처럼 좁히는 조건은 쓰지 않는다"],
  "discovery": "새로 볼 만한 사람을 고를 기준 한 문장"}}"""
 SCOPES = {"kr": "한국어 소식만", "world": "해외 소식도 함께"}
 MIX = {"kr": "국내 위주로.", "world": "해외와 국내를 섞어서."}
@@ -300,9 +300,9 @@ def finalize(cfg, field, scope, people, companies, topics, lens=None, answers=No
                           lens=LENSES.get(lens, "특정 대상 위주"), answers=answers_text(answers),
                           companies=names(companies), topics="·".join(topics) or "(없음)")
     base = {"name": _short(field, 12), "tag": _short(field, 6), "summary": f"{_short(field, 20)} 소식",
-            "criteria": [f"{_short(field, 20)}에서 고른 사람·기업의 공식 발표와 중요한 변화를 먼저 고른다.",
-                         "같은 소식은 여러 기사라도 카드 하나로, 공식 발표 전 소식은 「~라는 보도」로 쓴다.",
-                         "광고·홍보·가십은 버린다."],
+            "criteria": [f"범위: {_short(field, 20)}의 공식 발표·중요한 변화와, 사람들 사이에서 화제가 된 이야기·평가.",
+                         "버린다: 광고·홍보·가십.",
+                         "쓸 때: 공식 발표 전 소식은 「~라는 보도」로."],
             "discovery": f"{_short(field, 20)} 소식을 꾸준히 전하는 사람"}
     try:
         raw = briefing.parse_json(llm.ask(cfg, SYSTEM, prompt, timeout=180))
