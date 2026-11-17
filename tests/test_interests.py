@@ -3,7 +3,7 @@ import json
 import tomllib
 from datetime import datetime, timedelta, timezone
 
-from popme import briefing, catalog, config, interests
+from popme import accounts, briefing, catalog, config, interests
 from popme.db import DB
 
 
@@ -70,7 +70,7 @@ def test_x_accounts_merge_and_off(monkeypatch):
     assert "FabrizioRomano" in handles and "ManCity" in handles and "bcherny" in handles
     cfg["news"]["off"] = ["x:fabrizioromano"]
     assert "FabrizioRomano" not in [a["handle"] for a in catalog.x_accounts(cfg)]
-    core = briefing.core_accounts(cfg, DB(config.DATA_DIR / "unused.db") if False else _db())
+    core = accounts.core_accounts(cfg, DB(config.DATA_DIR / "unused.db") if False else _db())
     assert next(a for a in core if a["handle"] == "simonw")["group"] == "내 계정"  # 내 계정이 먼저 (관심사 쪽과 겹쳐도)
 
 
@@ -88,33 +88,33 @@ def test_x_rotation_keeps_mine_and_rotates_the_rest(monkeypatch):
     many = [{"handle": f"i{i}", "name": "", "group": "", "focus": "", "interest": "x"} for i in range(10)]
     cfg = {"x": {"accounts": mine}}
     since = datetime.now(timezone.utc).isoformat()
-    monkeypatch.setattr(briefing, "core_accounts", lambda cfg, db: mine + found + many)
-    first = briefing.x_plan(cfg, None, since)[0]
-    assert first[:14] == [a["handle"] for a in mine] and len(first) == briefing.X_VISIT_LIMIT  # 62개 → 30개
-    assert briefing.x_plan(cfg, None, since)[0] == first  # 수집이 실패해 기록을 안 남겼으면 같은 계정을 다시
-    briefing.mark_x_visited(first)
-    second = briefing.x_plan(cfg, None, since)[0]
+    monkeypatch.setattr(accounts, "core_accounts", lambda cfg, db: mine + found + many)
+    first = accounts.x_plan(cfg, None, since)[0]
+    assert first[:14] == [a["handle"] for a in mine] and len(first) == accounts.X_VISIT_LIMIT  # 62개 → 30개
+    assert accounts.x_plan(cfg, None, since)[0] == first  # 수집이 실패해 기록을 안 남겼으면 같은 계정을 다시
+    accounts.mark_x_visited(first)
+    second = accounts.x_plan(cfg, None, since)[0]
     assert set(first[14:]).isdisjoint(second[14:])  # 다음 수집은 아직 안 본 계정부터
     big = {"x": {"accounts": mine + found[:20]}}  # 내 계정이 30개를 넘어도 돌아가는 쪽은 10개는 본다
-    assert len(briefing.x_plan(big, None, since)[0]) == 34 + 10
-    monkeypatch.setattr(briefing, "core_accounts", lambda cfg, db: mine[:3] + many[:5])
-    assert briefing.x_plan(cfg, None, since) == ([a["handle"] for a in mine[:3] + many[:5]], {})  # 넘지 않으면 다 본다
+    assert len(accounts.x_plan(big, None, since)[0]) == 34 + 10
+    monkeypatch.setattr(accounts, "core_accounts", lambda cfg, db: mine[:3] + many[:5])
+    assert accounts.x_plan(cfg, None, since) == ([a["handle"] for a in mine[:3] + many[:5]], {})  # 넘지 않으면 다 본다
 
 
 def test_x_plan_scrolls_rotating_accounts_back_to_last_visit(monkeypatch):
     """돌아가며 보는 계정은 지난번에 본 시각까지 (최대 X_LOOKBACK). 처음 보는 계정·내 계정·최근 본 계정은 since까지."""
     mine = [{"handle": "me", "name": "", "group": "", "focus": ""}]
     rot = [{"handle": f"R{i}", "name": "", "group": "", "focus": ""} for i in range(12)]
-    monkeypatch.setattr(briefing, "core_accounts", lambda cfg, db: mine + rot)
+    monkeypatch.setattr(accounts, "core_accounts", lambda cfg, db: mine + rot)
     now = datetime.now(timezone.utc)
     visits = {f"r{i}": (now - timedelta(hours=1)).isoformat() for i in range(2, 12)}
     visits |= {"r0": (now - timedelta(days=5)).isoformat(), "r1": (now - timedelta(days=30)).isoformat()}
-    briefing.X_VISITS.write_text(json.dumps(visits), encoding="utf-8")
+    accounts.X_VISITS.write_text(json.dumps(visits), encoding="utf-8")
     since = (now - timedelta(hours=20)).isoformat()
-    handles, since_by = briefing.x_plan({"x": {"accounts": mine}}, None, since, limit=11)
+    handles, since_by = accounts.x_plan({"x": {"accounts": mine}}, None, since, limit=11)
     assert handles[:3] == ["me", "R1", "R0"] and len(handles) == 11  # 자리 10개, 오래 안 본 것부터
     assert abs(datetime.fromisoformat(since_by["r0"]) - (now - timedelta(days=5, hours=1))) < timedelta(minutes=1)
-    assert abs(datetime.fromisoformat(since_by["r1"]) - (now - briefing.X_LOOKBACK)) < timedelta(minutes=1)  # 7일까지만
+    assert abs(datetime.fromisoformat(since_by["r1"]) - (now - accounts.X_LOOKBACK)) < timedelta(minutes=1)  # 7일까지만
     assert set(since_by) == {"r0", "r1"}  # 1시간 전에 본 계정은 since(20시간 전)까지면 충분
 
 
@@ -122,18 +122,18 @@ def test_x_plan_reports_gaps_longer_than_lookback(monkeypatch):
     """지난번에 본 지 X_LOOKBACK이 넘은 계정, 한 바퀴가 X_LOOKBACK보다 긴 계정 수는 수집 경고로 (예전엔 사이 글이 조용히 빠졌다)."""
     mine = [{"handle": "me", "name": "", "group": "", "focus": ""}]
     rot = [{"handle": f"R{i}", "name": "", "group": "", "focus": ""} for i in range(12)]
-    monkeypatch.setattr(briefing, "core_accounts", lambda cfg, db: mine + rot)
+    monkeypatch.setattr(accounts, "core_accounts", lambda cfg, db: mine + rot)
     now = datetime.now(timezone.utc)
     visits = {f"r{i}": (now - timedelta(days=5)).isoformat() for i in range(12)} | {"r3": (now - timedelta(days=9)).isoformat()}
-    briefing.X_VISITS.write_text(json.dumps(visits), encoding="utf-8")
+    accounts.X_VISITS.write_text(json.dumps(visits), encoding="utf-8")
     since = (now - timedelta(hours=20)).isoformat()
     gaps = []
-    briefing.x_plan({"x": {"accounts": mine}}, None, since, limit=11, gaps=gaps)
+    accounts.x_plan({"x": {"accounts": mine}}, None, since, limit=11, gaps=gaps)
     assert gaps == ["X 계정 1개는 7일 넘게 못 봐서 그 앞 글은 못 받았어요"]  # 자리 10개 → 한 바퀴 2일이라 그 경고는 없다
     rot = [{"handle": f"R{i}", "name": "", "group": "", "focus": ""} for i in range(120)]
-    monkeypatch.setattr(briefing, "core_accounts", lambda cfg, db: mine + rot)
+    monkeypatch.setattr(accounts, "core_accounts", lambda cfg, db: mine + rot)
     gaps = []
-    briefing.x_plan({"x": {"accounts": mine}}, None, since, limit=17, gaps=gaps)  # 자리 16개 → 8일
+    accounts.x_plan({"x": {"accounts": mine}}, None, since, limit=17, gaps=gaps)  # 자리 16개 → 8일
     assert any("한 바퀴에 8일" in g for g in gaps)
 
 
@@ -145,9 +145,9 @@ def test_build_data_includes_late_seen_posts_of_rotating_accounts(monkeypatch):
     now = datetime.now(timezone.utc)
     prev = now - timedelta(hours=20)       # 지난 브리핑을 만든 시각
     since = prev - timedelta(hours=1)      # window_start: 지난 브리핑 1시간 전
-    monkeypatch.setattr(briefing, "core_accounts", lambda cfg, db: [
+    monkeypatch.setattr(accounts, "core_accounts", lambda cfg, db: [
         {"handle": h, "name": h, "group": "", "focus": ""} for h in ("old", "fresh", "busy")])
-    monkeypatch.setattr(briefing, "threads_accounts", lambda cfg, db: [])
+    monkeypatch.setattr(accounts, "threads_accounts", lambda cfg, db: [])
     monkeypatch.setattr(briefing, "rss_items", lambda cfg, db, s, new_after=None: [])
     monkeypatch.setattr(briefing.discovery, "candidates", lambda db, limit=5: [])
 

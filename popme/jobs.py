@@ -7,7 +7,7 @@ import time
 from datetime import datetime
 
 from popme.fileio import atomic_write_text
-from popme import briefing, catalog, chrome, config, discovery, event_weather, fieldscale, funnel, llm, sources
+from popme import accounts, briefing, catalog, chrome, config, discovery, event_weather, fieldscale, funnel, llm, sources
 from popme.collectors import NeedLogin, caldav, ics, threads, timetree, x, youtube
 from popme.db import DB
 
@@ -220,7 +220,7 @@ class Jobs:
         try:
             since = briefing.window_start(self.db).isoformat()  # 이보다 오래된 글까지 내려오면 스크롤 멈춤
             # 30개가 넘으면 관심사 계정은 돌아가며 — 그 계정들은 지난번에 본 시각까지 내려 본다 (since_by)
-            handles, since_by = briefing.x_plan(self.cfg, self.db, since, gaps=warnings)
+            handles, since_by = accounts.x_plan(self.cfg, self.db, since, gaps=warnings)
             users = {}  # 응답에 실려 오는 계정 규모 (발굴 인기 기준용)
             visited = []  # 실제로 글을 받아 온 계정 — 로그인이 풀리거나 창이 닫혀 못 본 계정은 「봤다」로 남기지 않는다
             saver = self._saver(users)
@@ -229,10 +229,10 @@ class Jobs:
                 x.collect(ctx, self.cfg, handles, progress, since, users, on_batch=saver,
                           since_by=since_by, visited=visited)
             finally:
-                briefing.mark_x_visited(visited)
+                accounts.mark_x_visited(visited)
             saver.flush()  # 새 글 없이 끝난 페이지의 계정 규모도
             # 발굴은 이번에 연 계정만이 아니라 보는 계정 전체를 「이미 보는 계정」으로 (돌아가며 안 연 계정이 후보로 오르지 않게)
-            discovery.update(self.db, [a["handle"] for a in briefing.core_accounts(self.cfg, self.db)], self.cfg)
+            discovery.update(self.db, [a["handle"] for a in accounts.core_accounts(self.cfg, self.db)], self.cfg)
             self._calibrate()
             self._check_candidates("x", ctx, warnings, progress)
         except NeedLogin as e:
@@ -244,7 +244,7 @@ class Jobs:
 
     def _collect_threads(self, ctx, warnings, progress):
         try:
-            th_users = briefing.threads_accounts(self.cfg, self.db)
+            th_users = accounts.threads_accounts(self.cfg, self.db)
             since = briefing.window_start(self.db).isoformat()
             users = {}  # 계정 페이지에 실려 오는 팔로워 수 (발굴 인기 기준용)
             saver = self._saver(users)

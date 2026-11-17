@@ -25,7 +25,7 @@ import pystray
 import webview
 
 from popme.fileio import atomic_write_text
-from popme import __version__, agenda, briefing, catalog, chrome, config, discovery, event_weather, mail, planner, character, update, weather
+from popme import __version__, agenda, ask, briefing, catalog, chrome, config, discovery, event_weather, mail, planner, character, update, weather
 from popme.collectors import timetree
 from popme.jobs import CHROME_CLOSED, Jobs, calendar_source
 from popme.pet import PetWindow, icon_image, load_images, write_icon
@@ -555,7 +555,7 @@ class Api:
         self._ask.update(running=True, stage="plan", info={})
         self._say("ask_start", q=question if len(question) <= 30 else question[:30] + "…")  # 옆 말풍선으로 안내
         try:
-            res = briefing.answer(self._jobs.cfg, self._jobs.db, question, progress)
+            res = ask.answer(self._jobs.cfg, self._jobs.db, question, progress)
             self._say("ask_done" if res["found"] else "ask_none")
             self._ask_bubble_until = time.time() + self._char.beh["chatter_bubble_sec"] + 2
             return res
