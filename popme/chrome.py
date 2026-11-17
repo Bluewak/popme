@@ -4,6 +4,7 @@
 별도 프로필(DATA_DIR/chrome-profile)에 한 번 로그인해 두고 계속 쓴다.
 헤드리스·자동화 플래그 없이 보통 Chrome으로 실행하고 CDP로 붙는다.
 """
+import contextlib
 import json
 import logging
 import os
@@ -63,15 +64,30 @@ def ensure_chrome(port: int, urls=()):
     raise RuntimeError("POPME 전용 Chrome에 연결하지 못했어요.")
 
 
+@contextlib.contextmanager
+def attached(port: int):
+    """전용 Chrome에 CDP로 붙어 첫 브라우저 컨텍스트를 준다. 끝나면 연결만 끊는다 (Chrome은 그대로).
+    Playwright 동기 API는 스레드끼리 나눠 쓸 수 없어서, 쓰는 스레드마다 이것으로 따로 붙는다.
+    예전엔 같은 코드가 다섯 곳에 있었고 두 곳(일정 추가·로그인 탭 열기)은 연결을 끊지 않았다."""
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as p:
+        browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
+        try:
+            yield browser.contexts[0]
+        finally:
+            # 사용자가 창을 닫아 이미 끊겼으면 여기서 또 오류가 나는데, 그걸로 하던 일까지 멈추지 않게
+            try:
+                browser.close()
+            except Exception:
+                log.info("전용 Chrome 연결 정리 실패 (이미 닫힘)", exc_info=True)
+
+
 def open_for_login(port: int, timetree: bool = True):
     """처음 한 번: 전용 Chrome에서 X·Threads(·TimeTree)에 로그인하도록 탭을 연다."""
     urls = ["https://x.com/login"] + (["https://timetreeapp.com/signin"] if timetree else []) + \
            ["https://www.threads.com/login"]
     if is_running(port):
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as p:
-            browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
-            ctx = browser.contexts[0]
+        with attached(port) as ctx:
             for u in urls:
                 ctx.new_page().goto(u)
     else:

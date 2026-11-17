@@ -177,27 +177,16 @@ class Jobs:
 
     def _with_browser(self, port, fn):
         """Playwright 동기 API는 스레드끼리 나눠 쓸 수 없어서 스레드마다 따로 붙는다."""
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as p:
-            browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
+        with chrome.attached(port) as ctx:
             try:
-                ctx = browser.contexts[0]
-                try:
-                    ctx.add_init_script(BANNER_JS)
-                except Exception:
-                    log.warning("수집 중 안내 띠를 못 붙였어요", exc_info=True)
-                if self is not None and self._minimizing():
-                    # 예비: 새 탭은 뒤에서 열리지만(chrome.new_page), 그래도 창이 다시 커지면 새 탭마다 다시 내린다
-                    # (X·Threads가 따로 붙으니 양쪽 다)
-                    ctx.on("page", lambda page: chrome.set_minimized(page, True))
-                fn(ctx)
-            finally:
-                # connect_over_cdp로 붙은 브라우저는 close()해도 Chrome 자체는 계속 떠 있다.
-                # 사용자가 창을 닫아 이미 끊겼으면 여기서 또 오류가 나는데, 그걸로 브리핑까지 멈추지 않게
-                try:
-                    browser.close()
-                except Exception:
-                    log.info("전용 Chrome 연결 정리 실패 (이미 닫힘)", exc_info=True)
+                ctx.add_init_script(BANNER_JS)
+            except Exception:
+                log.warning("수집 중 안내 띠를 못 붙였어요", exc_info=True)
+            if self is not None and self._minimizing():
+                # 예비: 새 탭은 뒤에서 열리지만(chrome.new_page), 그래도 창이 다시 커지면 새 탭마다 다시 내린다
+                # (X·Threads가 따로 붙으니 양쪽 다)
+                ctx.on("page", lambda page: chrome.set_minimized(page, True))
+            fn(ctx)
 
     def _collect_calendar_x(self, ctx, warnings, progress):
         source = calendar_source(self.cfg)

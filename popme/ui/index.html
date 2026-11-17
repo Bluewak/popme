@@ -335,7 +335,7 @@ function agendaHtml(rows) {
   return h || `<span class="muted">일정 없음</span>`;
 }
 
-const CATS = ["전체", "혜택·비용", "보안·장애", "규제·정책", "업데이트·단종", "새 모델·도구", "방법·흐름", "사례·커뮤니티", "발굴"];
+let CATS = ["전체"];  // 분류 칸: get_briefing의 cats (briefing.CATS)로 채운다
 let briefCat = "전체", briefLow = false, briefData = null, briefTag = "", briefGone = false, ipMenu = false;
 let headEdit = false;  // 태그 줄 「편집하기」: 이때만 태그를 고치고 빼고 더한다
 const openCards = new Set();  // 다시 그려도 펼친 카드는 펼친 채로
@@ -481,6 +481,7 @@ async function loadBrief() {
   briefData = b;
   (b.items || []).forEach((it, i) => it._i = i);
   if (b.items) {  // 카드 형식
+    CATS = ["전체", ...(b.cats || [])];
     if (!CATS.includes(briefCat)) briefCat = "전체";
     $("#brief").innerHTML = `<h1 class="title">${esc(b.title)} <span class="muted" style="font-size:12px">· ${b.items.length}개</span></h1>
       <div class="wx-strip" id="brief-wx"></div>

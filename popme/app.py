@@ -400,6 +400,7 @@ class Api:
                 "mails": mails,
                 "headlines": [{**h, "html": html.escape(h["md"])} for h in heads],
                 "items": briefing.for_view(payload),
+                "cats": briefing.CATS,  # 분류 칸 이름은 briefing.py 한곳에서 (화면에 따로 적지 않는다)
                 "date": b["date"],
                 "details": "",
                 "news": self._news_state(),
@@ -495,12 +496,10 @@ class Api:
 
     def add_event(self, calendar_id, title, date):
         """승인 카드에서 [추가]를 눌렀을 때만 TimeTree에 쓴다."""
-        from playwright.sync_api import sync_playwright
         port = int(self._jobs.cfg.get("chrome", {}).get("port", 9333))
         try:
             chrome.ensure_chrome(port)
-            with sync_playwright() as p:
-                ctx = p.chromium.connect_over_cdp(f"http://127.0.0.1:{port}").contexts[0]
+            with chrome.attached(port) as ctx:
                 ev = timetree.create_event(ctx, self._jobs.cfg, calendar_id, title, date)
             name = next((c["name"] for c in planner.calendar_names(self._jobs.db) if c["id"] == str(calendar_id)), "")
             self._jobs.db.upsert_events([timetree._event(ev, calendar_id, name)])

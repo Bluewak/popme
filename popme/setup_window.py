@@ -633,25 +633,19 @@ def login_status(sites):
     port = _chrome_port()
     if not chrome.is_running(port):
         return {"chrome": False, **{s: None for s in sites}}
-    from playwright.sync_api import sync_playwright
     out = {"chrome": True}
-    with sync_playwright() as p:
-        browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
-        try:
-            ctx = browser.contexts[0]
-            for s in sites:
-                site = LOGIN_SITES[s]
-                try:
-                    if "cookie" in site:
-                        url, name = site["cookie"]
-                        out[s] = any(c["name"] == name and c["value"] for c in ctx.cookies([url]))
-                    else:  # 쿠키 이름으로는 알 수 없는 곳: 로그인 페이지로 넘기는지 본다 (화면은 안 연다)
-                        out[s] = ctx.request.get(site["page"], max_redirects=0, timeout=15000).status == 200
-                except Exception:
-                    log.warning("%s 로그인 확인 실패", s, exc_info=True)
-                    out[s] = None
-        finally:
-            browser.close()  # CDP 연결만 끊는다 (Chrome은 그대로)
+    with chrome.attached(port) as ctx:
+        for s in sites:
+            site = LOGIN_SITES[s]
+            try:
+                if "cookie" in site:
+                    url, name = site["cookie"]
+                    out[s] = any(c["name"] == name and c["value"] for c in ctx.cookies([url]))
+                else:  # 쿠키 이름으로는 알 수 없는 곳: 로그인 페이지로 넘기는지 본다 (화면은 안 연다)
+                    out[s] = ctx.request.get(site["page"], max_redirects=0, timeout=15000).status == 200
+            except Exception:
+                log.warning("%s 로그인 확인 실패", s, exc_info=True)
+                out[s] = None
     return out
 
 
@@ -662,15 +656,10 @@ def open_login(site):
     if not chrome.is_running(port):
         chrome.ensure_chrome(port, [url])
         return
-    from playwright.sync_api import sync_playwright
-    with sync_playwright() as p:
-        browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
-        try:
-            page = browser.contexts[0].new_page()
-            page.goto(url)
-            page.bring_to_front()
-        finally:
-            browser.close()
+    with chrome.attached(port) as ctx:
+        page = ctx.new_page()
+        page.goto(url)
+        page.bring_to_front()
 
 
 def request_first_briefing():
