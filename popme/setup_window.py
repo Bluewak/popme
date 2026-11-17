@@ -19,7 +19,8 @@ import tempfile
 import tomllib
 from pathlib import Path
 
-from popme import config, vault
+from popme import config, tomledit, vault
+from popme.tomledit import base_text, set_value  # noqa: F401 (테스트·예전 이름 호환)
 from popme.collectors import caldav
 
 log = logging.getLogger(__name__)
@@ -197,127 +198,7 @@ CLIP = {
 }
 
 
-# ---------------------------------------------------------------- config.toml 줄 단위 편집 (주석 보존)
-
-_HEADER = re.compile(r"^\s*\[\[?\s*([^\]]+?)\s*\]\]?")
-
-
-def _section_span(lines, name):
-    """[name] 표의 (머리 줄, 다음 표 머리 줄) 번호. 없으면 None."""
-    start = None
-    for i, line in enumerate(lines):
-        m = _HEADER.match(line)
-        if not m:
-            continue
-        if start is not None:
-            return start, i
-        if m.group(1) == name and not line.lstrip().startswith("[["):
-            start = i
-    return (start, len(lines)) if start is not None else None
-
-
-def _value_end(lines, i, col):
-    """lines[i][col:]에서 시작하는 TOML 값이 끝나는 (줄, 칸). 배열·인라인 표는 여러 줄에 걸칠 수 있다."""
-    depth, quote = 0, None
-    for j in range(i, len(lines)):
-        text, k = lines[j], (col if j == i else 0)
-        while k < len(text):
-            c = text[k]
-            if quote:
-                if c == "\\" and quote == '"':
-                    k += 1
-                elif c == quote:
-                    quote = None
-                    if depth == 0:
-                        return j, k + 1
-            elif c in "\"'":
-                quote = c
-            elif c in "[{":
-                depth += 1
-            elif c in "]}":
-                depth -= 1
-                if depth == 0:
-                    return j, k + 1
-            elif c == "#":
-                if depth == 0:
-                    return j, k
-                break  # 배열 안 주석: 다음 줄로
-            elif depth == 0 and c.isspace():
-                return j, k
-            k += 1
-        if depth == 0 and not quote:
-            return j, len(text)
-    return len(lines) - 1, len(lines[-1])
-
-
-def _literal(v):
-    if isinstance(v, bool):
-        return "true" if v else "false"
-    if isinstance(v, (int, float)):
-        return repr(v)
-    if isinstance(v, str):
-        return json.dumps(v, ensure_ascii=False)  # JSON 문자열은 TOML 기본 문자열로도 유효
-    if isinstance(v, list):
-        if not v:
-            return "[]"
-        return "[\n" + "".join(f"  {_literal(x)},\n" for x in v) + "]"
-    if isinstance(v, dict):
-        return "{ " + ", ".join(f"{k} = {_literal(x)}" for k, x in v.items()) + " }"
-    raise TypeError(type(v))
-
-
-def set_value(text, section, key, value, before=()):
-    """[section]의 key 값을 바꾼다 (같으면 그대로). 키가 없으면 표 끝에, 표가 없으면 before 표 앞(없으면 파일 끝)에 만든다."""
-    lines = text.split("\n")
-    new = _literal(value)
-    span = _section_span(lines, section)
-    if span is None:
-        at = next((s[0] for s in (_section_span(lines, b) for b in before) if s), None)
-        block = [f"[{section}]", f"{key} = {new}", ""]
-        if at is None:
-            while lines and not lines[-1].strip():
-                lines.pop()
-            lines += [""] + block
-        else:
-            lines[at:at] = block
-        return "\n".join(lines).rstrip("\n") + "\n"
-    s, e = span
-    key_re = re.compile(rf"^(\s*{re.escape(key)}\s*=\s*)")
-    for i in range(s + 1, e):
-        m = key_re.match(lines[i])
-        if not m:
-            continue
-        j, k = _value_end(lines, i, m.end())
-        old = (lines[i][m.end():k] if j == i else "\n".join([lines[i][m.end():]] + lines[i + 1:j] + [lines[j][:k]]))
-        if old == new:
-            return text
-        rest = lines[j][k:]
-        if rest.lstrip().startswith("#"):  # 오른쪽 주석은 원래 칸에 맞춘다
-            col = len(lines[j]) - len(rest.lstrip())
-            last = (m.group(1) + new).split("\n")[-1]
-            rest = " " * max(1, col - len(last)) + rest.lstrip()
-        lines[i:j + 1] = (m.group(1) + new + rest).split("\n")
-        return "\n".join(lines)
-    last = s  # 표의 마지막 값 줄 뒤 (표 뒤의 빈 줄·다음 표 설명 주석 앞)
-    i = s + 1
-    while i < e:
-        if lines[i].strip() and not lines[i].lstrip().startswith("#") and "=" in lines[i]:
-            rest = lines[i][lines[i].index("=") + 1:]
-            col = len(lines[i]) - len(rest.lstrip())
-            last = _value_end(lines, i, col)[0]  # 여러 줄 배열이면 닫는 줄까지 (안에 끼워 넣지 않게)
-            i = last + 1
-        else:
-            i += 1
-    lines[last + 1:last + 1] = f"{key} = {new}".split("\n")
-    return "\n".join(lines)
-
-
 # ---------------------------------------------------------------- 현재 값 읽기 · 고른 값 쓰기
-
-def base_text():
-    path = config.CONFIG_PATH if config.CONFIG_PATH.exists() else config.EXAMPLE_CONFIG
-    return path.read_text(encoding="utf-8")
-
 
 def characters():
     """기본 캐릭터와 내가 만든 캐릭터 파일들 [{file, name, intro, image}] ([persona]가 있는 *.toml). 이름이 같으면 내 것."""
@@ -593,8 +474,8 @@ def apply(text, ch):
 
 
 def write(text):
-    config.CONFIG_PATH.write_text(text, encoding="utf-8", newline="\n")
-    config.hide_passwords()
+    """설정 저장: 검사 → 통째로 바꿔 쓰기 → 비밀번호 숨기기 (tomledit.save_config)."""
+    tomledit.save_config(text)
 
 
 def geocode_place(name):

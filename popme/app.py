@@ -24,6 +24,7 @@ import markdown
 import pystray
 import webview
 
+from popme.fileio import atomic_write_text
 from popme import __version__, agenda, briefing, catalog, chrome, config, discovery, event_weather, mail, planner, character, update, weather
 from popme.collectors import timetree
 from popme.jobs import CHROME_CLOSED, Jobs, calendar_source
@@ -58,7 +59,7 @@ def _load_ui_state():
 def _save_ui_state(**kw):
     """ui.json의 값 몇 개만 바꾼다 (캐릭터 위치 anchor, 수집 안내 횟수 chrome_hints 등)."""
     try:
-        UI_STATE.write_text(json.dumps({**_load_ui_state(), **kw}), encoding="utf-8")
+        atomic_write_text(UI_STATE, json.dumps({**_load_ui_state(), **kw}))
     except OSError:
         pass
 

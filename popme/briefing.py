@@ -4,6 +4,7 @@ import logging
 import re
 from datetime import datetime, timedelta, timezone
 
+from popme.fileio import atomic_write_text
 from popme import agenda, clock, discovery, event_weather, funnel, llm, search
 from popme.character import Character
 from popme import catalog, config, topics
@@ -249,7 +250,7 @@ def mark_x_visited(handles):
     now = datetime.now(timezone.utc).isoformat()
     seen.update({h.lower(): now for h in handles})
     try:
-        X_VISITS.write_text(json.dumps(seen), encoding="utf-8")
+        atomic_write_text(X_VISITS, json.dumps(seen))
     except OSError:
         log.warning("X 돌아가며 보기 기록 저장 실패", exc_info=True)
 

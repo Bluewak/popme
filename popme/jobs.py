@@ -6,6 +6,7 @@ import threading
 import time
 from datetime import datetime
 
+from popme.fileio import atomic_write_text
 from popme import briefing, catalog, chrome, config, discovery, event_weather, fieldscale, funnel, llm, sources
 from popme.collectors import NeedLogin, caldav, ics, threads, timetree, x, youtube
 from popme.db import DB
@@ -98,7 +99,9 @@ class Jobs:
         self.db = DB(config.DB_PATH)
         self.notify = notify
         self.lock = threading.Lock()
-        self.state = {"running": False, "status": "대기 중", "warnings": [], "last_run": None}
+        # 설정 파일이 깨져 대신 쓴 설정으로 켜졌으면 캐릭터가 경고로 알린다 (config.load)
+        self.state = {"running": False, "status": "대기 중", "warnings": [config.LOAD_ERROR] if config.LOAD_ERROR else [],
+                      "last_run": None}
         self._tried = None
         self.offline_retry = False  # 인터넷이 끊겨 멈춤 → 연결되면 아침 자동 수집을 다시
         self._retries = 0
@@ -324,7 +327,7 @@ class Jobs:
                     md += "\n\n---\n수집 경고\n" + "\n".join(f"- {w}" for w in warnings)
                 self.db.save_briefing(date, md, json.dumps(payload, ensure_ascii=False))
                 discovery.remember_verdicts(self.db, payload["items"], date)  # 발굴 탭에도 같은 추천 이유
-                (config.BRIEFING_DIR / f"{date}.md").write_text(md, encoding="utf-8")
+                atomic_write_text(config.BRIEFING_DIR / f"{date}.md", md)
                 self.notify("briefing", "브리핑이 준비됐어요")
             self._progress("완료" + (f" (경고 {len(warnings)}개)" if warnings else ""))
             if self._closed:  # 사용자가 창을 닫은 것 — 몰래 다시 켜지 않고, 다시 모을지 묻는다

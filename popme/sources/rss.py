@@ -12,6 +12,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 
+from popme.fileio import atomic_write_text
 from popme import config
 
 log = logging.getLogger(__name__)
@@ -65,7 +66,7 @@ def flush():
     """받기가 끝나면 한 번 저장 (sources.collect가 부른다)."""
     with _lock:
         if _cache is not None:
-            CACHE_PATH.write_text(json.dumps(_cache, ensure_ascii=False), encoding="utf-8")
+            atomic_write_text(CACHE_PATH, json.dumps(_cache, ensure_ascii=False))
 
 
 def _clean(s, limit):

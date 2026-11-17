@@ -11,7 +11,8 @@ from datetime import date
 from functools import lru_cache
 from urllib.parse import quote_plus
 
-from popme import config, topics
+from popme import config, tomledit, topics
+from popme.fileio import atomic_write_text
 
 log = logging.getLogger(__name__)
 
@@ -282,12 +283,9 @@ def caps(cfg):
 def save_interests(ids):
     """고른 관심사를 config.toml [news] interests에 바로 저장 (주석·다른 설정은 그대로). 모르는 id는 버린다.
     출처 목록은 다음 수집부터 바뀐다. 반환: 저장한 id들."""
-    from popme.setup_window import base_text, set_value
     known = {p["id"] for p in profiles(drafts=True)}
     ids = [i for i in dict.fromkeys(ids) if i in known]
-    text = set_value(base_text(), "news", "interests", ids, before=("llm",))
-    tomllib.loads(text)  # 깨진 설정은 쓰지 않는다
-    config.CONFIG_PATH.write_text(text, encoding="utf-8", newline="\n")
+    tomledit.save_config(tomledit.set_value(tomledit.base_text(), "news", "interests", ids, before=("llm",)))
     return ids
 
 
@@ -312,7 +310,7 @@ def migrate(text, interests=("ai-coding",)):
     tweak으로), 다른 주소는 「내가 더한 출처」로 남긴다. 고른 관심사는 그동안의 대상이던 「AI 코딩」.
     [[rss]]가 있던 자리에 [news]를 쓴다.
     다시 돌려도 결과가 같다 ([news]가 생기면 needs_migration이 거짓)."""
-    from popme.setup_window import _literal
+    _literal = tomledit.literal
     cfg = tomllib.loads(text)
     by_url = {}
     for fid, f in feeds().items():
@@ -364,7 +362,7 @@ def migrate_file():
     new, note = migrate(text)
     backup = path.with_name(f"config.toml.bak-{date.today():%Y%m%d}")
     if not backup.exists():
-        backup.write_text(text, encoding="utf-8", newline="\n")
-    path.write_text(new, encoding="utf-8", newline="\n")
+        atomic_write_text(backup, text)
+    atomic_write_text(path, new)
     NOTICE.write_text(note, encoding="utf-8")  # 다음 브리핑에서 한 번 알린다 (B1-3)
     return note
