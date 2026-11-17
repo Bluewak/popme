@@ -274,7 +274,7 @@ class Api:
         items, _ = briefing.events_block(db, self._jobs.cfg)
         today = [e for e in items if e["day"].startswith("오늘") and not e["holiday"]]
         tomorrow = [e for e in items if e["day"].startswith("내일") and not e["holiday"]]
-        heads = self.get_briefing()["headlines"]
+        heads = self._headlines()  # get_briefing()을 부르면 일정·메일·카드 전부를 다시 만들었다 (제목만 필요)
         options = [("cheer", 1, {})]
         # 하루 한 번씩만 하는 특별 대사: 요일, 날씨, 공휴일, 월초 (가중치 높게 → 그날 앞쪽에 나옴)
         d = datetime.now()
@@ -380,6 +380,17 @@ class Api:
     # --- 데이터 ---
     def get_state(self):
         return {**self._jobs.state, "mode": self._mode, "ask": self._ask}
+
+    def _headlines(self):
+        """가장 최근 브리핑의 머리 소식 [{md, html, …}] (캐릭터 잡담용)."""
+        b = self._jobs.db.latest_briefing()
+        if not b:
+            return []
+        payload = briefing.load_payload(b)
+        if payload:
+            return [{**h, "html": html.escape(h["md"])} for h in briefing.headlines_from(payload["items"])]
+        heads, _ = briefing.split_headlines(briefing.strip_schedule(b["markdown"]).partition("\n")[2])
+        return [{**h, "html": _inline_md(h["md"])} for h in heads]
 
     def get_briefing(self):
         items, _ = briefing.events_block(self._jobs.db, self._jobs.cfg)

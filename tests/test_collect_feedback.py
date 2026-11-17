@@ -167,3 +167,18 @@ def test_saver_writes_each_profile_once_unless_changed():
     save([])
     save.flush()
     assert calls == [["a", "b"], ["a", "c"]]
+
+
+def test_headlines_for_chatter_without_rebuilding_the_page(tmp_path):
+    """캐릭터 잡담은 머리 소식만 — get_briefing(일정·메일·카드 전부)을 다시 만들지 않는다."""
+    import json as _json
+
+    from popme.app import Api
+    from popme.db import DB
+    db = DB(tmp_path / "t.db")
+    me = SimpleNamespace(_jobs=SimpleNamespace(db=db))
+    assert Api._headlines(me) == []
+    items = [{"cat": "업데이트·단종", "rel": 3, "urgent": False, "status": "확인됨", "title": "<b>새 기능</b>", "links": []}]
+    db.save_briefing("2026-11-18", "# 11월 18일 아침 브리핑\n", _json.dumps({"items": items}))
+    heads = Api._headlines(me)
+    assert heads and "&lt;b&gt;" in heads[0]["html"]
