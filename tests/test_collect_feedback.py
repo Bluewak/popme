@@ -128,3 +128,14 @@ def test_minimize_while_collecting_is_on_by_default():
     assert j._minimizing() is True
     j.cfg = {"chrome": {"minimize_while_collecting": False}}
     assert j._minimizing() is False
+
+
+def test_timeline_ok_only_for_real_timeline():
+    """429 오류 JSON·계정 정보 응답만 받은 날은 「봤다」로 남기지 않는다 (다음 수집이 그 사이 글을 건너뛰지 않게)."""
+    ok = SimpleNamespace(status=200)
+    timeline = {"data": {"user": {"result": {"__typename": "User", "timeline": {"timeline": {"instructions": []}}}}}}
+    assert x.timeline_ok(ok, timeline)
+    assert not x.timeline_ok(SimpleNamespace(status=429), timeline)
+    assert not x.timeline_ok(ok, {"errors": [{"message": "Rate limit exceeded"}]})
+    assert not x.timeline_ok(ok, {"data": {"user": {"result": {"__typename": "User", "legacy": {}}}}})  # UserByScreenName
+    assert not x.timeline_ok(ok, None)

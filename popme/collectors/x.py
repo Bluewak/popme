@@ -117,7 +117,7 @@ def _op(url):
 
 def _visit(page, url, via, scrolls, sink, ops_seen, owner=None, since=None, users=None, answered=None):
     """owner·since를 주면 (계정 페이지) 그 계정 글이 since 이전까지 내려왔을 때 스크롤을 멈춘다.
-    users(dict)에는 응답에 실린 계정 규모를 모은다. answered(list): X가 JSON 응답을 하나라도 줬으면 True를 넣는다
+    users(dict)에는 응답에 실린 계정 규모를 모은다. answered(list): 계정 타임라인 응답을 정상으로 받았으면 True를 넣는다 (timeline_ok)
     (글이 0개여도 페이지는 정상으로 본 것 — 조용한 계정)."""
     responses, parsed = [], []  # parsed: (응답 원본, 트윗들) — 받은 응답을 차례로 풀어 둔다
 
@@ -168,9 +168,18 @@ def _visit(page, url, via, scrolls, sink, ops_seen, owner=None, since=None, user
         sink.extend(tweets)
         got += len(tweets)
     log.info("X %s: 트윗 %d개 (GraphQL 응답 %d개, 스크롤 %d번)", via, got, len(responses), done)
-    if answered is not None and any(data is not None for _, data, _ in parsed):
+    if answered is not None and any(timeline_ok(r, data) for r, data, _ in parsed):
         answered.append(True)
     return got
+
+
+def timeline_ok(r, data):
+    """정상으로 받은 계정 타임라인 응답인가 (글이 0개여도). 오류 JSON(429 등의 {"errors": …})이나 다른 응답
+    (UserByScreenName 같은 계정 정보)만 받았으면 아니다 — 그런 날을 「봤다」로 남기면 다음 수집이 그 사이 글을 건너뛴다."""
+    if not isinstance(data, dict) or data.get("errors") or getattr(r, "status", 200) != 200:
+        return False
+    result = (((data.get("data") or {}).get("user") or {}).get("result") or {})
+    return any(k in result for k in ("timeline", "timeline_v2"))
 
 
 def check_profiles(ctx, handles, progress=lambda s: None, users=None):
