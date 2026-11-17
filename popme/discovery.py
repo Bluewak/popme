@@ -1,7 +1,8 @@
 """발굴: 계속 지켜볼 만한 계정을 찾아 후보로 올린다. 목적은 AI 업계의 중요한 소식을 놓치지 않는 것.
 
 0단계 후보 풀 (추가 요청 없음)
-  X: 핵심 계정이 리트윗·인용·답글한 계정, 한국어 검색에서 반응 큰 작성자.
+  X: 핵심 계정이 인용·답글한 계정, 한국어 검색에서 반응 큰 작성자.
+     (리트윗은 신호가 없다: X 계정 페이지가 원글만 준다(UserOriginalsTimeline) — 2026-11 DB에 kind=retweet 0행)
      같은 회사 사람끼리의 반응은 한 번으로 세고, 자기 회사 직원의 반응은 세지 않는다 (X 소속 배지).
      기업 계정은 더 엄격하게: 서로 다른 회사 3곳 이상이 8주 중 3주 이상에 걸쳐 반응해야 한다.
   Threads: 여러 태그·검색에 반복 등장하고 반응 큰 한국어 작성자 (사용자 승인 로직).
@@ -18,6 +19,8 @@ import math
 import re
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
+
+from popme.collectors import VIA_TH_SEARCH, VIA_TH_TAG, VIA_X_SEARCH
 
 DEFAULTS = {
     # 카테고리별 팔로워 [통과, 지켜보기]. 2026-10 표본(X 119명·Threads 43명)의 상위 25%~10% 선
@@ -113,7 +116,7 @@ def update(db, core_handles, cfg=None):
     stats = defaultdict(lambda: {"name": None, "by": set(), "orgs": set(), "orgs_recent": set(), "weeks": set(),
                                  "inter": 0, "ko": 0, "ko_likes": 0, "interests": defaultdict(int)})
 
-    # 1) 핵심 계정이 리포스트·인용·답글한 대상
+    # 1) 핵심 계정이 인용·답글한 대상 (retweet은 계정 페이지에서 오지 않지만 다른 경로로 들어오면 센다)
     for r in db.q("SELECT author, ref_author, created_at FROM tweets WHERE kind IN ('retweet','quote','reply') "
                   "AND ref_author IS NOT NULL AND created_at >= ?", _ago(s["company_window_days"])):
         a, ref = r["author"].lower(), r["ref_author"]
@@ -133,7 +136,7 @@ def update(db, core_handles, cfg=None):
             st["orgs_recent"].add(src)
 
     # 2) 한국어 검색에서 반응이 큰 글의 작성자
-    for r in db.q("SELECT author, author_name, likes, lang FROM tweets WHERE via LIKE 'search:%' "
+    for r in db.q(f"SELECT author, author_name, likes, lang FROM tweets WHERE via LIKE '{VIA_X_SEARCH}%' "
                   "AND created_at >= ?", person_since):
         if r["author"].lower() in core or r["lang"] != "ko":
             continue
@@ -153,18 +156,19 @@ def update(db, core_handles, cfg=None):
             g = growth(db, "x", handle) or 0
             score = 5 * len(st["orgs"]) + 3 * len(st["weeks"]) + min(max(g, 0) * 50, 10)  # 떠오르는 회사는 가산
             reason = (f"서로 다른 회사 {len(st['orgs'])}곳의 핵심 계정({', '.join('@' + b for b in sorted(st['by']))})이 "
-                      f"{len(st['weeks'])}주에 걸쳐 {st['inter']}번 리포스트·인용")
+                      f"{len(st['weeks'])}주에 걸쳐 {st['inter']}번 인용·답글")
             if g >= 0.1:
                 reason += f" · 떠오르는 중(30일 팔로워 +{g:.0%})"
         else:
             recent = len(st["orgs_recent"])
-            if recent < s["person_min_orgs"] and not (st["ko"] >= 2 or st["ko_likes"] >= 200):
+            by_core = recent >= s["person_min_orgs"]
+            if not by_core and not (st["ko"] >= 2 or st["ko_likes"] >= 200):
                 continue
             score = 5 * recent + 3 * st["inter"] + 2 * st["ko"] + 2 * math.log10(1 + st["ko_likes"])
             reasons = []
-            if recent >= s["person_min_orgs"]:
+            if by_core:
                 reasons.append(f"서로 다른 회사 {recent}곳의 핵심 계정({', '.join('@' + b for b in sorted(st['by']))})이 "
-                               f"리포스트·인용·답글")
+                               f"인용·답글")
             if st["ko"]:
                 reasons.append(f"한국어 글 {st['ko']}개, 반응 합계 ♥{st['ko_likes']:,}")
             reason = " · ".join(reasons)
@@ -182,7 +186,7 @@ def update_threads(db, core_usernames, cfg=None):
     stats = defaultdict(lambda: {"name": None, "kw": set(), "likes": 0, "ids": set(), "best": (0, "")})
     for r in db.q("SELECT t.id, t.author, t.author_name, t.likes, t.text, s.via FROM sightings s "
                   "JOIN tweets t ON t.id = s.id WHERE t.platform='threads' AND t.lang='ko' "
-                  "AND (s.via LIKE 'th-search:%' OR s.via LIKE 'th-tag:%') AND s.seen_at >= ?", since):
+                  f"AND (s.via LIKE '{VIA_TH_SEARCH}%' OR s.via LIKE '{VIA_TH_TAG}%') AND s.seen_at >= ?", since):
         if r["author"].lower() in core:
             continue
         st = stats[r["author"]]
@@ -339,6 +343,15 @@ CARD_TITLE = re.compile(r"^@([\w.]+)\s*[—–-]+\s*(.+)$")
 VERDICTS = ("비추천", "보류", "추천")
 
 
+def verdict_of(head):
+    """발굴 카드 제목의 뒷부분 → (판정 뺀 이유, 판정). 판정 낱말은 앞 12자 안에서 찾는다 — AI는 "판단 보류: 대표글 없음"처럼도 쓴다.
+    예전엔 맨 앞에 있을 때만 봐서 그런 카드가 「추천」으로 저장됐다 (2026-10~11 다섯 건)."""
+    m = re.match(r"^(.{0,12}?)(비추천|보류)\s*[:：]?\s*", head)
+    if m:
+        return head[m.end():].strip() or head, m.group(2)
+    return re.sub(r"^추천\s*[:：]?\s*", "", head) or head, "추천"
+
+
 def remember_verdicts(db, items, date):
     """브리핑 발굴 카드("@handle — 볼 만한 이유" / "— 비추천: 이유" / "— 보류: 이유")를 후보에 붙여 둔다.
     발굴 탭이 브리핑과 같은 판단을 보여 주게 — AI를 다시 부르지 않는다."""
@@ -349,9 +362,7 @@ def remember_verdicts(db, items, date):
         m = CARD_TITLE.match((it.get("title") or "").strip()) if it.get("cat") == "발굴" else None
         if not m:
             continue
-        head = m.group(2).strip()
-        verdict = next((v for v in VERDICTS if head.startswith(v)), "추천")
-        head = re.sub(rf"^({'|'.join(VERDICTS)})\s*[:：]?\s*", "", head) or head
+        head, verdict = verdict_of(m.group(2).strip())
         links = [l.get("url") for l in it.get("links") or [] if l.get("url")]
         note = json.dumps({"title": head, "body": (it.get("body") or "").strip(), "date": date,
                            "link": links[0] if links else ""}, ensure_ascii=False)
@@ -399,7 +410,7 @@ def tags(c):
     for part in [p.strip() for p in (c.get("reason") or "").split(" · ") if p.strip()]:
         if m := re.match(r"서로 다른 회사 (\d+)곳의 핵심 계정\((.+?)\)이 (?:(\d+)주에 걸쳐 (\d+)번 )?", part):
             text = f"회사 {m.group(1)}곳이 " + (f"{m.group(3)}주간 {m.group(4)}번 " if m.group(3) else "") + "언급"
-            add(text, "", f"{m.group(2)}이 리포스트·인용·답글")
+            add(text, "", f"{m.group(2)}이 인용·답글")
         elif m := re.fullmatch(r"떠오르는 중\(30일 팔로워 (\+\d+%)\)", part):
             add(f"떠오르는 중 {m.group(1)}", "ok")
         elif m := re.fullmatch(r"한국어 글 (\d+)개, 반응 합계 (♥[\d,]+)", part):

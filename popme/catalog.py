@@ -4,13 +4,16 @@ popme/feeds.toml(출처 정의, id) + popme/profiles/*.toml(관심사: 출처·�
 + config.toml [[rss]](내가 더한 출처) → 「지금 받을 출처」 목록과 묶음별 상한.
 예전 config.toml(관심사 없이 [[rss]]만)은 migrate()로 한 번 옮긴다. 설계: docs/INTERESTS-DESIGN.md
 """
+import logging
 import re
 import tomllib
 from datetime import date
 from functools import lru_cache
 from urllib.parse import quote_plus
 
-from popme import config
+from popme import config, topics
+
+log = logging.getLogger(__name__)
 
 FEEDS_PATH = config.ROOT / "popme" / "feeds.toml"
 PROFILES_DIR = config.ROOT / "popme" / "profiles"
@@ -40,7 +43,11 @@ def _profiles():
     out = [tomllib.loads(p.read_text(encoding="utf-8")) for p in sorted(PROFILES_DIR.glob("*.toml"))]
     for p in sorted(CUSTOM_DIR.glob("custom-*.toml")):  # 새로 만든 관심사 — 깨진 파일은 건너뛴다
         try:
-            out.append({"order": 100, **tomllib.loads(p.read_text(encoding="utf-8")), "custom": True})
+            prof = {"order": 100, **tomllib.loads(p.read_text(encoding="utf-8")), "custom": True}
+            for t in topics.unknown(prof.get("topic")) + [n for e in prof.get("feeds", []) if isinstance(e.get("filter"), str)
+                                                            for n in topics.unknown(e["filter"])]:
+                log.warning("관심사 %s: 모르는 주제 이름 %r (그 거르기는 아무 글도 고르지 않아요)", p.name, t)
+            out.append(prof)
         except (OSError, tomllib.TOMLDecodeError):
             pass
     return sorted(out, key=lambda p: p.get("order", 99))

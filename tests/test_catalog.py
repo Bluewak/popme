@@ -3,7 +3,7 @@ import re
 import tomllib
 from datetime import datetime, timedelta, timezone
 
-from popme import briefing, catalog, config
+from popme import briefing, catalog, config, topics
 from popme.db import DB
 
 
@@ -32,6 +32,19 @@ def test_catalog_is_consistent():
             assert feeds[e["id"]]["group"] in p["caps"], (p["id"], e["id"])
             used.add(e["id"])
     assert used == set(feeds)  # 어느 관심사에도 안 쓰이는 출처는 없다
+    for p in catalog.profiles():  # 주제 이름 오타는 거르기를 조용히 바꾼다 (topics.matches)
+        assert not topics.unknown(p.get("topic")), (p["id"], p.get("topic"))
+        for e in p["feeds"]:
+            assert not isinstance(e.get("filter"), str) or not topics.unknown(e["filter"]), (p["id"], e["id"])
+    for f in feeds.values():
+        assert not topics.unknown(f.get("topic")), f["id"]
+
+
+def test_unknown_topic_name_filters_out_instead_of_passing_all():
+    assert topics.matches({"title": "그냥 글"}, "ai+dat") is False
+    assert topics.matches({"title": "그냥 글"}, "dat") is False
+    assert topics.matches({"title": "Claude Code 업데이트"}, "ai+dat") is True
+    assert topics.matches({"title": "그냥 글"}, None) is True
 
 
 def test_nothing_chosen_means_no_feeds():

@@ -148,7 +148,7 @@ def test_fetch_reads_gzip_body(monkeypatch):
     ("DuckDB 2.0 출시", "ai+data", True),
     ("Wayland 데스크톱 출시", "ai+data", False),
     ("아무 글", None, True),                         # topic 없으면 다 통과
-    ("아무 글", "unknown", True),                    # 모르는 이름은 무시
+    ("아무 글", "unknown", False),                   # 모르는 이름(오타)은 걸리지 않음 — 거르기가 꺼지지 않게
 ])
 def test_matches_topics(title, topic, want):
     assert topics.matches({"title": title, "summary": ""}, topic) is want

@@ -23,6 +23,17 @@ def test_why_is_plain(monkeypatch, err, want):
     assert want in text and "Target page" not in text and "로그에 받은 API" not in text
 
 
+@pytest.mark.parametrize("err", ["Failed to generate response", "moderate traffic", "accurate parse failed",
+                                 "file size limit exceeded"])
+def test_why_does_not_call_other_errors_a_limit(err):
+    assert "사용 한도" not in jobs.why(RuntimeError(err))
+
+
+@pytest.mark.parametrize("err", ["Rate limit exceeded", "You've hit your usage limit", "HTTP 429", "RESOURCE_EXHAUSTED: Quota exceeded"])
+def test_why_names_the_chosen_ai_for_limits(err):
+    assert jobs.why(RuntimeError(err), {"llm": {"provider": "gemini"}}).startswith("Gemini 사용 한도")
+
+
 def test_need_login_message_kept():
     assert jobs.why(NeedLogin("X 로그인이 필요해요.")) == "X 로그인이 필요해요."
 
@@ -59,7 +70,7 @@ def test_x_saves_each_page_even_if_cut_off(monkeypatch):
     """페이지마다 on_batch로 저장 → 세 번째 페이지에서 Chrome이 닫혀도 앞 두 페이지 글은 남는다."""
     calls = {"n": 0}
 
-    def fake_visit(page, url, via, scrolls, out, ops_seen, owner, since, users):
+    def fake_visit(page, url, via, scrolls, out, ops_seen, owner, since, users, answered=None):
         calls["n"] += 1
         if calls["n"] == 3:
             raise RuntimeError("Target page, context or browser has been closed")
@@ -75,22 +86,24 @@ def test_x_saves_each_page_even_if_cut_off(monkeypatch):
 
 def test_x_rotating_accounts_scroll_deeper_and_record_only_seen(monkeypatch):
     """돌아가며 보는 계정(since_by)은 그 시각까지·DEEP_SCROLLS번까지, 나머지는 since·설정 스크롤.
-    visited에는 글을 받아 온 계정만, 중간에 끊겨도 그때까지."""
+    visited에는 정상으로 연 계정만 — 글이 0개라도 X가 응답했으면(조용한 계정) 넣고, 응답이 없거나 끊기면 뺀다."""
     calls = []
 
-    def fake_visit(page, url, via, scrolls, out, ops_seen, owner, since, users):
+    def fake_visit(page, url, via, scrolls, out, ops_seen, owner, since, users, answered):
         calls.append((owner, scrolls, since))
-        if owner == "c":
+        if owner == "d":
             raise RuntimeError("Target page, context or browser has been closed")
-        return 0 if owner == "b" else 3
+        if owner != "c":  # c: 응답 없음 (막힘·구조 바뀜)
+            answered.append(True)
+        return 3 if owner == "A" else 0
     monkeypatch.setattr(x, "_visit", fake_visit)
     monkeypatch.setattr(x.random, "uniform", lambda a, b: 0)
     monkeypatch.setattr(x.random, "shuffle", lambda l: None)
     visited = []
     with pytest.raises(RuntimeError):
-        x.collect(FakeCtx(), {"x": {}}, ["A", "b", "c"], since="S", since_by={"a": "OLD"}, visited=visited)
+        x.collect(FakeCtx(), {"x": {}}, ["A", "b", "c", "d"], since="S", since_by={"a": "OLD"}, visited=visited)
     assert calls[0] == ("A", x.DEEP_SCROLLS, "OLD") and calls[1] == ("b", 3, "S")
-    assert visited == ["A"]  # b는 글이 없었고 c는 끊김
+    assert visited == ["A", "b"]  # b는 조용한 계정, c는 응답 없음, d는 끊김
 
 
 def test_menu_label_and_busy_line():

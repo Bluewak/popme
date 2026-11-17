@@ -118,6 +118,25 @@ def test_x_plan_scrolls_rotating_accounts_back_to_last_visit(monkeypatch):
     assert set(since_by) == {"r0", "r1"}  # 1시간 전에 본 계정은 since(20시간 전)까지면 충분
 
 
+def test_x_plan_reports_gaps_longer_than_lookback(monkeypatch):
+    """지난번에 본 지 X_LOOKBACK이 넘은 계정, 한 바퀴가 X_LOOKBACK보다 긴 계정 수는 수집 경고로 (예전엔 사이 글이 조용히 빠졌다)."""
+    mine = [{"handle": "me", "name": "", "group": "", "focus": ""}]
+    rot = [{"handle": f"R{i}", "name": "", "group": "", "focus": ""} for i in range(12)]
+    monkeypatch.setattr(briefing, "core_accounts", lambda cfg, db: mine + rot)
+    now = datetime.now(timezone.utc)
+    visits = {f"r{i}": (now - timedelta(days=5)).isoformat() for i in range(12)} | {"r3": (now - timedelta(days=9)).isoformat()}
+    briefing.X_VISITS.write_text(json.dumps(visits), encoding="utf-8")
+    since = (now - timedelta(hours=20)).isoformat()
+    gaps = []
+    briefing.x_plan({"x": {"accounts": mine}}, None, since, limit=11, gaps=gaps)
+    assert gaps == ["X 계정 1개는 7일 넘게 못 봐서 그 앞 글은 못 받았어요"]  # 자리 10개 → 한 바퀴 2일이라 그 경고는 없다
+    rot = [{"handle": f"R{i}", "name": "", "group": "", "focus": ""} for i in range(120)]
+    monkeypatch.setattr(briefing, "core_accounts", lambda cfg, db: mine + rot)
+    gaps = []
+    briefing.x_plan({"x": {"accounts": mine}}, None, since, limit=17, gaps=gaps)  # 자리 16개 → 8일
+    assert any("한 바퀴에 8일" in g for g in gaps)
+
+
 def test_build_data_includes_late_seen_posts_of_rotating_accounts(monkeypatch):
     """며칠 만에 연 계정의 사이 글: 지난 브리핑 뒤에 처음 받은 것은 구간 전 글이라도 넣는다.
     지난 브리핑 전에 받은 글(이미 실렸을 글)·처음 연 계정의 지난 글·남에게 단 답글은 넣지 않고,
@@ -129,7 +148,7 @@ def test_build_data_includes_late_seen_posts_of_rotating_accounts(monkeypatch):
     monkeypatch.setattr(briefing, "core_accounts", lambda cfg, db: [
         {"handle": h, "name": h, "group": "", "focus": ""} for h in ("old", "fresh", "busy")])
     monkeypatch.setattr(briefing, "threads_accounts", lambda cfg, db: [])
-    monkeypatch.setattr(briefing, "rss_items", lambda cfg, db, s: [])
+    monkeypatch.setattr(briefing, "rss_items", lambda cfg, db, s, new_after=None: [])
     monkeypatch.setattr(briefing.discovery, "candidates", lambda db, limit=5: [])
 
     def tw(i, author, created, collected, likes=100, kind="post", ref=None, via=None):
