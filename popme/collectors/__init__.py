@@ -1,7 +1,7 @@
 import json
 import time
 
-from popme.config import RAW_DIR
+from popme import config
 
 
 # 수집 경로 (tweets.via 접두어). 읽는 쪽(briefing.build_data의 재료 구획, discovery)은 이 이름으로 고른다.
@@ -27,7 +27,7 @@ def reached_since(posts, owner, since):
 
 def dump_raw(kind: str, name: str, data, keep: int = 30):
     """파서가 깨졌을 때 고칠 수 있도록 최근 원본 응답만 남긴다."""
-    d = RAW_DIR / kind
+    d = config.RAW_DIR / kind  # 그때그때 (import 시점에 묶으면 테스트가 바꿔 끼운 폴더를 못 따라간다)
     d.mkdir(parents=True, exist_ok=True)
     (d / f"{int(time.time() * 1000)}_{name}.json").write_text(
         json.dumps(data, ensure_ascii=False), encoding="utf-8")

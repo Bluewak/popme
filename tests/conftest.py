@@ -25,6 +25,10 @@ def no_personal_config(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "DATA_DIR", data)
     monkeypatch.setattr(config, "ASSETS_DIR", data / "assets")
     monkeypatch.setattr(config, "CONFIG_PATH", data / "config.toml")
+    for name in ("RAW_DIR", "BRIEFING_DIR"):  # 원본 응답 덤프·브리핑 md도 내 폴더 대신
+        (data / name.lower()).mkdir()
+        monkeypatch.setattr(config, name, data / name.lower())
+    monkeypatch.setattr(config, "FIRST_BRIEFING", data / "first-briefing")
     saved = {}
     monkeypatch.setattr(vault, "get", lambda name: saved.get(name, ""))
     monkeypatch.setattr(vault, "put", lambda name, value: saved.update({name: value}) or True)

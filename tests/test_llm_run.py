@@ -19,7 +19,6 @@ def test_timeout_kills_grandchild(tmp_path):
 
 
 def test_gemini_system_file_per_call(monkeypatch, tmp_path):
-    monkeypatch.setattr(llm, "DATA_DIR", tmp_path)
     monkeypatch.setattr(llm, "find_gemini", lambda cfg: "gemini")
     seen = []
 
@@ -32,7 +31,7 @@ def test_gemini_system_file_per_call(monkeypatch, tmp_path):
     assert llm.ask({"llm": {"provider": "gemini"}}, "지시 B", "p") == "ok"
     (a, ta), (b, tb) = seen
     assert a != b and (ta, tb) == ("지시 A", "지시 B")
-    assert not list((tmp_path / "llm-empty-gemini" / ".gemini").glob("system-*.md"))
+    assert not list((llm.config.DATA_DIR / "llm-empty-gemini" / ".gemini").glob("system-*.md"))
 
 
 def test_login_and_limit_words():

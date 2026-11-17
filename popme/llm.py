@@ -16,7 +16,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from popme.config import DATA_DIR
+from popme import config
 
 
 def provider(cfg) -> str:
@@ -132,9 +132,9 @@ CODEX_DISABLE = ["shell_tool", "unified_exec", "unified_exec_tty", "code_mode_ho
 
 
 def _ask_codex(cfg, system, prompt, timeout):
-    work = DATA_DIR / "llm-empty"  # 빈 폴더에서 실행 (읽을 파일도 없게)
+    work = config.DATA_DIR / "llm-empty"  # 빈 폴더에서 실행 (읽을 파일도 없게)
     work.mkdir(parents=True, exist_ok=True)
-    fd, out = tempfile.mkstemp(prefix="codex-", suffix=".txt", dir=DATA_DIR)
+    fd, out = tempfile.mkstemp(prefix="codex-", suffix=".txt", dir=config.DATA_DIR)
     os.close(fd)
     cmd = [find_codex(cfg), "exec", "--skip-git-repo-check", "--ephemeral", "--ignore-user-config", "--ignore-rules",
            "--sandbox", "read-only", "-C", str(work), "-o", out, "--color", "never", "-c", 'web_search="disabled"']
@@ -169,7 +169,7 @@ GEMINI_SETTINGS = {"tools": {"core": ["none"], "exclude": ["run_shell_command", 
 
 
 def _ask_gemini(cfg, system, prompt, timeout):
-    work = DATA_DIR / "llm-empty-gemini"
+    work = config.DATA_DIR / "llm-empty-gemini"
     (work / ".gemini").mkdir(parents=True, exist_ok=True)
     settings = work / ".gemini" / "settings.json"
     if not settings.exists() or settings.read_text(encoding="utf-8") != json.dumps(GEMINI_SETTINGS):
@@ -217,7 +217,7 @@ def ask(cfg, system: str, prompt: str, timeout: int = 600) -> str:
            "--strict-mcp-config", "--no-session-persistence", "--output-format", "text"]
     if cfg.get("llm", {}).get("model"):
         cmd += ["--model", cfg["llm"]["model"]]
-    r = _run(cmd, prompt, timeout, DATA_DIR)
+    r = _run(cmd, prompt, timeout, config.DATA_DIR)
     if r.returncode != 0:
         raise RuntimeError(f"claude 호출 실패: {(r.stderr or r.stdout).strip()[:500]}")
     return r.stdout.strip()
