@@ -202,12 +202,22 @@ class Jobs:
     def _collect_calendar_x(self, ctx, warnings, progress):
         source = calendar_source(self.cfg)
         try:
+            cal = self.cfg.get("calendar", {})
+            holidays = cal.get("holidays", True)
             if source == "ics":
                 self.db.upsert_events(*ics.collect(self.cfg, progress, warnings))
+                keep = {f"ics{i}" for i, c in enumerate(cal.get("ics", [])) if (c.get("url") or "").strip()}
+                self.db.retire_calendars("ics", keep, holidays)
             elif source == "caldav":
                 self.db.upsert_events(*caldav.collect(self.cfg, progress, warnings))
+                keep = {caldav.calendar_id(c).split(":", 1)[0]
+                        for c in self.cfg.get("caldav", {}).get("calendars", []) if (c.get("url") or "").strip()}
+                self.db.retire_calendars("caldav", keep, holidays)
             elif source == "timetree":
                 self.db.upsert_events(*timetree.collect(ctx, self.cfg, progress))
+                self.db.retire_calendars("timetree")
+            else:  # 안 씀: 예전 출처의 일정이 위젯에 남지 않게
+                self.db.retire_calendars("none")
             if source != "none":
                 try:
                     event_weather.refresh(self.cfg, self.db)  # 새 일정의 장소 → 그날 날씨

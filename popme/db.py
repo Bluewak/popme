@@ -1,4 +1,5 @@
 import logging
+import re
 import sqlite3
 import threading
 from datetime import datetime, timezone
@@ -191,9 +192,12 @@ class DB:
         with self.conn() as c:
             for e in events:
                 first_sync = e["calendar_id"] not in known
-                old = c.execute("SELECT updated_at, deleted, location FROM events WHERE id=?", (e["id"],)).fetchone()
+                old = c.execute("SELECT updated_at, deleted, location, calendar_id FROM events WHERE id=?",
+                                (e["id"],)).fetchone()
                 if old is not None and old["location"] != e.get("location"):  # 장소 칸은 나중에 추가된 컬럼이라 조용히 채움
                     c.execute("UPDATE events SET location=? WHERE id=?", (e.get("location"), e["id"]))
+                if old is not None and old["calendar_id"] != e["calendar_id"]:  # 캘린더 이름을 고쳤다 — 표시 없이 따라간다
+                    c.execute("UPDATE events SET calendar_id=? WHERE id=?", (e["calendar_id"], e["id"]))
                 if old is None:
                     kind = None if first_sync else ("deleted" if e["deleted"] else "new")
                     c.execute(
@@ -209,10 +213,44 @@ class DB:
                     )
             seen = {e["id"] for e in events}
             for cal in synced_calendars:
-                for r in c.execute("SELECT id FROM events WHERE calendar_id=? AND deleted=0", (cal,)).fetchall():
+                # 캘린더는 이름 앞 부분(ics0·cd1a2b3c4d·TimeTree id)으로 — 이름을 고친 뒤 원본에서 지운 일정도 찾는다
+                prefix = cal.split(":", 1)[0]
+                for r in c.execute("SELECT id FROM events WHERE (calendar_id=? OR substr(calendar_id, 1, ?)=?) "
+                                   "AND deleted=0", (cal, len(prefix) + 1, prefix + ":")).fetchall():
                     if r["id"] not in seen:
                         c.execute("UPDATE events SET deleted=1, change_kind='deleted', changed_at=? WHERE id=?",
                                   (ts, r["id"]))
+
+    def retire_calendars(self, source, keep=None, holidays=True):
+        """지금 일정 출처(source)가 아닌 캘린더의 일정을 지운다 → 지운 수. 수집이 실패했는지가 아니라 설정만 보고 정한다.
+        예전엔 TimeTree → 구글 ICS로 바꾸거나 「안 씀」으로 바꿔도 예전 일정이 위젯에 계속 남았다.
+        keep: 같은 출처 안에서 설정에 있는 캘린더 앞 부분들 (ics·caldav, 뺀 캘린더의 일정도 지운다).
+        공휴일은 출처마다 id가 달라(TimeTree 숫자 / 구글 ICS uid@…) 바꾸면 두 번씩 보였다 — 다른 출처 것은 지운다.
+        「지워짐」 표시 대신 행을 지운다 (출처를 바꿀 때 「최근 지워짐」이 한꺼번에 뜨지 않게)."""
+        def owner(cal_id):
+            p = cal_id.split(":", 1)[0]
+            if re.fullmatch(r"ics\d+", p):
+                return "ics", p
+            if re.fullmatch(r"cd[0-9a-f]{8}", p):
+                return "caldav", p
+            return ("holiday" if p == "holiday" else "timetree"), p
+
+        gone = []
+        for r in self.q("SELECT id, calendar_id FROM events"):
+            kind, p = owner(r["calendar_id"] or "")
+            if source == "none":
+                drop = True
+            elif kind == "holiday":
+                from_ics = "@" in r["id"]
+                drop = from_ics if source == "timetree" else (not from_ics or not holidays)
+            else:
+                drop = kind != source or (keep is not None and p not in keep)
+            if drop:
+                gone.append(r["id"])
+        if gone:
+            with self.conn() as c:
+                c.executemany("DELETE FROM events WHERE id=?", [(i,) for i in gone])
+        return len(gone)
 
     # --- 브리핑 ---
     def save_briefing(self, date, markdown, items=None):
