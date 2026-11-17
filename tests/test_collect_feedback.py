@@ -153,3 +153,17 @@ def test_why_names_broken_ai_json():
         json.loads('{"a" 1}')
     except json.JSONDecodeError as e:  # "Expecting ':' delimiter" — 예전엔 deLIMITer가 「사용 한도」로 보였다
         assert "형식이 깨졌어요" in jobs.why(e)
+
+
+def test_saver_writes_each_profile_once_unless_changed():
+    calls = []
+    db = SimpleNamespace(upsert_tweets=lambda b: None, upsert_profiles=lambda ps: calls.append([p["handle"] for p in ps]))
+    users = {"a": {"handle": "a", "followers": 1}, "b": {"handle": "b", "followers": 2}}
+    save = jobs.Saver(db, users)
+    save([])
+    save([])  # 그대로면 다시 안 쓴다
+    users["c"] = {"handle": "c", "followers": 3}
+    users["a"] = {"handle": "a", "followers": 5}
+    save([])
+    save.flush()
+    assert calls == [["a", "b"], ["a", "c"]]

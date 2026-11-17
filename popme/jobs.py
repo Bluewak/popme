@@ -94,6 +94,24 @@ def calendar_source(cfg):
     return cfg.get("calendar", {}).get("source", "timetree")
 
 
+class Saver:
+    """수집 페이지마다 부르는 중간 저장 (on_batch). 계정 규모(users)는 바뀐 것만 저장한다 — 예전엔 페이지마다 그때까지
+    모은 계정 전부를 다시 저장해서(수백~천여 명 × 페이지 30개) 쓰기가 제곱으로 늘었다. flush(): 남은 것 저장."""
+
+    def __init__(self, db, users):
+        self.db, self.users, self.saved = db, users, {}
+
+    def flush(self):
+        fresh = {h: u for h, u in list(self.users.items()) if self.saved.get(h) != u}
+        if fresh:
+            self.db.upsert_profiles(list(fresh.values()))
+            self.saved.update((h, dict(u)) for h, u in fresh.items())
+
+    def __call__(self, batch):
+        self.db.upsert_tweets(batch)
+        self.flush()
+
+
 class Jobs:
     def __init__(self, notify=lambda kind, msg: None):
         """notify(kind, msg): kind = 'briefing' | 'error'"""
@@ -206,13 +224,14 @@ class Jobs:
             handles, since_by = briefing.x_plan(self.cfg, self.db, since, gaps=warnings)
             users = {}  # 응답에 실려 오는 계정 규모 (발굴 인기 기준용)
             visited = []  # 실제로 글을 받아 온 계정 — 로그인이 풀리거나 창이 닫혀 못 본 계정은 「봤다」로 남기지 않는다
+            saver = self._saver(users)
             try:
                 # 페이지 하나 볼 때마다 저장 — 중간에 Chrome이 닫혀도 모은 데까지는 남는다
-                x.collect(ctx, self.cfg, handles, progress, since, users, on_batch=self._saver(users),
+                x.collect(ctx, self.cfg, handles, progress, since, users, on_batch=saver,
                           since_by=since_by, visited=visited)
             finally:
                 briefing.mark_x_visited(visited)
-            self.db.upsert_profiles(list(users.values()))  # 새 글 없이 끝난 페이지의 계정 규모도
+            saver.flush()  # 새 글 없이 끝난 페이지의 계정 규모도
             # 발굴은 이번에 연 계정만이 아니라 보는 계정 전체를 「이미 보는 계정」으로 (돌아가며 안 연 계정이 후보로 오르지 않게)
             discovery.update(self.db, [a["handle"] for a in briefing.core_accounts(self.cfg, self.db)], self.cfg)
             self._calibrate()
@@ -229,8 +248,9 @@ class Jobs:
             th_users = briefing.threads_accounts(self.cfg, self.db)
             since = briefing.window_start(self.db).isoformat()
             users = {}  # 계정 페이지에 실려 오는 팔로워 수 (발굴 인기 기준용)
-            threads.collect(ctx, self.cfg, th_users, progress, since, users, on_batch=self._saver(users))
-            self.db.upsert_profiles(list(users.values()))  # 새 글 없이 끝난 페이지의 계정 규모도
+            saver = self._saver(users)
+            threads.collect(ctx, self.cfg, th_users, progress, since, users, on_batch=saver)
+            saver.flush()  # 새 글 없이 끝난 페이지의 계정 규모도
             discovery.update_threads(self.db, th_users, self.cfg)
             self._check_candidates("threads", ctx, warnings, progress)
         except NeedLogin as e:
@@ -267,10 +287,7 @@ class Jobs:
             log.exception("분야 발굴 기준 보정 실패")
 
     def _saver(self, users):
-        def save(batch):
-            self.db.upsert_tweets(batch)
-            self.db.upsert_profiles(list(users.values()))
-        return save
+        return Saver(self.db, users)
 
     def _fail(self, what, e):
         """수집 경고 한 줄 (사람 말). Chrome이 닫힌 거면 CHROME_CLOSED로 시작 — 끝나고 「다시 모으기」를 띄운다.

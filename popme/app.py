@@ -45,8 +45,13 @@ user32.SetWindowPos.argtypes = [wt.HWND, wt.HWND] + [ctypes.c_int] * 4 + [ctypes
 HWND_TOPMOST = wt.HWND(-1)
 
 
+def _md(text, **kw):
+    """예전 글 형식 브리핑의 마크다운 → HTML. 원문 HTML은 글자로 (AI가 수집 글에서 옮겨 온 태그가 화면에서 실행되지 않게)."""
+    return markdown.markdown(html.escape(text, quote=False), **kw)
+
+
 def _inline_md(text):
-    return re.sub(r"^<p>|</p>$", "", markdown.markdown(text).strip())
+    return re.sub(r"^<p>|</p>$", "", _md(text).strip())
 
 
 def _load_ui_state():
@@ -109,6 +114,7 @@ class Api:
         self._said_today = {}  # 하루 한 번 대사 종류 → 마지막으로 말한 날짜
         # 질문 처리 상태 (화면이 진행 단계를 그린다). stage: plan → search → write
         self._ask = {"running": False, "stage": "", "info": {}}
+        self._ask_lock = threading.Lock()  # pywebview는 JS 호출마다 스레드를 따로 만든다 — 빠르게 두 번 눌러도 한 번만
         self._ask_bubble_until = 0.0  # 이 시각 전에 말풍선을 누르면 질문 탭을 연다 ("답 찾아왔어요")
 
     # --- 모드 전환·배치 ---
@@ -405,7 +411,7 @@ class Api:
             "agenda": agenda_items,
             "mails": mails,
             "headlines": [{**h, "html": _inline_md(h["md"])} for h in heads],
-            "details": markdown.markdown(details, extensions=["tables", "sane_lists"]),
+            "details": _md(details, extensions=["tables", "sane_lists"]),
         }
 
     def _news_state(self):
@@ -541,7 +547,7 @@ class Api:
 
     def ask(self, question):
         """질문 → 정리된 답 (JSON). 진행 단계는 get_state()["ask"]로 화면이 그리고, 끝나면 말풍선으로 알린다."""
-        if self._ask["running"]:
+        if not self._ask_lock.acquire(blocking=False):
             return {"error": "이전 질문을 아직 생각하는 중이에요."}
 
         def progress(stage, info=None):  # info는 누적 (화면이 지난 단계 내용도 보여줄 수 있게)
@@ -560,6 +566,7 @@ class Api:
             return {"error": str(e)}
         finally:
             self._ask.update(running=False, stage="", info={})
+            self._ask_lock.release()
 
     def open_url(self, url):
         webbrowser.open(url)

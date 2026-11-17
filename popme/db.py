@@ -84,6 +84,8 @@ MIGRATIONS = [
     "ALTER TABLE candidates ADD COLUMN stage TEXT DEFAULT 'pool'",
     "ALTER TABLE candidates ADD COLUMN check_note TEXT",
     "ALTER TABLE candidates ADD COLUMN checked_at TEXT",
+    # 발굴 kind_of가 후보마다 「다른 계정의 소속 배지에 이 회사가 있나」를 찾는다 — 인덱스 없이는 profiles를 훑었다
+    "CREATE INDEX IF NOT EXISTS profiles_org ON profiles(org COLLATE NOCASE)",
     "ALTER TABLE candidates ADD COLUMN fail_since TEXT",  # 승인 계정이 꾸준함 기준에 처음 못 미친 때
     "ALTER TABLE candidates ADD COLUMN interest TEXT",  # 어느 관심사 계정들의 반응으로 올라왔나 → 그 분야 기준으로 판정 (fieldscale)
     # 브리핑 발굴 카드의 AI 판단 (discovery.remember_verdicts): 추천|비추천|보류, {title, body, date, link} JSON
@@ -122,6 +124,8 @@ class DB:
         if c is None:
             c = sqlite3.connect(self.path, timeout=30)
             c.row_factory = sqlite3.Row
+            # WAL에서 권장 값: 커밋마다 fsync하지 않는다 (전원이 나가면 마지막 커밋만 잃을 수 있고 DB는 깨지지 않는다)
+            c.execute("PRAGMA synchronous=NORMAL")
             self._local.c = c
         return c
 

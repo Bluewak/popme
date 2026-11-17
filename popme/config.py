@@ -32,6 +32,13 @@ OLD_APP_ASSETS = {"README.md", "prepare.py", "fonts", "characters", "pet.ico", "
 for d in (DATA_DIR, BRIEFING_DIR, RAW_DIR, ASSETS_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
+LOG_MAX = 5 * 1024 * 1024  # 이보다 크면 켤 때 popme.log.1로 넘긴다 (예전엔 끝없이 커졌다)
+try:  # 설정 창 프로세스도 같은 파일에 써서 RotatingFileHandler(쓰는 중 이름 바꾸기)는 Windows에서 실패한다 — 켤 때 한 번만
+    if LOG_PATH.exists() and LOG_PATH.stat().st_size > LOG_MAX:
+        os.replace(LOG_PATH, LOG_PATH.with_suffix(".log.1"))
+except OSError:
+    pass  # 다른 프로세스가 잡고 있으면 다음에
+
 logging.basicConfig(
     filename=LOG_PATH,
     level=logging.INFO,
