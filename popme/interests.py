@@ -13,7 +13,7 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 
-from popme import briefing, catalog, llm, tomledit
+from popme import catalog, llm, tomledit
 from popme.fileio import atomic_write_text
 from popme.sources import rss
 
@@ -151,7 +151,7 @@ def suggest(cfg, field, scope, lens=None, answers=None, headlines=None, context=
                             extra_out=', "media": [...], "searches": ["..."]' if flow else "")
     empty = {"people": [], "companies": [], "topics": [], "media": [], "searches": []}
     try:
-        raw = briefing.parse_json(llm.ask(cfg, SYSTEM, prompt, timeout=180))
+        raw = llm.parse_json(llm.ask(cfg, SYSTEM, prompt, timeout=180))
     except Exception:
         log.exception("관심사 후보 받기 실패")
         return {**empty, "error": "AI가 지금 답하지 못했어요"}
@@ -273,7 +273,7 @@ def questions(cfg, field, lens, heads=None, context="", domain=None):
     prompt = QUESTIONS.format(persona=with_persona(domain, "questions"), field=_short(field, 40), where=where(context), lens=LENSES[lens], headlines="\n".join(f"- {h}" for h in heads) or "(없음)",
                               types=" / ".join(f"{k}({v['범위']}·{v['대상']})" for k, v in TYPES.items()), slots=words)
     try:
-        raw = briefing.parse_json(llm.ask(cfg, SYSTEM, prompt, timeout=180))
+        raw = llm.parse_json(llm.ask(cfg, SYSTEM, prompt, timeout=180))
         out = clean_questions(raw, lens)
     except Exception:
         log.exception("관심사 질문 만들기 실패 (고정 질문으로)")
@@ -306,7 +306,7 @@ def finalize(cfg, field, scope, people, companies, topics, lens=None, answers=No
                          "광고·홍보·가십은 버린다."],
             "discovery": f"{_short(field, 20)} 소식을 꾸준히 전하는 사람"}
     try:
-        raw = briefing.parse_json(llm.ask(cfg, SYSTEM, prompt, timeout=180))
+        raw = llm.parse_json(llm.ask(cfg, SYSTEM, prompt, timeout=180))
     except Exception:
         log.exception("관심사 기준 만들기 실패 (정해진 문장으로)")
         return base

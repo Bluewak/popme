@@ -69,6 +69,8 @@ def why(e, cfg=None):
     """수집·브리핑 오류 → 사용자에게 보일 짧은 이유. 원문은 log.exception으로 남긴다. cfg: AI 이름을 쓸 설정 (없으면 기본 공급자)."""
     if isinstance(e, NeedLogin):
         return str(e)
+    if isinstance(e, json.JSONDecodeError):  # AI 답이 두 번 다 JSON이 아니었다 ("Expecting ',' delimiter …")
+        return "AI 답 형식이 깨졌어요. 「브리핑만 다시 만들기」를 눌러 주세요"
     s = str(e).lower()
     if chrome_closed(e):
         return "Chrome 창이 닫혔어요"
@@ -80,7 +82,7 @@ def why(e, cfg=None):
         return "페이지가 너무 오래 걸렸어요"
     if llm.is_limit(s):  # config.load()를 다시 부르지 않는다 (설정 옮기기 같은 부수 효과가 있다)
         return f"{llm.provider_name(cfg or {})} 사용 한도에 걸렸어요. 한도가 풀리면 「브리핑만 다시 만들기」를 눌러 주세요"
-    if any(k in s for k in ("login", "auth", "api key", "credential", "401")):
+    if llm.is_login(s):
         return "AI 로그인이 풀렸어요. 트레이 → 설정 바꾸기 → 브리핑 AI에서 로그인해 주세요"
     if "구조가 바뀐" in s:  # 수집기가 이미 사람 말로 쓴 경고
         return str(e).split(" (로그에")[0]
@@ -308,7 +310,11 @@ class Jobs:
             if collect and not online():  # 처음부터 끊겨 있으면 모으지도, 묵은 자료로 브리핑을 만들지도 않는다
                 return self._offline(warnings, "인터넷이 연결돼 있지 않아서 모으지 않았어요. 연결되면 다시 모을게요")
             if collect:
-                self._browser_collect(warnings)
+                try:  # 전용 Chrome이 늦게 뜨거나 안 떠도 RSS·브리핑은 이어서 (예전엔 그날 브리핑이 통째로 없었다)
+                    self._browser_collect(warnings)
+                except Exception as e:
+                    log.exception("전용 Chrome 수집 실패")
+                    warnings.append(self._fail("전용 Chrome", e))
                 self._progress("RSS 수집 중")
                 feeds = catalog.active(self.cfg)
                 items, errs = sources.collect(feeds, self._progress)

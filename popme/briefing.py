@@ -438,12 +438,7 @@ def _fill(template, **kw):
     return template
 
 
-def parse_json(text):
-    """모델 답에서 JSON 객체를 꺼낸다 (앞뒤 설명·```json 코드블록이 붙어 와도)."""
-    s, e = text.find("{"), text.rfind("}")
-    if s < 0 or e < s:
-        raise ValueError("JSON이 없음")
-    return json.loads(text[s:e + 1])
+parse_json = llm.parse_json  # 예전 이름 (테스트·옛 호출부)
 
 
 VERSION_RE = re.compile(r"\bv?\d+\.\d+(\.\d+)+\b")

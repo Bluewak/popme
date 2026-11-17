@@ -33,6 +33,44 @@ def is_limit(text) -> bool:
     return bool(LIMIT_RE.search(str(text)))
 
 
+# AI 로그인 문제인가 — 낱말 경계로. 예전엔 "auth"가 들어 있기만 하면 로그인으로 봐서 KeyError: 'author' 같은 것도
+# 「AI 로그인이 풀렸어요」가 됐다
+LOGIN_RE = re.compile(r"(?<![a-z])(login|log in|unauthori[sz]ed|authenticat\w*|auth|api key|credentials?|not logged)(?![a-z])"
+                      r"|(?<!\d)401(?!\d)", re.I)
+
+
+def is_login(text) -> bool:
+    return bool(LOGIN_RE.search(str(text)))
+
+
+def parse_json(text):
+    """모델 답에서 JSON 객체를 꺼낸다 (앞뒤 설명·```json 코드블록이 붙어 와도)."""
+    s, e = text.find("{"), text.rfind("}")
+    if s < 0 or e < s:
+        raise ValueError("JSON이 없음")
+    return json.loads(text[s:e + 1])
+
+
+def _run(cmd, input, timeout, cwd, env=None):
+    """subprocess.run과 같되, 시간이 넘으면 프로세스 트리를 통째로 끝낸다 → CompletedProcess (넘으면 TimeoutExpired).
+    npm으로 깐 gemini.cmd·codex.cmd(·claude.cmd)는 cmd.exe가 node를 띄운다. subprocess.run은 시간이 넘으면 cmd.exe만
+    죽이고 출력이 닫히길 기다려서, 손자 node가 출력을 쥔 채 계속 돌면 끝없이 멈췄다 — 브리핑 잠금도 함께."""
+    p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                         encoding="utf-8", errors="replace", cwd=cwd, env=env,
+                         creationflags=subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP)
+    try:
+        out, err = p.communicate(input, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        subprocess.run(["taskkill", "/T", "/F", "/PID", str(p.pid)], capture_output=True, timeout=10,
+                       creationflags=subprocess.CREATE_NO_WINDOW)
+        try:
+            p.communicate(timeout=10)
+        except subprocess.TimeoutExpired:
+            p.kill()
+        raise
+    return subprocess.CompletedProcess(cmd, p.returncode, out, err)
+
+
 def provider_name(cfg) -> str:
     return {"claude": "Claude", "codex": "ChatGPT", "gemini": "Gemini"}.get(provider(cfg), provider(cfg))
 
@@ -107,12 +145,11 @@ def _ask_codex(cfg, system, prompt, timeout):
     cmd.append("-")  # 프롬프트는 stdin으로
     text = f"<instructions>\n{system}\n</instructions>\n\n{prompt}"  # codex exec엔 시스템 프롬프트 옵션이 없음
     try:
-        r = subprocess.run(cmd, input=text, capture_output=True, text=True, encoding="utf-8", errors="replace",
-                           timeout=timeout, cwd=work, creationflags=subprocess.CREATE_NO_WINDOW)
+        r = _run(cmd, text, timeout, work)
         answer = Path(out).read_text(encoding="utf-8").strip() if os.path.exists(out) else ""
         if r.returncode != 0 or not answer:
             err = (r.stderr or r.stdout or "").strip()
-            if "login" in err.lower() or "auth" in err.lower():
+            if is_login(err):
                 raise RuntimeError("Codex 로그인이 필요해요. 터미널에서 `codex login`을 해 주세요.")
             raise RuntimeError(f"codex 호출 실패: {err[-500:]}")
         return answer
@@ -134,16 +171,29 @@ GEMINI_SETTINGS = {"tools": {"core": ["none"], "exclude": ["run_shell_command", 
 def _ask_gemini(cfg, system, prompt, timeout):
     work = DATA_DIR / "llm-empty-gemini"
     (work / ".gemini").mkdir(parents=True, exist_ok=True)
-    (work / ".gemini" / "settings.json").write_text(json.dumps(GEMINI_SETTINGS), encoding="utf-8")
-    sys_md = work / ".gemini" / "system.md"
-    sys_md.write_text(system, encoding="utf-8")
+    settings = work / ".gemini" / "settings.json"
+    if not settings.exists() or settings.read_text(encoding="utf-8") != json.dumps(GEMINI_SETTINGS):
+        settings.write_text(json.dumps(GEMINI_SETTINGS), encoding="utf-8")
+    # 시스템 프롬프트 파일은 호출마다 따로 — 예전엔 한 파일을 덮어써서, 브리핑과 메일 분류가 겹치면
+    # 브리핑이 메일 분류용 지시문(데이터 속 지시를 따르지 말라는 문장 없음)으로 돌 수 있었다
+    fd, sys_md = tempfile.mkstemp(prefix="system-", suffix=".md", dir=work / ".gemini")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(system)
+    try:
+        return _gemini_call(cfg, prompt, timeout, work, sys_md)
+    finally:
+        try:
+            os.remove(sys_md)
+        except OSError:
+            pass
+
+
+def _gemini_call(cfg, prompt, timeout, work, sys_md):
     cmd = [find_gemini(cfg), "-p", "위 입력에 답하세요.", "-o", "json", "-e", "none",
            "--allowed-mcp-server-names", "none", "--approval-mode", "default", "--skip-trust"]
     if cfg.get("llm", {}).get("gemini_model"):
         cmd += ["-m", cfg["llm"]["gemini_model"]]
-    r = subprocess.run(cmd, input=prompt, capture_output=True, text=True, encoding="utf-8", errors="replace",
-                       timeout=timeout, cwd=work, env={**os.environ, "GEMINI_SYSTEM_MD": str(sys_md)},
-                       creationflags=subprocess.CREATE_NO_WINDOW)
+    r = _run(cmd, prompt, timeout, work, env={**os.environ, "GEMINI_SYSTEM_MD": str(sys_md)})
     out = (r.stdout or "").strip()
     try:
         data = json.loads(out[out.index("{"):]) if "{" in out else {}
@@ -152,7 +202,7 @@ def _ask_gemini(cfg, system, prompt, timeout):
     answer = (data.get("response") or "").strip()
     if r.returncode != 0 or not answer:
         err = json.dumps(data.get("error"), ensure_ascii=False) if data.get("error") else (r.stderr or out)
-        if any(k in err.lower() for k in ("login", "auth", "credential")):
+        if is_login(err):
             raise RuntimeError("Gemini 로그인이 필요해요. 터미널에서 `gemini`를 한 번 실행해 Google 로그인을 해 주세요.")
         raise RuntimeError(f"gemini 호출 실패: {err.strip()[-500:]}")
     return answer
@@ -167,8 +217,7 @@ def ask(cfg, system: str, prompt: str, timeout: int = 600) -> str:
            "--strict-mcp-config", "--no-session-persistence", "--output-format", "text"]
     if cfg.get("llm", {}).get("model"):
         cmd += ["--model", cfg["llm"]["model"]]
-    r = subprocess.run(cmd, input=prompt, capture_output=True, text=True, encoding="utf-8",
-                       timeout=timeout, cwd=DATA_DIR, creationflags=subprocess.CREATE_NO_WINDOW)
+    r = _run(cmd, prompt, timeout, DATA_DIR)
     if r.returncode != 0:
         raise RuntimeError(f"claude 호출 실패: {(r.stderr or r.stdout).strip()[:500]}")
     return r.stdout.strip()

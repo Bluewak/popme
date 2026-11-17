@@ -139,3 +139,17 @@ def test_timeline_ok_only_for_real_timeline():
     assert not x.timeline_ok(ok, {"errors": [{"message": "Rate limit exceeded"}]})
     assert not x.timeline_ok(ok, {"data": {"user": {"result": {"__typename": "User", "legacy": {}}}}})  # UserByScreenName
     assert not x.timeline_ok(ok, None)
+
+
+@pytest.mark.parametrize("err", ["KeyError: 'author'", "authority check", "char 4290"])
+def test_why_does_not_call_parts_of_words_a_login_or_limit(err):
+    text = jobs.why(RuntimeError(err))
+    assert "로그인" not in text and "사용 한도" not in text
+
+
+def test_why_names_broken_ai_json():
+    import json
+    try:
+        json.loads('{"a" 1}')
+    except json.JSONDecodeError as e:  # "Expecting ':' delimiter" — 예전엔 deLIMITer가 「사용 한도」로 보였다
+        assert "형식이 깨졌어요" in jobs.why(e)

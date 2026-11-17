@@ -734,8 +734,7 @@ def ai_status(provider):
     home, plan = Path.home(), ""
 
     def run(*args):
-        return subprocess.run([exe, *args], capture_output=True, text=True, encoding="utf-8", errors="replace",
-                              timeout=20, creationflags=subprocess.CREATE_NO_WINDOW)
+        return llm._run([exe, *args], "", 20, None)  # npm .cmd면 시간이 넘을 때 node까지 끝낸다
     if provider == "codex":
         try:
             r = run("login", "status")
@@ -765,7 +764,7 @@ def ai_test(provider):
         raise ValueError(f"{name}이(가) 2분 안에 답하지 않았어요. 잠시 뒤 「다시 불러 보기」를 눌러 주세요.")
     except (RuntimeError, OSError) as e:
         err = str(e).lower()
-        if any(k in err for k in ("login", "auth", "api key", "credential", "401")):
+        if llm.is_login(err):
             raise ValueError(f"{name} 로그인이 필요해요. 「로그인 하기」를 눌러 주세요.")
         if llm.is_limit(err):
             raise ValueError(f"{name} 사용 한도에 걸렸어요. 한도가 풀리면 브리핑도 써져요. 그대로 다음으로 가도 돼요.")

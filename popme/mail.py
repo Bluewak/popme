@@ -19,7 +19,7 @@ from datetime import datetime, timedelta, timezone
 from email.utils import getaddresses, parsedate_to_datetime
 from urllib.parse import quote
 
-from popme import briefing, clock, llm
+from popme import clock, llm
 from popme.db import now_iso
 
 log = logging.getLogger(__name__)
@@ -161,7 +161,7 @@ def judge(cfg, mails):
     user = cfg.get("user", {})
     prompt = (PROMPT.replace("__USER__", f"{user.get('plan', '')} 사용자, 주로 {user.get('tools', '')} 사용")
               .replace("__CRITERIA__", settings(cfg)["criteria"]).replace("__MAILS__", "\n".join(lines)))
-    raw = briefing.parse_json(llm.ask(cfg, SYSTEM, prompt, timeout=180))
+    raw = llm.parse_json(llm.ask(cfg, SYSTEM, prompt, timeout=180))
     return {r["i"]: r for r in raw.get("mails", []) if isinstance(r, dict) and isinstance(r.get("i"), int)}
 
 
