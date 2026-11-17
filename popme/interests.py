@@ -422,9 +422,9 @@ def save_custom(field, scope, verified, topics, final, lens=None, kind=None, ans
                       f"feeds = {_q([e['feed']])}", ""]
         if e.get("kind") == "search" and e.get("news_count"):
             lines += ["[[searches]]", f"name = {_q(e['name'])}", f"region = {_q(e['region'])}", f"news = {_q(e['name'])}", ""]
-    for kind, key in (("person", "people"), ("company", "companies")):
+    for want, key in (("person", "people"), ("company", "companies")):  # (인자 kind와 이름이 겹치지 않게)
         for e in verified:
-            if e["kind"] != kind:
+            if e["kind"] != want:
                 continue
             lines += [f"[[{key}]]", f"name = {_q(e['name'])}", f"why = {_q(e.get('why', ''))}", f"region = {_q(e['region'])}"]
             if e.get("x_status") == "ok":
