@@ -2,12 +2,11 @@
 from popme import agenda, clock
 from popme.db import DB
 
-DAY = clock.today().isoformat()
-
 
 def ev(i, cal, title="모임", deleted=0):
-    return {"id": i, "calendar_id": cal, "title": title, "start_at": f"{DAY}T10:00:00+09:00",
-            "end_at": f"{DAY}T11:00:00+09:00", "all_day": 0, "updated_at": "1", "deleted": deleted,
+    day = clock.today().isoformat()  # 부를 때 (import 때 정하면 conftest의 한국 시간대가 아직 안 걸려 CI(UTC)에서 하루 어긋난다)
+    return {"id": i, "calendar_id": cal, "title": title, "start_at": f"{day}T10:00:00+09:00",
+            "end_at": f"{day}T11:00:00+09:00", "all_day": 0, "updated_at": "1", "deleted": deleted,
             "recurrences": "[]", "location": None}
 
 
