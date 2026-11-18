@@ -27,6 +27,10 @@ X_VISITS = config.DATA_DIR / "x-visits.json"  # 계정 페이지를 마지막으
 # 예전엔 수집도 브리핑도 「지난 브리핑 이후」만 봐서 사이 글이 빠졌다 — 2026-11-16 한 번에 226개
 # (@sundarpichai의 Gemini 4 Carbon·TPU 발표, @deepseek_ai의 API 공개 등)
 X_LOOKBACK = timedelta(days=7)
+X_LIST = config.DATA_DIR / "x-list.json"  # 리스트에 넣은 계정 {"list": ID, "name": 이름, "members": {handle 소문자: ISO}, "failed": {…}, "added": {날짜: 수}}
+LIST_ADD_PER_DAY = 30   # 하루에 리스트에 넣는 계정 수 (사람이 리스트를 처음 만들 때 한자리에서 넣는 정도. X는 「공격적인 리스트 추가」를 금지한다)
+LIST_RETRY = timedelta(days=7)  # 넣기 실패한 계정은 이만큼 뒤에 다시
+LIST_FRESH = timedelta(hours=48)  # 리스트를 이만큼 안에 정상으로 봤을 때만 리스트 멤버를 계정 페이지 방문에서 뺀다
 X_LATE_PER_ACCOUNT = 5  # 사이 글은 계정당 반응 큰 이만큼만 (다 넣으면 2026-11-16 브리핑의 X 글이 42개 → 426개)
 
 
@@ -49,7 +53,8 @@ def x_plan(cfg, db, since, limit=X_VISIT_LIMIT, gaps=None):
     accts = core_accounts(cfg, db)
     mine = {a["handle"].lower() for a in cfg.get("x", {}).get("accounts", [])}
     fixed = [a["handle"] for a in accts if a["handle"].lower() in mine]
-    rotating = [a["handle"] for a in accts if a["handle"].lower() not in mine]
+    on_list = list_members(cfg)  # 리스트로 매번 받는 계정 — 그 자리를 아직 리스트에 없는 계정에
+    rotating = [a["handle"] for a in accts if a["handle"].lower() not in mine and a["handle"].lower() not in on_list]
     room = max(10, limit - len(fixed))
     if len(rotating) <= room:
         return fixed + rotating, {}
@@ -75,6 +80,90 @@ def x_plan(cfg, db, since, limit=X_VISIT_LIMIT, gaps=None):
     if gaps is not None and late:
         gaps.append(f"X 계정 {late}개는 {X_LOOKBACK.days}일 넘게 못 봐서 그 앞 글은 못 받았어요")
     return fixed + pick, since_by
+
+
+def _list_state(lid):
+    try:
+        s = json.loads(X_LIST.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        s = {}
+    if s.get("list") != lid:  # 다른 리스트로 바꿨으면 처음부터
+        s = {"list": lid}
+    for k in ("members", "failed", "added"):
+        s.setdefault(k, {})
+    return s
+
+
+def _save_list_state(s):
+    try:
+        atomic_write_text(X_LIST, json.dumps(s, ensure_ascii=False, indent=1))
+    except OSError:
+        log.warning("X 리스트 기록 저장 실패", exc_info=True)
+
+
+def list_members(cfg):
+    """리스트에 넣은 계정(소문자) — 단 리스트를 LIST_FRESH 안에 정상으로 봤을 때만. 아니면 빈 집합
+    (리스트를 못 읽는 동안 그 계정들을 계정 페이지로라도 보게)."""
+    from popme.collectors.x import list_id
+    lid = list_id(cfg.get("x", {}).get("list_url"))
+    if not lid:
+        return set()
+    try:
+        seen = datetime.fromisoformat(_visits().get(f"list:{lid}") or "")
+    except ValueError:
+        return set()
+    if datetime.now(timezone.utc) - seen > LIST_FRESH:
+        return set()
+    return set(_list_state(lid)["members"])
+
+
+def list_todo(cfg, db, name=None):
+    """리스트에 넣을 계정 → (handles, 리스트 이름). 보는 계정 중 아직 안 넣었고 최근에 실패하지 않은 것, 오늘 남은 몫만큼.
+    빼는 일은 하지 않는다: 안 보게 된 계정이 리스트에 남아도 재료는 보는 계정 글만 쓴다 (넣고 빼기를 되풀이하지 않게)."""
+    from popme.collectors.x import list_id
+    xcfg = cfg.get("x", {})
+    lid = list_id(xcfg.get("list_url"))
+    if not lid or not xcfg.get("list_sync", True):
+        return [], None
+    s = _list_state(lid)
+    if name and s.get("name") != name:
+        s["name"] = name
+        _save_list_state(s)
+    name = s.get("name")
+    if not name:
+        return [], None  # 리스트를 한 번 정상으로 봐야 이름을 안다
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    room = LIST_ADD_PER_DAY - s["added"].get(today, 0)
+    now = datetime.now(timezone.utc)
+
+    def failed_recently(h):
+        try:
+            return now - datetime.fromisoformat(s["failed"][h]) < LIST_RETRY
+        except (KeyError, ValueError):
+            return False
+    todo = [a["handle"] for a in core_accounts(cfg, db)
+            if a["handle"].lower() not in s["members"] and not failed_recently(a["handle"].lower())]
+    return todo[:max(room, 0)], name
+
+
+def mark_list(cfg, handle, result):
+    """add_to_list 결과를 남긴다. added만 하루 몫에 센다 (already는 X에 쓴 게 아니다)."""
+    from popme.collectors.x import list_id
+    lid = list_id(cfg.get("x", {}).get("list_url"))
+    if not lid:
+        return
+    s = _list_state(lid)
+    now = datetime.now(timezone.utc)
+    h = handle.lower()
+    if result in ("added", "already"):
+        s["members"][h] = now.isoformat()
+        s["failed"].pop(h, None)
+        if result == "added":
+            today = now.strftime("%Y-%m-%d")
+            s["added"] = {today: s["added"].get(today, 0) + 1}  # 오늘 것만 남긴다
+    else:
+        s["failed"][h] = now.isoformat()
+    _save_list_state(s)
 
 
 def list_since(cfg, since):

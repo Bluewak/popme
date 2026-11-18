@@ -228,13 +228,16 @@ class Jobs:
             users = {}  # 응답에 실려 오는 계정 규모 (발굴 인기 기준용)
             visited = []  # 실제로 글을 받아 온 계정 — 로그인이 풀리거나 창이 닫혀 못 본 계정은 「봤다」로 남기지 않는다
             saver = self._saver(users)
+            meta = {}  # 리스트 이름 (리스트를 보면 채워진다)
             try:
                 # 페이지 하나 볼 때마다 저장 — 중간에 Chrome이 닫혀도 모은 데까지는 남는다
                 x.collect(ctx, self.cfg, handles, progress, since, users, on_batch=saver,
-                          since_by=since_by, visited=visited, list_since=accounts.list_since(self.cfg, since))
+                          since_by=since_by, visited=visited, list_since=accounts.list_since(self.cfg, since),
+                          list_meta=meta)
             finally:
                 accounts.mark_x_visited(visited)
             saver.flush()  # 새 글 없이 끝난 페이지의 계정 규모도
+            self._sync_x_list(ctx, meta.get("name"), warnings, progress)
             # 발굴은 이번에 연 계정만이 아니라 보는 계정 전체를 「이미 보는 계정」으로 (돌아가며 안 연 계정이 후보로 오르지 않게)
             discovery.update(self.db, [a["handle"] for a in accounts.core_accounts(self.cfg, self.db)], self.cfg)
             self._calibrate()
@@ -245,6 +248,20 @@ class Jobs:
             log.exception("X 실패")
             warnings.append(self._fail("X", e))
         progress("X 완료")
+
+    def _sync_x_list(self, ctx, name, warnings, progress):
+        """보는 계정 중 X 리스트에 아직 없는 것을 하루 LIST_ADD_PER_DAY개까지 넣는다. 실패해도 수집은 그대로
+        (리스트에 없는 계정은 계정 페이지로 돌아가며 본다)."""
+        todo, name = accounts.list_todo(self.cfg, self.db, name)
+        if not todo:
+            return
+        try:
+            x.sync_list(ctx, todo, name, lambda h, r: accounts.mark_list(self.cfg, h, r), progress)
+        except NeedLogin as e:
+            warnings.append(str(e))
+        except Exception as e:
+            log.exception("X 리스트 동기화 실패")
+            warnings.append(self._fail("X 리스트에 계정 넣기", e))
 
     def _collect_threads(self, ctx, warnings, progress):
         try:

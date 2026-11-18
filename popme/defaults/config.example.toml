@@ -17,6 +17,7 @@ minimize_while_collecting = true  # 수집 중 Chrome 창을 최소화 (최소�
 
 [x]
 list_url = ""                     # X 리스트 주소(비공개 가능). 있으면 계정 페이지를 본 뒤 리스트도 본다 (보는 계정 전체의 새 글·리트윗)
+list_sync = true                  # 보는 계정 중 리스트에 없는 것을 하루 30개까지 리스트에 넣는다 (빼지는 않음)
 scrolls_per_page = 3              # 페이지당 스크롤 횟수 (사람 속도, 작게 유지)
 
 accounts = [

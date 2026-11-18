@@ -31,6 +31,46 @@ def list_id(url):
     return m.group(1) if m else None
 
 
+def add_to_list(page, handle, list_name):
+    """계정 페이지 「…」 → Add/remove from Lists → list_name 줄을 체크 → Save. → "added" | "already" (이미 체크돼 있음).
+    사람이 하듯 한 번에 한 계정. 실패하면 예외 (계정이 없어졌거나 화면이 바뀜)."""
+    page.goto(f"https://x.com/{handle}", wait_until="domcontentloaded", timeout=45000)
+    page.wait_for_timeout(random.uniform(3500, 5500))
+    if any(m in page.url for m in BLOCK_MARKERS):
+        raise NeedLogin(f"X 로그인이 필요해요 ({page.url})")
+    page.locator("[data-testid=userActions]").first.click(timeout=15000)
+    page.wait_for_timeout(random.uniform(900, 1600))
+    page.get_by_role("menuitem").filter(has_text="List").first.click(timeout=15000)
+    page.wait_for_timeout(random.uniform(2000, 3000))
+    dlg = page.get_by_role("dialog")
+    row = dlg.locator("[data-testid=listCell]").filter(has_text=list_name).first
+    if row.get_attribute("aria-checked", timeout=15000) == "true":
+        page.keyboard.press("Escape")
+        return "already"
+    row.click()
+    page.wait_for_timeout(random.uniform(800, 1400))
+    dlg.get_by_role("button", name="Save").first.click(timeout=15000)
+    page.wait_for_timeout(random.uniform(1500, 2500))
+    return "added"
+
+
+def list_name(data, lid):
+    """리스트 화면의 응답에서 리스트 이름 (add_to_list가 대화상자에서 줄을 찾을 때). 없으면 None."""
+    found = []
+
+    def walk_(o):
+        if isinstance(o, dict):
+            if str(o.get("id_str") or o.get("rest_id") or "") == lid and o.get("name") and "member_count" in o:
+                found.append(o["name"])
+            for v in o.values():
+                walk_(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk_(v)
+    walk_(data)
+    return found[0] if found else None
+
+
 def _list_reached(tweets, since):
     """마지막 응답의 글이 절반 넘게 since보다 오래됐으면 그 아래는 이미 받은 구간이다.
     응답에는 인용·리트윗 원문(더 오래된 글)도 섞여 오므로 하나가 아니라 절반으로 본다."""
@@ -211,7 +251,7 @@ def check_profiles(ctx, handles, progress=lambda s: None, users=None):
     return out
 
 
-def _visit_list(page, url, via, since, sink, ops_seen, users=None):
+def _visit_list(page, url, via, since, sink, ops_seen, users=None, meta=None):
     """리스트 타임라인 → 받은 글 수. since(UTC ISO)까지 내려가면 멈춘다 (최대 LIST_SCROLLS번).
     리스트는 보는 계정 전체의 글을 시간순으로 한 페이지에 준다 — 계정 페이지를 30개씩 돌아가며 열면 한 바퀴에 5일쯤 걸려,
     그 사이 글의 56%가 어느 브리핑에도 못 들어갔다(2026-11-04~18). 계정 페이지가 안 주는 리트윗도 온다."""
@@ -232,6 +272,10 @@ def _visit_list(page, url, via, since, sink, ops_seen, users=None):
             tweets = []
             if data is not None:
                 walk(data, tweets, users)
+                if meta is not None and "name" not in meta:
+                    name = list_name(data, via.split(":", 1)[-1])
+                    if name:
+                        meta["name"] = name
             parsed.append((r, data, tweets))
 
     page.on("response", handler)
@@ -268,12 +312,12 @@ def _visit_list(page, url, via, since, sink, ops_seen, users=None):
 
 
 def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None, on_batch=None, since_by=None,
-            visited=None, list_since=None):
+            visited=None, list_since=None, list_meta=None):
     """accounts: 핵심 계정 handle 목록. since(UTC ISO): 계정 페이지는 이 시각 이전 글까지만 스크롤.
     since_by({handle 소문자: UTC ISO}): 그 계정만 다른 시각까지, 스크롤도 DEEP_SCROLLS번까지 (돌아가며 보는 계정 — 지난번에 본 시각).
     [x] list_url이 있으면 계정 페이지를 다 본 뒤 리스트도 본다 (list_since까지). 같은 글은 처음 받은 경로(via)가 남으므로
     맨 마지막에 봐야 날마다 여는 계정의 글이 계정 페이지 경로로 남는다 — 리스트로 옮기기 전 나란히 견줘 보는 기간.
-    리스트를 정상으로 봤으면 visited에 "list:<ID>"를 넣는다.
+    리스트를 정상으로 봤으면 visited에 "list:<ID>"를 넣는다. list_meta(dict)에는 리스트 이름을 담는다 (동기화용).
     visited(list): 정상으로 연 계정 페이지(글이 0개여도)의 handle을 차례로 넣는다 (중간에 실패해도 그때까지 본 것).
     users(dict): 응답에 실린 계정 규모(팔로워 등)를 모아 둘 곳. 반환: 파싱된 트윗 리스트.
     on_batch(새 트윗들): 페이지 하나를 볼 때마다 — 중간에 끊겨도 모은 데까지 저장되게."""
@@ -318,10 +362,30 @@ def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None,
             progress("X 리스트 수집 중")
             before = len(out)
             if _visit_list(page, f"https://x.com/i/lists/{lid}", f"{VIA_X_LIST}{lid}", list_since or since, out, ops_seen,
-                           users) and visited is not None:
+                           users, list_meta) and visited is not None:
                 visited.append(f"{VIA_X_LIST}{lid}")
             if on_batch and len(out) > before:
                 on_batch(out[before:])
     finally:
         page.close()
     return out
+
+
+def sync_list(ctx, handles, name, on_result, progress=lambda s: None):
+    """보는 계정 중 리스트에 아직 없는 handles를 하나씩 넣는다 (사람 속도, 계정 사이 6~12초).
+    on_result(handle, "added" | "already" | "failed")로 하나씩 알린다 — 중간에 끊겨도 넣은 데까지 남게.
+    로그인이 풀렸으면 멈춘다 (NeedLogin을 그대로 올린다)."""
+    page = chrome.new_page(ctx)
+    try:
+        for i, h in enumerate(handles):
+            progress(f"X 리스트에 계정 넣는 중 {i + 1}/{len(handles)}")
+            try:
+                on_result(h, add_to_list(page, h, name))
+            except NeedLogin:
+                raise
+            except Exception as e:
+                log.warning("X 리스트에 @%s 넣기 실패: %s", h, e)
+                on_result(h, "failed")
+            page.wait_for_timeout(random.uniform(6000, 12000))
+    finally:
+        page.close()
