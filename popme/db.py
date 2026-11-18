@@ -1,4 +1,5 @@
 import logging
+import re
 import sqlite3
 import threading
 from datetime import datetime, timezone
@@ -84,6 +85,8 @@ MIGRATIONS = [
     "ALTER TABLE candidates ADD COLUMN stage TEXT DEFAULT 'pool'",
     "ALTER TABLE candidates ADD COLUMN check_note TEXT",
     "ALTER TABLE candidates ADD COLUMN checked_at TEXT",
+    # 발굴 kind_of가 후보마다 「다른 계정의 소속 배지에 이 회사가 있나」를 찾는다 — 인덱스 없이는 profiles를 훑었다
+    "CREATE INDEX IF NOT EXISTS profiles_org ON profiles(org COLLATE NOCASE)",
     "ALTER TABLE candidates ADD COLUMN fail_since TEXT",  # 승인 계정이 꾸준함 기준에 처음 못 미친 때
     "ALTER TABLE candidates ADD COLUMN interest TEXT",  # 어느 관심사 계정들의 반응으로 올라왔나 → 그 분야 기준으로 판정 (fieldscale)
     # 브리핑 발굴 카드의 AI 판단 (discovery.remember_verdicts): 추천|비추천|보류, {title, body, date, link} JSON
@@ -122,6 +125,8 @@ class DB:
         if c is None:
             c = sqlite3.connect(self.path, timeout=30)
             c.row_factory = sqlite3.Row
+            # WAL에서 권장 값: 커밋마다 fsync하지 않는다 (전원이 나가면 마지막 커밋만 잃을 수 있고 DB는 깨지지 않는다)
+            c.execute("PRAGMA synchronous=NORMAL")
             self._local.c = c
         return c
 
@@ -187,9 +192,12 @@ class DB:
         with self.conn() as c:
             for e in events:
                 first_sync = e["calendar_id"] not in known
-                old = c.execute("SELECT updated_at, deleted, location FROM events WHERE id=?", (e["id"],)).fetchone()
+                old = c.execute("SELECT updated_at, deleted, location, calendar_id FROM events WHERE id=?",
+                                (e["id"],)).fetchone()
                 if old is not None and old["location"] != e.get("location"):  # 장소 칸은 나중에 추가된 컬럼이라 조용히 채움
                     c.execute("UPDATE events SET location=? WHERE id=?", (e.get("location"), e["id"]))
+                if old is not None and old["calendar_id"] != e["calendar_id"]:  # 캘린더 이름을 고쳤다 — 표시 없이 따라간다
+                    c.execute("UPDATE events SET calendar_id=? WHERE id=?", (e["calendar_id"], e["id"]))
                 if old is None:
                     kind = None if first_sync else ("deleted" if e["deleted"] else "new")
                     c.execute(
@@ -205,10 +213,46 @@ class DB:
                     )
             seen = {e["id"] for e in events}
             for cal in synced_calendars:
-                for r in c.execute("SELECT id FROM events WHERE calendar_id=? AND deleted=0", (cal,)).fetchall():
+                # 캘린더는 이름 앞 부분(ics1a2b3c4d·cd1a2b3c4d·TimeTree id)으로 — 이름을 고친 뒤 원본에서 지운 일정도 찾는다
+                prefix = cal.split(":", 1)[0]
+                for r in c.execute("SELECT id FROM events WHERE (calendar_id=? OR substr(calendar_id, 1, ?)=?) "
+                                   "AND deleted=0", (cal, len(prefix) + 1, prefix + ":")).fetchall():
                     if r["id"] not in seen:
                         c.execute("UPDATE events SET deleted=1, change_kind='deleted', changed_at=? WHERE id=?",
                                   (ts, r["id"]))
+
+    def retire_calendars(self, source, keep=None, holidays=True, keep_legacy=False):
+        """지금 일정 출처(source)가 아닌 캘린더의 일정을 지운다 → 지운 수. 수집이 실패했는지가 아니라 설정만 보고 정한다.
+        예전엔 TimeTree → 구글 ICS로 바꾸거나 「안 씀」으로 바꿔도 예전 일정이 위젯에 계속 남았다.
+        keep: 같은 출처 안에서 설정에 있는 캘린더 앞 부분들 (ics·caldav, 뺀 캘린더의 일정도 지운다).
+        공휴일은 출처마다 id가 달라(TimeTree 숫자 / 구글 ICS uid@…) 바꾸면 두 번씩 보였다 — 다른 출처 것은 지운다.
+        keep_legacy: 예전 순서 id(ics0…)를 남긴다 — 새 id로 아직 다 못 받았을 때.
+        「지워짐」 표시 대신 행을 지운다 (출처를 바꿀 때 「최근 지워짐」이 한꺼번에 뜨지 않게)."""
+        def owner(cal_id):
+            p = cal_id.split(":", 1)[0]
+            if re.fullmatch(r"ics(\d+|[0-9a-f]{8})", p):  # ics0… (예전 순서 id) · ics1a2b3c4d (주소 id)
+                return "ics", p
+            if re.fullmatch(r"cd[0-9a-f]{8}", p):
+                return "caldav", p
+            return ("holiday" if p == "holiday" else "timetree"), p
+
+        gone = []
+        for r in self.q("SELECT id, calendar_id FROM events"):
+            kind, p = owner(r["calendar_id"] or "")
+            if source == "none":
+                drop = True
+            elif kind == "holiday":
+                from_ics = "@" in r["id"]
+                drop = from_ics if source == "timetree" else (not from_ics or not holidays)
+            else:
+                legacy = keep_legacy and re.fullmatch(r"ics\d+", p)
+                drop = kind != source or (keep is not None and p not in keep and not legacy)
+            if drop:
+                gone.append(r["id"])
+        if gone:
+            with self.conn() as c:
+                c.executemany("DELETE FROM events WHERE id=?", [(i,) for i in gone])
+        return len(gone)
 
     # --- 브리핑 ---
     def save_briefing(self, date, markdown, items=None):

@@ -27,7 +27,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from popme import briefing, config, search  # noqa: E402
+from popme import ask, config, search  # noqa: E402
 from popme.db import DB  # noqa: E402
 
 def copy_db(tmp):
@@ -74,16 +74,16 @@ def post_ages(data):
 def run_case(cfg, db, case, use_ai):
     t = time.time()
     if use_ai:
-        kw, since, until = briefing.plan_search(cfg, case["q"])
+        kw, since, until = ask.plan_search(cfg, case["q"])
     else:
         kw, since, until = case.get("keywords") or [], case.get("since"), case.get("until")
-    data, counts = briefing.ask_data(cfg, db, kw, since, until)
+    data, counts = ask.ask_data(cfg, db, kw, since, until)
     g = gold(db, case)
     score = {k: (sum(1 for link in g[k] if link in data), len(g[k])) for k in g}
     out = {"q": case["q"], "keywords": kw, "counts": counts, "chars": len(data), "score": score,
            "ages": post_ages(data), "missing": [s for s in case.get("expect") or [] if s not in data]}
     if use_ai:
-        res = briefing.answer(cfg, db, case["q"])  # 검색어를 한 번 더 뽑는다 (answer가 스스로 뽑으므로)
+        res = ask.answer(cfg, db, case["q"])  # 검색어를 한 번 더 뽑는다 (answer가 스스로 뽑으므로)
         links = {link["url"] for p in res["points"] for link in p["links"]}
         out["answer"] = {"found": res["found"], "summary": res["summary"],
                          "gold_links": sum(1 for link in links if link in g["posts"] | g["items"]), "links": len(links)}

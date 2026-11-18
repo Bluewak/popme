@@ -16,6 +16,7 @@ import logging
 import re
 from datetime import date, timedelta
 
+from popme.fileio import atomic_write_text
 from popme import config
 
 log = logging.getLogger(__name__)
@@ -152,7 +153,7 @@ def calibrate(db, cfg):
             out[pid] = {"followers": f, "sample": len(pool), "checked": date.today().isoformat(), "how": "수집한 반응 관계"}
     if out:
         CALIBRATION.parent.mkdir(parents=True, exist_ok=True)
-        CALIBRATION.write_text(json.dumps({**old, **out}, ensure_ascii=False, indent=1), encoding="utf-8")
+        atomic_write_text(CALIBRATION, json.dumps({**old, **out}, ensure_ascii=False, indent=1))
     return sorted(out)
 
 

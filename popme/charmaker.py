@@ -9,7 +9,8 @@ import string
 import tomllib
 from datetime import datetime
 
-from popme import config, prepare, setup_window
+from popme import config, prepare, tomledit
+from popme.fileio import atomic_write_text
 
 NEW_PET = "new-pet.png"  # 저장 전 미리 보기용 이미지 (config.DATA_DIR)
 MAX_LINE = 80
@@ -141,7 +142,7 @@ def dump(cfg):
     out = [HEADER]
     for section, values in cfg.items():
         out.append(f"[{section}]")
-        out += [f"{k} = {_multiline(v) if isinstance(v, str) and chr(10) in v else setup_window._literal(v)}"
+        out += [f"{k} = {_multiline(v) if isinstance(v, str) and chr(10) in v else tomledit.literal(v)}"
                 for k, v in values.items()]
         out.append("")
     return "\n".join(out)
@@ -165,7 +166,7 @@ def save(nc, image=None):
     text = dump(b)
     tomllib.loads(text)
     name = new_file()
-    (config.DATA_DIR / name).write_text(text, encoding="utf-8", newline="\n")
+    atomic_write_text(config.DATA_DIR / name, text)
     if image:
         install_image(image)
     return name

@@ -139,3 +139,46 @@ def test_timeline_ok_only_for_real_timeline():
     assert not x.timeline_ok(ok, {"errors": [{"message": "Rate limit exceeded"}]})
     assert not x.timeline_ok(ok, {"data": {"user": {"result": {"__typename": "User", "legacy": {}}}}})  # UserByScreenName
     assert not x.timeline_ok(ok, None)
+
+
+@pytest.mark.parametrize("err", ["KeyError: 'author'", "authority check", "char 4290"])
+def test_why_does_not_call_parts_of_words_a_login_or_limit(err):
+    text = jobs.why(RuntimeError(err))
+    assert "로그인" not in text and "사용 한도" not in text
+
+
+def test_why_names_broken_ai_json():
+    import json
+    try:
+        json.loads('{"a" 1}')
+    except json.JSONDecodeError as e:  # "Expecting ':' delimiter" — 예전엔 deLIMITer가 「사용 한도」로 보였다
+        assert "형식이 깨졌어요" in jobs.why(e)
+
+
+def test_saver_writes_each_profile_once_unless_changed():
+    calls = []
+    db = SimpleNamespace(upsert_tweets=lambda b: None, upsert_profiles=lambda ps: calls.append([p["handle"] for p in ps]))
+    users = {"a": {"handle": "a", "followers": 1}, "b": {"handle": "b", "followers": 2}}
+    save = jobs.Saver(db, users)
+    save([])
+    save([])  # 그대로면 다시 안 쓴다
+    users["c"] = {"handle": "c", "followers": 3}
+    users["a"] = {"handle": "a", "followers": 5}
+    save([])
+    save.flush()
+    assert calls == [["a", "b"], ["a", "c"]]
+
+
+def test_headlines_for_chatter_without_rebuilding_the_page(tmp_path):
+    """캐릭터 잡담은 머리 소식만 — get_briefing(일정·메일·카드 전부)을 다시 만들지 않는다."""
+    import json as _json
+
+    from popme.app import Api
+    from popme.db import DB
+    db = DB(tmp_path / "t.db")
+    me = SimpleNamespace(_jobs=SimpleNamespace(db=db))
+    assert Api._headlines(me) == []
+    items = [{"cat": "업데이트·단종", "rel": 3, "urgent": False, "status": "확인됨", "title": "<b>새 기능</b>", "links": []}]
+    db.save_briefing("2026-11-18", "# 11월 18일 아침 브리핑\n", _json.dumps({"items": items}))
+    heads = Api._headlines(me)
+    assert heads and "&lt;b&gt;" in heads[0]["html"]

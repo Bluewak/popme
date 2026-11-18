@@ -6,7 +6,8 @@ import threading
 import time
 from datetime import datetime
 
-from popme import briefing, catalog, chrome, config, discovery, event_weather, fieldscale, funnel, llm, sources
+from popme.fileio import atomic_write_text
+from popme import accounts, briefing, catalog, chrome, config, discovery, event_weather, fieldscale, funnel, llm, sources
 from popme.collectors import NeedLogin, caldav, ics, threads, timetree, x, youtube
 from popme.db import DB
 
@@ -68,6 +69,8 @@ def why(e, cfg=None):
     """수집·브리핑 오류 → 사용자에게 보일 짧은 이유. 원문은 log.exception으로 남긴다. cfg: AI 이름을 쓸 설정 (없으면 기본 공급자)."""
     if isinstance(e, NeedLogin):
         return str(e)
+    if isinstance(e, json.JSONDecodeError):  # AI 답이 두 번 다 JSON이 아니었다 ("Expecting ',' delimiter …")
+        return "AI 답 형식이 깨졌어요. 「브리핑만 다시 만들기」를 눌러 주세요"
     s = str(e).lower()
     if chrome_closed(e):
         return "Chrome 창이 닫혔어요"
@@ -79,7 +82,7 @@ def why(e, cfg=None):
         return "페이지가 너무 오래 걸렸어요"
     if llm.is_limit(s):  # config.load()를 다시 부르지 않는다 (설정 옮기기 같은 부수 효과가 있다)
         return f"{llm.provider_name(cfg or {})} 사용 한도에 걸렸어요. 한도가 풀리면 「브리핑만 다시 만들기」를 눌러 주세요"
-    if any(k in s for k in ("login", "auth", "api key", "credential", "401")):
+    if llm.is_login(s):
         return "AI 로그인이 풀렸어요. 트레이 → 설정 바꾸기 → 브리핑 AI에서 로그인해 주세요"
     if "구조가 바뀐" in s:  # 수집기가 이미 사람 말로 쓴 경고
         return str(e).split(" (로그에")[0]
@@ -91,6 +94,24 @@ def calendar_source(cfg):
     return cfg.get("calendar", {}).get("source", "timetree")
 
 
+class Saver:
+    """수집 페이지마다 부르는 중간 저장 (on_batch). 계정 규모(users)는 바뀐 것만 저장한다 — 예전엔 페이지마다 그때까지
+    모은 계정 전부를 다시 저장해서(수백~천여 명 × 페이지 30개) 쓰기가 제곱으로 늘었다. flush(): 남은 것 저장."""
+
+    def __init__(self, db, users):
+        self.db, self.users, self.saved = db, users, {}
+
+    def flush(self):
+        fresh = {h: u for h, u in list(self.users.items()) if self.saved.get(h) != u}
+        if fresh:
+            self.db.upsert_profiles(list(fresh.values()))
+            self.saved.update((h, dict(u)) for h, u in fresh.items())
+
+    def __call__(self, batch):
+        self.db.upsert_tweets(batch)
+        self.flush()
+
+
 class Jobs:
     def __init__(self, notify=lambda kind, msg: None):
         """notify(kind, msg): kind = 'briefing' | 'error'"""
@@ -98,7 +119,9 @@ class Jobs:
         self.db = DB(config.DB_PATH)
         self.notify = notify
         self.lock = threading.Lock()
-        self.state = {"running": False, "status": "대기 중", "warnings": [], "last_run": None}
+        # 설정 파일이 깨져 대신 쓴 설정으로 켜졌으면 캐릭터가 경고로 알린다 (config.load)
+        self.state = {"running": False, "status": "대기 중", "warnings": [config.LOAD_ERROR] if config.LOAD_ERROR else [],
+                      "last_run": None}
         self._tried = None
         self.offline_retry = False  # 인터넷이 끊겨 멈춤 → 연결되면 아침 자동 수집을 다시
         self._retries = 0
@@ -154,37 +177,40 @@ class Jobs:
 
     def _with_browser(self, port, fn):
         """Playwright 동기 API는 스레드끼리 나눠 쓸 수 없어서 스레드마다 따로 붙는다."""
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as p:
-            browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
+        with chrome.attached(port) as ctx:
             try:
-                ctx = browser.contexts[0]
-                try:
-                    ctx.add_init_script(BANNER_JS)
-                except Exception:
-                    log.warning("수집 중 안내 띠를 못 붙였어요", exc_info=True)
-                if self is not None and self._minimizing():
-                    # 예비: 새 탭은 뒤에서 열리지만(chrome.new_page), 그래도 창이 다시 커지면 새 탭마다 다시 내린다
-                    # (X·Threads가 따로 붙으니 양쪽 다)
-                    ctx.on("page", lambda page: chrome.set_minimized(page, True))
-                fn(ctx)
-            finally:
-                # connect_over_cdp로 붙은 브라우저는 close()해도 Chrome 자체는 계속 떠 있다.
-                # 사용자가 창을 닫아 이미 끊겼으면 여기서 또 오류가 나는데, 그걸로 브리핑까지 멈추지 않게
-                try:
-                    browser.close()
-                except Exception:
-                    log.info("전용 Chrome 연결 정리 실패 (이미 닫힘)", exc_info=True)
+                ctx.add_init_script(BANNER_JS)
+            except Exception:
+                log.warning("수집 중 안내 띠를 못 붙였어요", exc_info=True)
+            if self is not None and self._minimizing():
+                # 예비: 새 탭은 뒤에서 열리지만(chrome.new_page), 그래도 창이 다시 커지면 새 탭마다 다시 내린다
+                # (X·Threads가 따로 붙으니 양쪽 다)
+                ctx.on("page", lambda page: chrome.set_minimized(page, True))
+            fn(ctx)
 
     def _collect_calendar_x(self, ctx, warnings, progress):
         source = calendar_source(self.cfg)
         try:
+            cal = self.cfg.get("calendar", {})
+            holidays = cal.get("holidays", True)
             if source == "ics":
-                self.db.upsert_events(*ics.collect(self.cfg, progress, warnings))
+                events, synced = ics.collect(self.cfg, progress, warnings)
+                self.db.upsert_events(events, synced)
+                keep = {ics.calendar_id(c).split(":", 1)[0] for c in cal.get("ics", []) if (c.get("url") or "").strip()}
+                # 예전 순서 id(ics0…) 일정은 설정된 캘린더가 모두 새 id로 받아졌을 때만 지운다
+                # (하나라도 받기에 실패하면 그 캘린더의 예전 일정이 남아 있어야 위젯이 비지 않는다)
+                done = {s.split(":", 1)[0] for s in synced}
+                self.db.retire_calendars("ics", keep, holidays, keep_legacy=not keep <= done)
             elif source == "caldav":
                 self.db.upsert_events(*caldav.collect(self.cfg, progress, warnings))
+                keep = {caldav.calendar_id(c).split(":", 1)[0]
+                        for c in self.cfg.get("caldav", {}).get("calendars", []) if (c.get("url") or "").strip()}
+                self.db.retire_calendars("caldav", keep, holidays)
             elif source == "timetree":
                 self.db.upsert_events(*timetree.collect(ctx, self.cfg, progress))
+                self.db.retire_calendars("timetree")
+            else:  # 안 씀: 예전 출처의 일정이 위젯에 남지 않게
+                self.db.retire_calendars("none")
             if source != "none":
                 try:
                     event_weather.refresh(self.cfg, self.db)  # 새 일정의 장소 → 그날 날씨
@@ -198,18 +224,19 @@ class Jobs:
         try:
             since = briefing.window_start(self.db).isoformat()  # 이보다 오래된 글까지 내려오면 스크롤 멈춤
             # 30개가 넘으면 관심사 계정은 돌아가며 — 그 계정들은 지난번에 본 시각까지 내려 본다 (since_by)
-            handles, since_by = briefing.x_plan(self.cfg, self.db, since, gaps=warnings)
+            handles, since_by = accounts.x_plan(self.cfg, self.db, since, gaps=warnings)
             users = {}  # 응답에 실려 오는 계정 규모 (발굴 인기 기준용)
             visited = []  # 실제로 글을 받아 온 계정 — 로그인이 풀리거나 창이 닫혀 못 본 계정은 「봤다」로 남기지 않는다
+            saver = self._saver(users)
             try:
                 # 페이지 하나 볼 때마다 저장 — 중간에 Chrome이 닫혀도 모은 데까지는 남는다
-                x.collect(ctx, self.cfg, handles, progress, since, users, on_batch=self._saver(users),
+                x.collect(ctx, self.cfg, handles, progress, since, users, on_batch=saver,
                           since_by=since_by, visited=visited)
             finally:
-                briefing.mark_x_visited(visited)
-            self.db.upsert_profiles(list(users.values()))  # 새 글 없이 끝난 페이지의 계정 규모도
+                accounts.mark_x_visited(visited)
+            saver.flush()  # 새 글 없이 끝난 페이지의 계정 규모도
             # 발굴은 이번에 연 계정만이 아니라 보는 계정 전체를 「이미 보는 계정」으로 (돌아가며 안 연 계정이 후보로 오르지 않게)
-            discovery.update(self.db, [a["handle"] for a in briefing.core_accounts(self.cfg, self.db)], self.cfg)
+            discovery.update(self.db, [a["handle"] for a in accounts.core_accounts(self.cfg, self.db)], self.cfg)
             self._calibrate()
             self._check_candidates("x", ctx, warnings, progress)
         except NeedLogin as e:
@@ -221,11 +248,12 @@ class Jobs:
 
     def _collect_threads(self, ctx, warnings, progress):
         try:
-            th_users = briefing.threads_accounts(self.cfg, self.db)
+            th_users = accounts.threads_accounts(self.cfg, self.db)
             since = briefing.window_start(self.db).isoformat()
             users = {}  # 계정 페이지에 실려 오는 팔로워 수 (발굴 인기 기준용)
-            threads.collect(ctx, self.cfg, th_users, progress, since, users, on_batch=self._saver(users))
-            self.db.upsert_profiles(list(users.values()))  # 새 글 없이 끝난 페이지의 계정 규모도
+            saver = self._saver(users)
+            threads.collect(ctx, self.cfg, th_users, progress, since, users, on_batch=saver)
+            saver.flush()  # 새 글 없이 끝난 페이지의 계정 규모도
             discovery.update_threads(self.db, th_users, self.cfg)
             self._check_candidates("threads", ctx, warnings, progress)
         except NeedLogin as e:
@@ -262,10 +290,7 @@ class Jobs:
             log.exception("분야 발굴 기준 보정 실패")
 
     def _saver(self, users):
-        def save(batch):
-            self.db.upsert_tweets(batch)
-            self.db.upsert_profiles(list(users.values()))
-        return save
+        return Saver(self.db, users)
 
     def _fail(self, what, e):
         """수집 경고 한 줄 (사람 말). Chrome이 닫힌 거면 CHROME_CLOSED로 시작 — 끝나고 「다시 모으기」를 띄운다.
@@ -305,7 +330,11 @@ class Jobs:
             if collect and not online():  # 처음부터 끊겨 있으면 모으지도, 묵은 자료로 브리핑을 만들지도 않는다
                 return self._offline(warnings, "인터넷이 연결돼 있지 않아서 모으지 않았어요. 연결되면 다시 모을게요")
             if collect:
-                self._browser_collect(warnings)
+                try:  # 전용 Chrome이 늦게 뜨거나 안 떠도 RSS·브리핑은 이어서 (예전엔 그날 브리핑이 통째로 없었다)
+                    self._browser_collect(warnings)
+                except Exception as e:
+                    log.exception("전용 Chrome 수집 실패")
+                    warnings.append(self._fail("전용 Chrome", e))
                 self._progress("RSS 수집 중")
                 feeds = catalog.active(self.cfg)
                 items, errs = sources.collect(feeds, self._progress)
@@ -324,7 +353,7 @@ class Jobs:
                     md += "\n\n---\n수집 경고\n" + "\n".join(f"- {w}" for w in warnings)
                 self.db.save_briefing(date, md, json.dumps(payload, ensure_ascii=False))
                 discovery.remember_verdicts(self.db, payload["items"], date)  # 발굴 탭에도 같은 추천 이유
-                (config.BRIEFING_DIR / f"{date}.md").write_text(md, encoding="utf-8")
+                atomic_write_text(config.BRIEFING_DIR / f"{date}.md", md)
                 self.notify("briefing", "브리핑이 준비됐어요")
             self._progress("완료" + (f" (경고 {len(warnings)}개)" if warnings else ""))
             if self._closed:  # 사용자가 창을 닫은 것 — 몰래 다시 켜지 않고, 다시 모을지 묻는다

@@ -90,3 +90,18 @@ def test_morning_waits_for_internet_then_runs_and_retries(monkeypatch):
         j.offline_retry = True
     assert len(runs) == 1 + jobs.RETRY_OFFLINE
     assert j.morning_tick(datetime(2026, 10, 20, 8, 59)) is False  # 시각 전엔 안 함
+
+
+def test_chrome_failure_still_makes_rss_briefing(monkeypatch, tmp_path):
+    """전용 Chrome이 20초 안에 안 떠도 RSS·브리핑은 이어서 (예전엔 그날 브리핑이 통째로 없었다)."""
+    net = {"up": True}
+    j = make(monkeypatch, net)
+    monkeypatch.setattr(j, "_browser_collect", lambda w: (_ for _ in ()).throw(RuntimeError("전용 Chrome에 붙지 못했어요")))
+    monkeypatch.setattr(jobs.catalog, "active", lambda cfg: [{"name": "f"}])
+    monkeypatch.setattr(jobs.sources, "collect", lambda feeds, progress: ([{"url": "u"}], []))
+    monkeypatch.setattr(jobs.briefing, "make_briefing", lambda cfg, db: ("2026-11-18", "# b", {"items": []}))
+    monkeypatch.setattr(jobs.discovery, "remember_verdicts", lambda *a: None)
+    monkeypatch.setattr(jobs.config, "BRIEFING_DIR", tmp_path)
+    j.lock.acquire()
+    j._run(make_brief=True)
+    assert len(j.db.saved) == 1 and any("전용 Chrome" in w for w in j.state["warnings"])

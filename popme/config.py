@@ -6,6 +6,7 @@ import tomllib
 from pathlib import Path
 
 from popme import vault
+from popme.fileio import atomic_write_text
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULTS_DIR = ROOT / "popme" / "defaults"  # 앱과 함께 배포되는 기본 설정·캐릭터
@@ -30,6 +31,13 @@ OLD_APP_ASSETS = {"README.md", "prepare.py", "fonts", "characters", "pet.ico", "
 for d in (DATA_DIR, BRIEFING_DIR, RAW_DIR, ASSETS_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
+LOG_MAX = 5 * 1024 * 1024  # 이보다 크면 켤 때 popme.log.1로 넘긴다 (예전엔 끝없이 커졌다)
+try:  # 설정 창 프로세스도 같은 파일에 써서 RotatingFileHandler(쓰는 중 이름 바꾸기)는 Windows에서 실패한다 — 켤 때 한 번만
+    if LOG_PATH.exists() and LOG_PATH.stat().st_size > LOG_MAX:
+        os.replace(LOG_PATH, LOG_PATH.with_suffix(".log.1"))
+except OSError:
+    pass  # 다른 프로세스가 잡고 있으면 다음에
+
 logging.basicConfig(
     filename=LOG_PATH,
     level=logging.INFO,
@@ -49,7 +57,7 @@ def _hide(path, overwrite):
     """path의 평문 비밀번호를 자격 증명 관리자로 옮기고 파일의 값은 비운다. 못 옮기면 평문을 그대로 둔다 (계정이 끊기면 안 되므로).
     overwrite=False: 이미 저장된 값이 있으면 그 값을 둔다 (백업·옛 폴더의 값이 지금 값을 덮지 않게)."""
     try:
-        text = path.read_text(encoding="utf-8")
+        text = path.read_text(encoding="utf-8-sig")
         cfg = tomllib.loads(text)
     except (OSError, ValueError):
         return
@@ -64,7 +72,7 @@ def _hide(path, overwrite):
             if hit and value and ((not overwrite and vault.get(section)) or vault.put(section, value)):
                 lines[i], changed = new, True
     if changed:
-        path.write_text("\n".join(lines), encoding="utf-8", newline="\n")
+        atomic_write_text(path, "\n".join(lines))
 
 
 def hide_passwords():
@@ -106,21 +114,32 @@ def adopt_old_files(folder=None):
     return moved
 
 
+LOAD_ERROR = None  # 사용자 설정을 못 읽어 대신 쓴 경우 그 이유 (app이 켜질 때 말풍선으로 알린다)
+
+
+def last_good():
+    """마지막으로 앱이 저장한 읽히는 설정 (tomledit.save_config). 상수로 두지 않는다 — CONFIG_PATH를 바꿔 끼운 테스트가
+    실제 사용자 폴더에 쓰지 않게 (2026-11-18 상수로 뒀다가 테스트가 예시 설정을 내 폴더에 저장했다)."""
+    return CONFIG_PATH.with_name("config.toml.last-good")
+
+
 def load() -> dict:
-    """개인 설정 config.toml (DATA_DIR) → 없으면 기본 예시.
-    예전 형식(관심사 없이 [[rss]]만)이면 먼저 새 형식으로 옮긴다 (백업: config.toml.bak-날짜).
-    파일에 평문 비밀번호가 있으면 자격 증명 관리자로 옮기고, 돌려주는 값에는 비밀번호를 채워 준다."""
-    from popme import catalog
-    hide_passwords()
-    try:
-        note = catalog.migrate_file()
-        if note:
-            logging.getLogger(__name__).info(note)
-    except Exception:
-        logging.getLogger(__name__).exception("소식 출처 옮기기 실패 — 예전 형식 그대로 씀")
+    """개인 설정 config.toml (DATA_DIR) → 없으면 기본 예시. 읽기만 한다 (옮기기·비밀번호 숨기기는 catalog.prepare_config).
+    파일이 깨졌으면(메모장으로 고치다 따옴표가 빠지는 등) 마지막으로 앱이 저장한 설정(last-good), 그것도 없으면 기본 예시로 켜고
+    LOAD_ERROR에 이유를 남긴다. 예전엔 예외가 나서 pythonw 앱이 아무 표시 없이 켜지지 않았다. 사용자 파일은 덮어쓰지 않는다.
+    돌려주는 값에는 자격 증명 관리자의 비밀번호를 채워 준다."""
+    global LOAD_ERROR
+    LOAD_ERROR = None
     path = CONFIG_PATH if CONFIG_PATH.exists() else EXAMPLE_CONFIG
-    with open(path, "rb") as f:
-        cfg = tomllib.load(f)
+    try:
+        cfg = tomllib.loads(path.read_text(encoding="utf-8-sig"))  # 메모장이 붙이는 BOM도 읽는다
+    except ValueError as e:
+        logging.getLogger(__name__).exception("설정 파일을 못 읽음: %s", path)
+        LOAD_ERROR = f"설정 파일(config.toml)을 읽지 못해 마지막으로 저장한 설정으로 켰어요 ({e})"
+        alt = last_good() if last_good().exists() else EXAMPLE_CONFIG
+        cfg = tomllib.loads(alt.read_text(encoding="utf-8-sig"))
+    if LOAD_ERROR:  # 대신 켠 설정의 계정(예전 메일 주소 등)에 지금 저장된 비밀번호를 붙여 다른 서버로 보내지 않는다
+        return cfg
     for s in SECRET_SECTIONS:
         if s in cfg and not cfg[s].get("password"):
             cfg[s]["password"] = vault.get(s)

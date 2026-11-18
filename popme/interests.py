@@ -13,7 +13,8 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 
-from popme import briefing, catalog, config, llm
+from popme import catalog, llm, tomledit
+from popme.fileio import atomic_write_text
 from popme.sources import rss
 
 log = logging.getLogger(__name__)
@@ -150,7 +151,7 @@ def suggest(cfg, field, scope, lens=None, answers=None, headlines=None, context=
                             extra_out=', "media": [...], "searches": ["..."]' if flow else "")
     empty = {"people": [], "companies": [], "topics": [], "media": [], "searches": []}
     try:
-        raw = briefing.parse_json(llm.ask(cfg, SYSTEM, prompt, timeout=180))
+        raw = llm.parse_json(llm.ask(cfg, SYSTEM, prompt, timeout=180))
     except Exception:
         log.exception("관심사 후보 받기 실패")
         return {**empty, "error": "AI가 지금 답하지 못했어요"}
@@ -272,7 +273,7 @@ def questions(cfg, field, lens, heads=None, context="", domain=None):
     prompt = QUESTIONS.format(persona=with_persona(domain, "questions"), field=_short(field, 40), where=where(context), lens=LENSES[lens], headlines="\n".join(f"- {h}" for h in heads) or "(없음)",
                               types=" / ".join(f"{k}({v['범위']}·{v['대상']})" for k, v in TYPES.items()), slots=words)
     try:
-        raw = briefing.parse_json(llm.ask(cfg, SYSTEM, prompt, timeout=180))
+        raw = llm.parse_json(llm.ask(cfg, SYSTEM, prompt, timeout=180))
         out = clean_questions(raw, lens)
     except Exception:
         log.exception("관심사 질문 만들기 실패 (고정 질문으로)")
@@ -305,7 +306,7 @@ def finalize(cfg, field, scope, people, companies, topics, lens=None, answers=No
                          "광고·홍보·가십은 버린다."],
             "discovery": f"{_short(field, 20)} 소식을 꾸준히 전하는 사람"}
     try:
-        raw = briefing.parse_json(llm.ask(cfg, SYSTEM, prompt, timeout=180))
+        raw = llm.parse_json(llm.ask(cfg, SYSTEM, prompt, timeout=180))
     except Exception:
         log.exception("관심사 기준 만들기 실패 (정해진 문장으로)")
         return base
@@ -394,8 +395,7 @@ def _slug(field):
 
 
 def _q(v):
-    from popme.setup_window import _literal
-    return _literal(v)
+    return tomledit.literal(v)
 
 
 def save_custom(field, scope, verified, topics, final, lens=None, kind=None, answers=None, domain=None, taste=None):
@@ -422,9 +422,9 @@ def save_custom(field, scope, verified, topics, final, lens=None, kind=None, ans
                       f"feeds = {_q([e['feed']])}", ""]
         if e.get("kind") == "search" and e.get("news_count"):
             lines += ["[[searches]]", f"name = {_q(e['name'])}", f"region = {_q(e['region'])}", f"news = {_q(e['name'])}", ""]
-    for kind, key in (("person", "people"), ("company", "companies")):
+    for want, key in (("person", "people"), ("company", "companies")):  # (인자 kind와 이름이 겹치지 않게)
         for e in verified:
-            if e["kind"] != kind:
+            if e["kind"] != want:
                 continue
             lines += [f"[[{key}]]", f"name = {_q(e['name'])}", f"why = {_q(e.get('why', ''))}", f"region = {_q(e['region'])}"]
             if e.get("x_status") == "ok":
@@ -439,7 +439,7 @@ def save_custom(field, scope, verified, topics, final, lens=None, kind=None, ans
     text = "\n".join(lines)
     tomllib.loads(text)  # 깨진 파일은 쓰지 않는다
     catalog.CUSTOM_DIR.mkdir(parents=True, exist_ok=True)
-    (catalog.CUSTOM_DIR / f"{pid}.toml").write_text(text, encoding="utf-8", newline="\n")
+    atomic_write_text(catalog.CUSTOM_DIR / f"{pid}.toml", text)
     if domain:  # 이 관심사의 분야 페르소나 — 다음에 고치기·취향 문답에서 다시 쓴다
         from popme import domains
         domains.save_local(pid, domains.clean(domain, pid))
@@ -449,14 +449,12 @@ def save_custom(field, scope, verified, topics, final, lens=None, kind=None, ans
 
 def save_picks(pid, scope, people, companies, topics, extra=()):
     """미리 만든 관심사에서 고친 것 → config.toml [news.picks.<id>] (사용자 몫만, 주석·다른 설정은 그대로)."""
-    from popme.setup_window import base_text, set_value
-    text = base_text()
+    text = tomledit.base_text()
     sec = f"news.picks.{pid}"
     for k, v in (("scope", scope), ("people", list(people)), ("companies", list(companies)), ("topics", list(topics)),
                  ("extra", [{k2: e[k2] for k2 in ("kind", "name", "why", "x", "region", "news", "news_en") if e.get(k2)} for e in extra])):
-        text = set_value(text, sec, k, v, before=("llm",))
-    tomllib.loads(text)
-    config.CONFIG_PATH.write_text(text, encoding="utf-8", newline="\n")
+        text = tomledit.set_value(text, sec, k, v, before=("llm",))
+    tomledit.save_config(text)
 
 
 def preset_view(pid, cfg):

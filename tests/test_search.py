@@ -1,7 +1,7 @@
 """질문용 전체 기록 검색 (popme/search.py)."""
 from datetime import datetime, timedelta, timezone
 
-from popme import briefing, search
+from popme import ask, briefing, search
 from popme.db import DB
 
 
@@ -102,10 +102,10 @@ def test_plan_search_falls_back_when_llm_fails(monkeypatch):
     def boom(*a, **k):
         raise RuntimeError("no claude")
     monkeypatch.setattr(briefing.llm, "ask", boom)
-    assert briefing.plan_search({}, "클로드코드 소식 알려줘") == (["클로드코드"], None, None)
+    assert ask.plan_search({}, "클로드코드 소식 알려줘") == (["클로드코드"], None, None)
 
 
 def test_plan_search_validates_llm_output(monkeypatch):
     monkeypatch.setattr(briefing.llm, "ask", lambda *a, **k:
                         '```json\n{"keywords": ["MCP", "엠씨피"], "since": "2026-09-01", "until": "지난달"}\n```')
-    assert briefing.plan_search({}, "q") == (["MCP", "엠씨피"], "2026-09-01", None)
+    assert ask.plan_search({}, "q") == (["MCP", "엠씨피"], "2026-09-01", None)

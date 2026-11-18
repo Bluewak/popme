@@ -19,305 +19,17 @@ import tempfile
 import tomllib
 from pathlib import Path
 
-from popme import config, vault
+from popme import config, tomledit, vault
+from popme.tomledit import base_text, set_value  # noqa: F401 (테스트·예전 이름 호환)
 from popme.collectors import caldav
+from popme.setup_data import AIS, SOURCES, MAIL_DOMAINS, MX_HOSTS, MS_NOTE, REFRESH_PATH, AI_SETUP, CALENDAR_APPS, HELP, HELP_SYSTEM, LOGIN_SITES, CLIP  # noqa: F401 (예전 이름)
+from popme.winclip import _clipboard, take_clipboard  # noqa: F401 (예전 이름)
 
 log = logging.getLogger(__name__)
 UI = config.ROOT / "popme" / "ui" / "setup.html"
 
-AIS = {
-    "claude": {"name": "Claude", "plans": ["Claude Pro", "Claude Max"], "tools": "Claude Code"},
-    "codex": {"name": "ChatGPT", "plans": ["ChatGPT Plus", "ChatGPT Pro"], "tools": "ChatGPT, Codex"},
-    "gemini": {"name": "Gemini", "plans": ["Google AI Pro", "Google AI Ultra", "무료"], "tools": "Gemini"},
-}
-SOURCES = ("timetree", "ics", "caldav", "none")
-# 메일 주소 도메인 → IMAP 서버. 목록에 없는 도메인은 guess_mail_host()가 MX 레코드로 추측한다
-MAIL_DOMAINS = {"gmail.com": "imap.gmail.com", "naver.com": "imap.naver.com", "daum.net": "imap.daum.net",
-                "hanmail.net": "imap.daum.net", "kakao.com": "imap.kakao.com"}
-# MX 서버 이름 끝 → IMAP 서버 (회사·학교 도메인이 구글·네이버웍스 메일을 쓰는 경우)
-MX_HOSTS = {"google.com": "imap.gmail.com", "googlemail.com": "imap.gmail.com",
-            "worksmobile.com": "imap.worksmobile.com", "naver.com": "imap.naver.com", "daum.net": "imap.daum.net",
-            "kakao.com": "imap.kakao.com"}
-MS_NOTE = "Microsoft(Outlook·365) 메일은 비밀번호로 IMAP 로그인하는 것을 막아 두어서 연결이 안 될 수 있어요."
-REFRESH_PATH = ("$env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + "
-                "[Environment]::GetEnvironmentVariable('Path','User')")
-# 새 터미널에서 돌릴 설치·로그인 명령 (이미 설치돼 있으면 로그인만)
-AI_SETUP = {
-    "claude": [
-        "if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {",
-        "  Write-Host 'Claude Code 설치 중...'; irm https://claude.ai/install.ps1 | iex",
-        "  $env:Path += \";$env:USERPROFILE\\.local\\bin\"",
-        "}",
-        "Write-Host ''; Write-Host '브라우저가 열리면 Claude 계정으로 로그인하세요. 끝나면 설정 창이 알아채요. 이 창은 닫아도 돼요.'",
-        "claude auth login --claudeai",
-        "if ($LASTEXITCODE -ne 0) { claude }  # auth 명령이 없는 옛 버전이면 대화 화면에서 로그인",
-    ],
-    "codex": [
-        "if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {",
-        "  Write-Host 'Codex CLI 설치 중...'",
-        "  winget install --id OpenAI.Codex -e --source winget --accept-package-agreements --accept-source-agreements",
-        "  " + REFRESH_PATH,
-        "}",
-        "Write-Host ''; Write-Host '브라우저가 열리면 ChatGPT 계정으로 로그인하세요. 끝나면 설정 창이 알아채요. 이 창은 닫아도 돼요.'",
-        "codex login",
-    ],
-    "gemini": [
-        "if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {",
-        "  Write-Host 'Node.js 설치 중 (Gemini CLI에 필요)...'",
-        "  winget install --id OpenJS.NodeJS.LTS -e --source winget --accept-package-agreements --accept-source-agreements",
-        "  " + REFRESH_PATH,
-        "}",
-        "if (-not (Get-Command gemini -ErrorAction SilentlyContinue)) {",
-        "  Write-Host 'Gemini CLI 설치 중...'; npm install -g @google/gemini-cli",
-        "  " + REFRESH_PATH,
-        "}",
-        "Write-Host ''; Write-Host '「Sign in with Google」을 골라 로그인하세요. 대화 화면이 나오면 설정 창이 알아채요. /quit 입력 후 이 창을 닫으면 돼요.'",
-        "gemini",
-    ],
-}
-
-# 캘린더 앱 → 읽는 방법. ics면 원본 캘린더의 비공개 주소, caldav면 계정 + 앱 암호 (안내는 setup.html)
-# 미니캘은 "어느 캘린더와 연결됐나"를 물어서 iCloud면 caldav, 구글이면 ics로 간다 (source "ask")
-CALENDAR_APPS = {
-    "timetree": {"name": "TimeTree", "source": "timetree"},
-    "google": {"name": "구글 캘린더", "source": "ics"},
-    "icloud": {"name": "아이폰 기본 캘린더 (iCloud)", "source": "caldav"},
-    "minical": {"name": "미니캘 같은 아이폰 캘린더 앱", "source": "ask"},
-    "naver": {"name": "네이버 캘린더", "source": "ics"},
-    "outlook": {"name": "Outlook", "source": "ics"},
-    "none": {"name": "안 씀", "source": "none"},
-}
-# 연결 안내: steps = 화면에 보일 순서(HTML 조각, <a data-url>은 평소 브라우저로 열림), faq = 자주 막히는 질문과 정해진 답,
-# open = 「… 열기」 버튼이 여는 주소. 화면과 「AI한테 해결 요청하기」가 같은 내용을 쓴다
-HELP = {
-    "google": {
-        "open": ("구글 캘린더 설정 열기", "https://calendar.google.com/calendar/r/settings"),
-        "steps": ["아래 <b>「구글 캘린더 설정 열기」</b> → 평소 브라우저에서 구글에 로그인돼 있는지 봐요",
-                  "왼쪽 <b>「내 캘린더의 설정」</b>에서 캘린더 이름을 눌러요",
-                  "맨 아래 <b>「캘린더 통합」</b>의 <b>「iCal 형식의 비공개 주소」</b> 옆 복사 버튼을 눌러요 → 여기에 저절로 들어와요",
-                  "캘린더가 여러 개면 2~3을 반복해요. 하나씩 줄이 늘어나요"],
-        "faq": [
-            ["설정 화면이 안 나와요", "PC 브라우저에서 열어야 해요. 휴대폰 구글 캘린더 앱에는 이 설정이 없어요. "
-                                  "구글에 로그인이 안 돼 있으면 먼저 로그인 화면이 나와요."],
-            ["「iCal 형식의 비공개 주소」가 안 보여요", "캘린더 이름을 누른 뒤 페이지를 맨 아래까지 내려 「캘린더 통합」을 찾아요. "
-                                                "회사·학교 계정은 관리자가 막아 두면 안 보여요. 그럴 땐 개인 계정 캘린더를 쓰거나 관리자에게 물어봐요."],
-            ["공개 주소와 비공개 주소 중 뭘 써요?", "「비공개 주소」를 써요. 공개 주소는 캘린더를 공개로 바꿔야 해서 남도 볼 수 있어요."],
-            ["복사했는데 안 들어와요", "「구글 캘린더 설정 열기」를 누른 뒤 15분 안에 복사한 것만 저절로 들어와요. "
-                                   "버튼을 다시 누르고 복사하거나, 아래 칸에 직접 붙여 넣어도 돼요."],
-            ["일정이 늦게 보여요", "구글 비공개 주소는 바뀐 일정이 반영되기까지 몇 분~몇 시간 걸릴 수 있어요 (구글 쪽 사정)."],
-        ]},
-    "icloud": {  # Apple 계정 + 앱 암호 (caldav)
-        "open": ("Apple 페이지 열기", "https://account.apple.com/account/manage"),
-        "steps": ["아래 <b>「Apple 페이지 열기」</b> → 평소 브라우저에서 아이폰과 같은 계정으로 로그인해요",
-                  "<b>로그인 및 보안</b> → <b>앱 암호</b> → <b>+</b> → 이름 <b>POPME</b> → 만들기",
-                  "나온 <b>xxxx-xxxx-xxxx-xxxx</b>를 복사만 하면 여기에 저절로 들어와요 (한 번만 보여 주니 창을 닫기 전에 복사해요)"],
-        "faq": [
-            ["「앱 암호」 메뉴가 없어요", "Apple 계정에 2단계 인증이 켜져 있어야 보여요. 아이폰 설정 → 맨 위 내 이름 → 로그인 및 보안 → 2단계 인증을 켜요."],
-            ["Apple 계정 이메일을 모르겠어요", "아이폰 설정 맨 위 내 이름을 누르면 보여요. 평소 쓰는 메일과 다를 수 있어요."],
-            ["「로그인하지 못했어요」가 나와요", "이메일이 앱 암호를 만든 그 Apple 계정인지 봐요. 그래도 안 되면 앱 암호를 새로 만들어 복사해요. "
-                                            "Apple 계정 비밀번호를 바꾸면 예전 앱 암호는 모두 쓸 수 없게 돼요."],
-            ["캘린더가 하나도 없대요", "아이폰 설정 → 내 이름 → iCloud에서 캘린더가 켜져 있어야 해요. 켜면 몇 분 뒤 다시 「연결 확인」을 눌러요."],
-            ["복사했는데 안 들어와요", "「Apple 페이지 열기」를 누른 뒤 15분 안에 복사한 것만 저절로 들어와요. 앱 암호 칸에 직접 붙여 넣어도 돼요."],
-        ]},
-    "icloud_ics": {  # 앱 암호 대신 공개 캘린더 주소
-        "steps": ["아이폰 <b>캘린더</b> 앱 → 아래 <b>「캘린더」</b> → 쓰는 캘린더 옆 <b>ⓘ</b>",
-                  "<b>「공개 캘린더」</b>를 켜고 <b>「링크 공유」</b>로 PC에 보내요 (카톡 나와의 채팅 등)",
-                  "PC에서 <code>webcal://</code>로 시작하는 주소를 복사하면 여기에 저절로 들어와요"],
-        "faq": [
-            ["「공개 캘린더」가 안 보여요", "iCloud 캘린더만 공개로 바꿀 수 있어요. 구글 등 다른 계정 캘린더면 그 서비스를 골라요."],
-            ["공개해도 괜찮아요?", "주소를 아는 사람은 누구나 볼 수 있어요. 주소를 남에게 보내지 말아요. 걱정되면 「Apple 계정으로 연결하기」가 더 안전해요."],
-        ]},
-    "naver": {
-        "open": ("네이버 캘린더 열기", "https://calendar.naver.com"),
-        "steps": ["아래 <b>「네이버 캘린더 열기」</b> → <b>환경설정</b> → <b>캘린더 관리</b>",
-                  "내보내기/공유의 <b>ICS(iCal) 주소</b>를 복사하면 여기에 저절로 들어와요"],
-        "faq": [["주소가 안 보여요", "PC 브라우저의 네이버 캘린더에서 찾아요. 모바일 앱에는 이 설정이 없어요."]]},
-    "outlook": {
-        "open": ("Outlook 캘린더 설정 열기", "https://outlook.live.com/calendar/0/options/calendar/SharedCalendars"),
-        "steps": ["아래 <b>「Outlook 캘린더 설정 열기」</b> → <b>공유 캘린더</b>",
-                  "<b>캘린더 게시</b>에서 캘린더와 「모든 세부 정보 보기」를 고르고 <b>게시</b>",
-                  "<b>ICS 링크</b>를 복사하면 여기에 저절로 들어와요"],
-        "faq": [["「캘린더 게시」가 없어요", "회사·학교 계정은 관리자가 막아 두었을 수 있어요. 개인 outlook.com 계정에서 해 봐요."]]},
-    "minical": {
-        "steps": ["미니캘은 아이폰에 등록된 캘린더를 그대로 보여 줘요",
-                  "아이폰 <b>설정 → 앱 → 캘린더 → 캘린더 계정</b>을 열어요 (옛 iOS: 설정 → 캘린더 → 계정)",
-                  "<b>iCloud</b>에 캘린더가 켜져 있으면 「iCloud (아이폰 계정)」, <b>Gmail</b>이면 「구글 계정」을 골라요. "
-                  "둘 다 켜져 있으면 일정을 주로 넣는 쪽을 골라요"],
-        "faq": [["둘 다 써요", "지금은 한 곳만 연결할 수 있어요. 일정을 주로 넣는 쪽을 고르고, 나중에 설정에서 바꿀 수 있어요."]]},
-    "gmail": {
-        "open": ("앱 비밀번호 만들기", "https://myaccount.google.com/apppasswords"),
-        "steps": ["아래 <b>「앱 비밀번호 만들기」</b> → 평소 브라우저에서 ① 메일 주소의 구글 계정으로 로그인해요",
-                  "앱 이름에 <b>POPME</b> → 만들기",
-                  "나온 16자리를 마우스로 끌어 <b>모두</b> 선택하고 <b>Ctrl+C</b> → 아래 ③ 칸에 저절로 들어와요 (한 번만 보여 줘요)"],
-        "faq": [
-            ["「사용할 수 없는 설정」이라고 나와요", "구글 계정에 2단계 인증이 켜져 있어야 앱 비밀번호를 만들 수 있어요. "
-                                              "<a data-url='https://myaccount.google.com/signinoptions/twosv'>2단계 인증 켜기</a> 뒤 다시 해요. "
-                                              "회사·학교 계정은 관리자가 막아 두었을 수 있어요."],
-            ["「로그인하지 못했어요」가 나와요", "구글 비밀번호가 아니라 앱 비밀번호 16자리를 넣어야 해요. 구글 비밀번호를 바꾸면 앱 비밀번호도 새로 만들어야 해요."],
-            ["복사했는데 안 들어와요", "「앱 비밀번호 만들기」를 누른 뒤 15분 안에 복사한 것만 저절로 들어와요. "
-                                   "16자리를 모두 선택했는지 보고, 안 되면 ③ 칸을 누르고 Ctrl+V로 붙여 넣어도 돼요."],
-            ["다른 구글 계정으로 열려요", "브라우저 오른쪽 위 프로필 사진을 눌러 ① 메일 주소와 같은 계정으로 바꾼 뒤 다시 만들어요."],
-            ["16자리 창을 닫아 버렸어요", "다시 볼 수는 없어요. 같은 페이지에서 POPME를 지우고 새로 만들면 돼요."],
-        ]},
-    "mail_other": {
-        "steps": ["메일 서비스 설정에서 <b>IMAP 사용</b>을 켜요", "2단계 인증을 쓰면 <b>앱 비밀번호</b>를 만들어 넣어요"],
-        "faq": [["「로그인하지 못했어요」가 나와요", "메일 설정에서 IMAP 사용을 켰는지, 2단계 인증을 쓴다면 앱 비밀번호를 넣었는지 봐요. "
-                                              "회사·학교 메일은 관리자가 막아 두었을 수 있어요."]]},
-    "login": {
-        "steps": ["사이트 옆 <b>「로그인 열기」</b>를 누르면 POPME 전용 Chrome에 그 사이트가 열려요",
-                  "평소처럼 직접 로그인해요. 끝나면 여기 ✓가 저절로 켜져요"],
-        "faq": [
-            ["전용 Chrome이 뭐예요?", "POPME가 소식을 모을 때 쓰는 Chrome 창이에요. 평소 Chrome과 로그인이 따로라서 여기서 한 번 더 로그인해야 해요."],
-            ["비밀번호를 POPME가 봐요?", "아니요. 로그인은 Chrome 안에서 직접 하고, POPME는 로그인됐는지만 확인해요."],
-            ["X·Threads 계정이 없어요", "건너뛰어도 돼요. 공식 블로그·릴리스 소식은 계정 없이도 모여요."],
-            ["로그인했는데 ✓가 안 켜져요", "로그인을 끝까지 마쳤는지(첫 화면이 보이는지) 봐요. 몇 초 기다리면 저절로 다시 확인해요."],
-        ]},
-}
-# 「AI한테 해결 요청하기」에 적은 상황: 이 단계 안내 안에서만 답한다
-HELP_SYSTEM = """너는 POPME 설정 창의 도우미다. 사용자는 컴퓨터를 잘 모를 수 있다.
-반드시 아래 [안내]와 [자주 막히는 곳]에 적힌 내용만 근거로 답한다.
-- 한국어 존댓말, 3문장 이내. 화면에서 무엇을 누르면 되는지만 말한다.
-- [안내]로 답할 수 없는 질문이면 정확히 「이 단계와 관련된 것만 도와드릴 수 있어요. 다른 방법을 고르거나 나중에 설정해도 돼요.」라고만 답한다.
-- 명령어·코드·다른 앱이나 사이트를 권하지 않는다. 비밀번호·주소를 보여 달라고 하지 않는다."""
-# 로그인 단계: 전용 Chrome에서 사용자가 직접 로그인 → 쿠키(또는 로그인 페이지로 넘기는지)로 확인만 한다
-LOGIN_SITES = {
-    "x": {"name": "X", "url": "https://x.com/login", "why": "AI 소식 모으기 — 가장 중요해요",
-          "cookie": ("https://x.com", "auth_token")},
-    "threads": {"name": "Threads", "url": "https://www.threads.com/login", "why": "국내 반응 모으기 (없으면 건너뛰어요)",
-                "cookie": ("https://www.threads.com", "sessionid"), "optional": True},
-    "timetree": {"name": "TimeTree", "url": "https://timetreeapp.com/signin", "why": "일정 읽기",
-                 "page": "https://timetreeapp.com/calendars"},  # 로그인 안 했으면 /signin으로 넘긴다
-}
-# 클립보드에서 꺼낼 것: 이 모양일 때만 꺼내고 다른 내용은 화면에 넘기지 않는다
-CLIP = {
-    "apple": (re.compile(r"[a-z]{4}-[a-z]{4}-[a-z]{4}-[a-z]{4}"), lambda t: t),  # Apple 앱 암호
-    "google": (re.compile(r"[a-z]{4} ?[a-z]{4} ?[a-z]{4} ?[a-z]{4}"), lambda t: t.replace(" ", "")),  # 구글 앱 비밀번호
-    # 캘린더 비공개·공개 주소 (구글 ical, iCloud published, 그 밖의 .ics)
-    "ics": (re.compile(r"(?:https|webcal)://\S*(?:\.ics|/ical/\S+|caldav\.icloud\.com/published/\S+)\S*"), lambda t: t),
-}
-
-
-# ---------------------------------------------------------------- config.toml 줄 단위 편집 (주석 보존)
-
-_HEADER = re.compile(r"^\s*\[\[?\s*([^\]]+?)\s*\]\]?")
-
-
-def _section_span(lines, name):
-    """[name] 표의 (머리 줄, 다음 표 머리 줄) 번호. 없으면 None."""
-    start = None
-    for i, line in enumerate(lines):
-        m = _HEADER.match(line)
-        if not m:
-            continue
-        if start is not None:
-            return start, i
-        if m.group(1) == name and not line.lstrip().startswith("[["):
-            start = i
-    return (start, len(lines)) if start is not None else None
-
-
-def _value_end(lines, i, col):
-    """lines[i][col:]에서 시작하는 TOML 값이 끝나는 (줄, 칸). 배열·인라인 표는 여러 줄에 걸칠 수 있다."""
-    depth, quote = 0, None
-    for j in range(i, len(lines)):
-        text, k = lines[j], (col if j == i else 0)
-        while k < len(text):
-            c = text[k]
-            if quote:
-                if c == "\\" and quote == '"':
-                    k += 1
-                elif c == quote:
-                    quote = None
-                    if depth == 0:
-                        return j, k + 1
-            elif c in "\"'":
-                quote = c
-            elif c in "[{":
-                depth += 1
-            elif c in "]}":
-                depth -= 1
-                if depth == 0:
-                    return j, k + 1
-            elif c == "#":
-                if depth == 0:
-                    return j, k
-                break  # 배열 안 주석: 다음 줄로
-            elif depth == 0 and c.isspace():
-                return j, k
-            k += 1
-        if depth == 0 and not quote:
-            return j, len(text)
-    return len(lines) - 1, len(lines[-1])
-
-
-def _literal(v):
-    if isinstance(v, bool):
-        return "true" if v else "false"
-    if isinstance(v, (int, float)):
-        return repr(v)
-    if isinstance(v, str):
-        return json.dumps(v, ensure_ascii=False)  # JSON 문자열은 TOML 기본 문자열로도 유효
-    if isinstance(v, list):
-        if not v:
-            return "[]"
-        return "[\n" + "".join(f"  {_literal(x)},\n" for x in v) + "]"
-    if isinstance(v, dict):
-        return "{ " + ", ".join(f"{k} = {_literal(x)}" for k, x in v.items()) + " }"
-    raise TypeError(type(v))
-
-
-def set_value(text, section, key, value, before=()):
-    """[section]의 key 값을 바꾼다 (같으면 그대로). 키가 없으면 표 끝에, 표가 없으면 before 표 앞(없으면 파일 끝)에 만든다."""
-    lines = text.split("\n")
-    new = _literal(value)
-    span = _section_span(lines, section)
-    if span is None:
-        at = next((s[0] for s in (_section_span(lines, b) for b in before) if s), None)
-        block = [f"[{section}]", f"{key} = {new}", ""]
-        if at is None:
-            while lines and not lines[-1].strip():
-                lines.pop()
-            lines += [""] + block
-        else:
-            lines[at:at] = block
-        return "\n".join(lines).rstrip("\n") + "\n"
-    s, e = span
-    key_re = re.compile(rf"^(\s*{re.escape(key)}\s*=\s*)")
-    for i in range(s + 1, e):
-        m = key_re.match(lines[i])
-        if not m:
-            continue
-        j, k = _value_end(lines, i, m.end())
-        old = (lines[i][m.end():k] if j == i else "\n".join([lines[i][m.end():]] + lines[i + 1:j] + [lines[j][:k]]))
-        if old == new:
-            return text
-        rest = lines[j][k:]
-        if rest.lstrip().startswith("#"):  # 오른쪽 주석은 원래 칸에 맞춘다
-            col = len(lines[j]) - len(rest.lstrip())
-            last = (m.group(1) + new).split("\n")[-1]
-            rest = " " * max(1, col - len(last)) + rest.lstrip()
-        lines[i:j + 1] = (m.group(1) + new + rest).split("\n")
-        return "\n".join(lines)
-    last = s  # 표의 마지막 값 줄 뒤 (표 뒤의 빈 줄·다음 표 설명 주석 앞)
-    i = s + 1
-    while i < e:
-        if lines[i].strip() and not lines[i].lstrip().startswith("#") and "=" in lines[i]:
-            rest = lines[i][lines[i].index("=") + 1:]
-            col = len(lines[i]) - len(rest.lstrip())
-            last = _value_end(lines, i, col)[0]  # 여러 줄 배열이면 닫는 줄까지 (안에 끼워 넣지 않게)
-            i = last + 1
-        else:
-            i += 1
-    lines[last + 1:last + 1] = f"{key} = {new}".split("\n")
-    return "\n".join(lines)
-
 
 # ---------------------------------------------------------------- 현재 값 읽기 · 고른 값 쓰기
-
-def base_text():
-    path = config.CONFIG_PATH if config.CONFIG_PATH.exists() else config.EXAMPLE_CONFIG
-    return path.read_text(encoding="utf-8")
-
 
 def characters():
     """기본 캐릭터와 내가 만든 캐릭터 파일들 [{file, name, intro, image}] ([persona]가 있는 *.toml). 이름이 같으면 내 것."""
@@ -593,8 +305,8 @@ def apply(text, ch):
 
 
 def write(text):
-    config.CONFIG_PATH.write_text(text, encoding="utf-8", newline="\n")
-    config.hide_passwords()
+    """설정 저장: 검사 → 통째로 바꿔 쓰기 → 비밀번호 숨기기 (tomledit.save_config)."""
+    tomledit.save_config(text)
 
 
 def geocode_place(name):
@@ -703,43 +415,6 @@ def check_ics(url):
     return {"events": len(cal.walk("VEVENT")), "name": str(cal.get("X-WR-CALNAME", "") or "")}
 
 
-def _clipboard(clear=False):
-    """Windows 클립보드 글자 (clear=True면 비우기만). 못 열면 ""."""
-    import ctypes
-    from ctypes import wintypes
-    u32, k32 = ctypes.windll.user32, ctypes.windll.kernel32
-    u32.GetClipboardData.restype = wintypes.HANDLE
-    k32.GlobalLock.argtypes = k32.GlobalUnlock.argtypes = [wintypes.HGLOBAL]
-    k32.GlobalLock.restype = ctypes.c_void_p
-    if not u32.OpenClipboard(None):
-        return ""
-    try:
-        if clear:
-            u32.EmptyClipboard()
-            return ""
-        h = u32.GetClipboardData(13)  # CF_UNICODETEXT
-        p = k32.GlobalLock(h) if h else None
-        if not p:
-            return ""
-        try:
-            return ctypes.wstring_at(p)
-        finally:
-            k32.GlobalUnlock(h)
-    finally:
-        u32.CloseClipboard()
-
-
-def take_clipboard(kind, read=_clipboard):
-    """클립보드가 CLIP[kind] 모양 하나뿐이면 꺼내고(정리해서) 클립보드를 비운다. 아니면 "" — 다른 내용은 화면에 넘기지 않는다."""
-    pattern, tidy = CLIP[kind]
-    text = read().strip()
-    if not pattern.fullmatch(text):
-        return ""
-    if read().strip() == text:  # 그 사이 다른 걸 복사했으면 건드리지 않는다
-        read(clear=True)
-    return tidy(text)
-
-
 # ---------------------------------------------------------------- 로그인 단계 (전용 Chrome)
 
 def _chrome_port():
@@ -752,25 +427,19 @@ def login_status(sites):
     port = _chrome_port()
     if not chrome.is_running(port):
         return {"chrome": False, **{s: None for s in sites}}
-    from playwright.sync_api import sync_playwright
     out = {"chrome": True}
-    with sync_playwright() as p:
-        browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
-        try:
-            ctx = browser.contexts[0]
-            for s in sites:
-                site = LOGIN_SITES[s]
-                try:
-                    if "cookie" in site:
-                        url, name = site["cookie"]
-                        out[s] = any(c["name"] == name and c["value"] for c in ctx.cookies([url]))
-                    else:  # 쿠키 이름으로는 알 수 없는 곳: 로그인 페이지로 넘기는지 본다 (화면은 안 연다)
-                        out[s] = ctx.request.get(site["page"], max_redirects=0, timeout=15000).status == 200
-                except Exception:
-                    log.warning("%s 로그인 확인 실패", s, exc_info=True)
-                    out[s] = None
-        finally:
-            browser.close()  # CDP 연결만 끊는다 (Chrome은 그대로)
+    with chrome.attached(port) as ctx:
+        for s in sites:
+            site = LOGIN_SITES[s]
+            try:
+                if "cookie" in site:
+                    url, name = site["cookie"]
+                    out[s] = any(c["name"] == name and c["value"] for c in ctx.cookies([url]))
+                else:  # 쿠키 이름으로는 알 수 없는 곳: 로그인 페이지로 넘기는지 본다 (화면은 안 연다)
+                    out[s] = ctx.request.get(site["page"], max_redirects=0, timeout=15000).status == 200
+            except Exception:
+                log.warning("%s 로그인 확인 실패", s, exc_info=True)
+                out[s] = None
     return out
 
 
@@ -781,15 +450,10 @@ def open_login(site):
     if not chrome.is_running(port):
         chrome.ensure_chrome(port, [url])
         return
-    from playwright.sync_api import sync_playwright
-    with sync_playwright() as p:
-        browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
-        try:
-            page = browser.contexts[0].new_page()
-            page.goto(url)
-            page.bring_to_front()
-        finally:
-            browser.close()
+    with chrome.attached(port) as ctx:
+        page = ctx.new_page()
+        page.goto(url)
+        page.bring_to_front()
 
 
 def request_first_briefing():
@@ -853,8 +517,7 @@ def ai_status(provider):
     home, plan = Path.home(), ""
 
     def run(*args):
-        return subprocess.run([exe, *args], capture_output=True, text=True, encoding="utf-8", errors="replace",
-                              timeout=20, creationflags=subprocess.CREATE_NO_WINDOW)
+        return llm._run([exe, *args], "", 20, None)  # npm .cmd면 시간이 넘을 때 node까지 끝낸다
     if provider == "codex":
         try:
             r = run("login", "status")
@@ -884,7 +547,7 @@ def ai_test(provider):
         raise ValueError(f"{name}이(가) 2분 안에 답하지 않았어요. 잠시 뒤 「다시 불러 보기」를 눌러 주세요.")
     except (RuntimeError, OSError) as e:
         err = str(e).lower()
-        if any(k in err for k in ("login", "auth", "api key", "credential", "401")):
+        if llm.is_login(err):
             raise ValueError(f"{name} 로그인이 필요해요. 「로그인 하기」를 눌러 주세요.")
         if llm.is_limit(err):
             raise ValueError(f"{name} 사용 한도에 걸렸어요. 한도가 풀리면 브리핑도 써져요. 그대로 다음으로 가도 돼요.")

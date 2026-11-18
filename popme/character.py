@@ -4,6 +4,7 @@
 내가 만든 것(DATA_DIR) → 기본 캐릭터(popme/defaults) → 없으면 character.example.toml.
 """
 import ctypes
+import logging
 import random
 import re
 import tomllib
@@ -91,8 +92,12 @@ def plain(html, limit=34):
 
 class Character:
     def __init__(self):
-        with open(character_path(), "rb") as f:
-            self.cfg = tomllib.load(f)
+        path = character_path()
+        try:
+            self.cfg = tomllib.loads(path.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError):  # 메모장으로 고치다 깨진 캐릭터 파일 — 앱이 안 켜지는 대신 기본 캐릭터로
+            logging.getLogger(__name__).exception("캐릭터 파일을 못 읽어 기본 캐릭터로: %s", path)
+            self.cfg = tomllib.loads((config.DEFAULTS_DIR / "character.example.toml").read_text(encoding="utf-8"))
         self.lines = self.cfg["lines"]
         self.beh = self.cfg["behavior"]
         p = self.cfg.get("persona", {})

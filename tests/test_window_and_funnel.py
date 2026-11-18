@@ -2,7 +2,7 @@
 import json
 from datetime import datetime, timedelta, timezone
 
-from popme import briefing, clock, discovery, funnel
+from popme import accounts, ask, briefing, clock, discovery, funnel
 from popme.db import DB
 
 
@@ -61,8 +61,8 @@ def _tw(db, i, created, collected, via, platform="x", likes=10):
 def test_threads_section_takes_only_search_paths(tmp_path, monkeypatch):
     """Threads 검색·태그 구획은 검색·태그 경로만 — 모르는 새 경로의 글은 섞지 않는다."""
     db = _db(tmp_path)
-    monkeypatch.setattr(briefing, "core_accounts", lambda cfg, db: [])
-    monkeypatch.setattr(briefing, "threads_accounts", lambda cfg, db: [])
+    monkeypatch.setattr(accounts, "core_accounts", lambda cfg, db: [])
+    monkeypatch.setattr(accounts, "threads_accounts", lambda cfg, db: [])
     monkeypatch.setattr(briefing, "rss_items", lambda *a, **k: [])
     monkeypatch.setattr(briefing.discovery, "candidates", lambda db, limit=5: [])
     now = datetime.now(timezone.utc)
@@ -83,15 +83,15 @@ def test_verdict_found_anywhere_near_the_start():
 
 def test_question_data_names_the_briefing_date(tmp_path, monkeypatch):
     db = _db(tmp_path)
-    monkeypatch.setattr(briefing.search, "find", lambda db, kw, since, until: ("", {}))
+    monkeypatch.setattr(ask.search, "find", lambda db, kw, since, until: ("", {}))
     monkeypatch.setattr(briefing, "build_data", lambda *a, **k: "자료")
     yesterday = (clock.now() - timedelta(days=1)).strftime("%Y-%m-%d")
     _brief(db, yesterday, datetime.now(timezone.utc) - timedelta(days=1))
-    data, _ = briefing.ask_data({}, db, ["x"])
+    data, _ = ask.ask_data({}, db, ["x"])
     assert f"# 가장 최근 브리핑 ({yesterday})\n(오늘 브리핑은 아직 없다)" in data and "# 오늘 브리핑" not in data
     today = clock.now().strftime("%Y-%m-%d")
     _brief(db, today, datetime.now(timezone.utc))
-    data, _ = briefing.ask_data({}, db, ["x"])
+    data, _ = ask.ask_data({}, db, ["x"])
     assert f"# 가장 최근 브리핑 ({today})\n# {today}" in data and "아직 없다" not in data
 
 

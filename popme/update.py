@@ -5,6 +5,7 @@ import re
 import urllib.request
 from datetime import date
 
+from popme.fileio import atomic_write_text
 from popme import __version__, config
 
 log = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ def check(today=None):
         except (OSError, ValueError, KeyError):
             log.info("새 버전 확인 실패", exc_info=True)
             return None
-        STATE.write_text(json.dumps(state), encoding="utf-8")
+        atomic_write_text(STATE, json.dumps(state))
     return state["tag"] if is_newer(state.get("tag")) else None
 
 
@@ -56,5 +57,5 @@ def first_notice(tag):
     state = _state()
     if state.get("told") == tag:
         return False
-    STATE.write_text(json.dumps({**state, "told": tag}), encoding="utf-8")
+    atomic_write_text(STATE, json.dumps({**state, "told": tag}))
     return True

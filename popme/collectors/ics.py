@@ -120,6 +120,12 @@ def holiday_events(cfg):
     return hol
 
 
+def calendar_id(c, name=None):
+    """DB calendar_id = "ics<주소로 만든 짧은 ID>:<이름>". 예전엔 목록 순서(ics0·ics1)라서, 앞 캘린더를 빼면 뒤 캘린더가
+    ics0이 돼 지운 캘린더의 일정과 섞였다 (CalDAV의 cd… 와 같은 방식)."""
+    return f"ics{hashlib.sha1(c['url'].strip().encode()).hexdigest()[:8]}:{name or c.get('name') or '캘린더'}"
+
+
 def collect(cfg, progress=lambda s: None, warnings=None):
     """반환: (일정 리스트, 전체를 다시 읽은 calendar_id 목록) — timetree.collect와 같은 모양.
     한 캘린더가 실패해도 나머지는 읽는다. 실패한 캘린더는 synced에서 빠지므로 기존 일정이 '지워짐'이 되지 않는다."""
@@ -129,10 +135,10 @@ def collect(cfg, progress=lambda s: None, warnings=None):
         if not (c.get("url") or "").strip():
             log.info("캘린더 %s: 주소가 비어 있어 건너뜀", name)
             continue
-        cid = f"ics{i}:{name}"
+        cid = calendar_id(c, name)
         progress(f"캘린더 읽는 중: {name}")
         try:
-            events += parse(fetch(c["url"]), cid, f"ics{i}:")
+            events += parse(fetch(c["url"]), cid, cid.split(":", 1)[0] + ":")
             synced.append(cid)
         except Exception as e:
             log.warning("캘린더 %s 읽기 실패: %s", name, e)

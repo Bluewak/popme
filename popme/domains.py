@@ -8,6 +8,7 @@ import json
 import logging
 import re
 
+from popme.fileio import atomic_write_text
 from popme import config
 
 log = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ def load(pid):
 
 def save_local(pid, data):
     LOCAL_DIR.mkdir(parents=True, exist_ok=True)
-    (LOCAL_DIR / f"{pid}.json").write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    atomic_write_text(LOCAL_DIR / f"{pid}.json", json.dumps(data, ensure_ascii=False, indent=1))
 
 
 def _s(v, n):

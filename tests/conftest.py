@@ -25,6 +25,10 @@ def no_personal_config(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "DATA_DIR", data)
     monkeypatch.setattr(config, "ASSETS_DIR", data / "assets")
     monkeypatch.setattr(config, "CONFIG_PATH", data / "config.toml")
+    for name in ("RAW_DIR", "BRIEFING_DIR"):  # 원본 응답 덤프·브리핑 md도 내 폴더 대신
+        (data / name.lower()).mkdir()
+        monkeypatch.setattr(config, name, data / name.lower())
+    monkeypatch.setattr(config, "FIRST_BRIEFING", data / "first-briefing")
     saved = {}
     monkeypatch.setattr(vault, "get", lambda name: saved.get(name, ""))
     monkeypatch.setattr(vault, "put", lambda name, value: saved.update({name: value}) or True)
@@ -52,8 +56,8 @@ def no_custom_profiles(monkeypatch, tmp_path):
 
 @pytest.fixture(autouse=True)
 def no_x_visits(monkeypatch, tmp_path):
-    from popme import briefing
-    monkeypatch.setattr(briefing, "X_VISITS", tmp_path / "x-visits.json")
+    from popme import accounts
+    monkeypatch.setattr(accounts, "X_VISITS", tmp_path / "x-visits.json")
 
 
 @pytest.fixture(autouse=True)
@@ -76,3 +80,25 @@ def no_background_fieldcard(monkeypatch):
     from popme import fieldcard
     monkeypatch.setattr(fieldcard, "BACKGROUND", False)
     fieldcard._jobs.clear()
+
+
+@pytest.fixture(autouse=True, scope="session")
+def never_touch_my_folder():
+    """테스트가 끝난 뒤 실제 사용자 폴더(%LOCALAPPDATA%/POPME)에 새 파일이 생기지 않았는지.
+    2026-11-18 상수 경로 하나를 conftest가 바꿔 끼우지 않아 테스트가 예시 설정을 내 폴더에 저장한 적이 있다.
+    (있던 파일이 바뀐 것은 보지 않는다 — 같은 PC에서 앱이 돌며 상태 파일을 고칠 수 있어 흔들린다)"""
+    from popme import config
+    root = config.DATA_DIR
+    skip = ("popme.db", "popme.log", "chrome-profile", "raw", "venv", "llm-empty")
+
+    def snap():
+        out = {}
+        for p in root.glob("*") if root.exists() else ():
+            if p.is_file() and not p.name.startswith(skip):
+                out[p.name] = p.stat().st_mtime_ns
+        return out
+    before = snap()
+    yield
+    after = snap()
+    new = sorted(set(after) - set(before))
+    assert not new, f"테스트가 실제 사용자 폴더에 파일을 만들었어요: {new}"

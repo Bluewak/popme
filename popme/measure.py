@@ -38,7 +38,9 @@ def known(handles):
 def app_collecting():
     """앱이 지금 모으는 중인가 (로그의 마지막 popme.jobs 줄이 끝난 상태가 아니면). 모르면 모으는 중으로 본다."""
     try:
-        tail = LOG.read_text(encoding="utf-8", errors="replace").splitlines()[-400:]
+        with open(LOG, "rb") as f:  # 끝 64KB만 (파일 전체를 읽지 않게)
+            f.seek(max(0, f.seek(0, 2) - 65536))
+            tail = f.read().decode("utf-8", errors="replace").splitlines()[-400:]
     except OSError:
         return False
     jobs = [line for line in tail if "popme.jobs:" in line]

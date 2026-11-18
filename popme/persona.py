@@ -59,7 +59,7 @@ def check(p, out):
 
 def chain(cfg, p, timeout=120):
     """[메시지] → 구독 CLI → 글 → JSON → 검사한 dict."""
-    from popme.briefing import parse_json
+    from popme.llm import parse_json
     return (chat.CliChatModel(cfg=cfg, timeout=timeout) | StrOutputParser()
             | RunnableLambda(parse_json) | RunnableLambda(lambda out: check(p, out)))
 
