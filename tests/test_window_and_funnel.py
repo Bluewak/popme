@@ -125,3 +125,69 @@ def test_funnel_warns_only_after_a_week_and_when_far_from_usual(tmp_path):
                  "RSS 글이 평소보다 많이 들어왔어요 (260개, 평소 100개)"]  # 평소 2개짜리는 흔들림이라 견주지 않음
     assert funnel.warnings(db, {**usual, "카드:전날과 같은 링크": 4}, "2026-11-20") == [
         "전날 카드와 같은 링크가 4개예요 (같은 소식이 되풀이됐을 수 있어요)"]
+
+
+def _post(db, i, author, via, created, collected, kind="post", ref=None, ref_author=None, text=None, likes=10):
+    db.upsert_tweets([{"id": i, "author": author, "text": text or f"{author} 글 {i}", "created_at": created.isoformat(),
+                       "lang": "en", "likes": likes, "urls": "[]", "kind": kind, "ref_author": ref_author, "ref_id": ref,
+                       "via": via, "platform": "x"}])
+    db.conn().execute("UPDATE tweets SET collected_at=? WHERE id=?", (collected.isoformat(), i))
+    db.conn().commit()
+
+
+def _material(monkeypatch, db, handles, since, late_since=None):
+    monkeypatch.setattr(accounts, "core_accounts",
+                        lambda cfg, db: [{"handle": h, "name": h, "group": "g", "focus": "f"} for h in handles])
+    monkeypatch.setattr(accounts, "threads_accounts", lambda cfg, db: [])
+    monkeypatch.setattr(briefing, "rss_items", lambda *a, **k: [])
+    monkeypatch.setattr(briefing.discovery, "candidates", lambda db, limit=5: [])
+    return briefing.build_data({}, db, since.isoformat(), late_since=late_since)
+
+
+def test_quote_carries_its_original(tmp_path, monkeypatch):
+    """인용 글 아래에 원문을 붙인다 — 원문 작성자가 보는 계정이 아니어도. 「neat」만으로는 무슨 소식인지 모른다."""
+    db = _db(tmp_path)
+    now = datetime.now(timezone.utc)
+    _post(db, "o1", "joelniklaus", "user:badlogicgames", now - timedelta(hours=5), now - timedelta(hours=1),
+          text="Releasing the Harness Leaderboard", likes=2638)
+    _post(db, "q1", "badlogicgames", "user:badlogicgames", now - timedelta(hours=3), now - timedelta(hours=1),
+          kind="quote", ref="o1", ref_author="joelniklaus", text="neat")
+    _post(db, "q2", "badlogicgames", "user:badlogicgames", now - timedelta(hours=2), now - timedelta(hours=1),
+          kind="quote", ref="nowhere", ref_author="someone", text="원문이 DB에 없는 인용")
+    data = _material(monkeypatch, db, ["badlogicgames"], now - timedelta(hours=20))
+    lines = data.split("\n")
+    i = next(n for n, line in enumerate(lines) if "neat" in line)
+    assert lines[i + 1].startswith("  ↳ 원문 @joelniklaus ♥2638: Releasing the Harness Leaderboard")
+    j = next(n for n, line in enumerate(lines) if "원문이 DB에 없는 인용" in line)
+    assert j + 1 == len(lines) or not lines[j + 1].startswith("  ↳")
+    assert funnel.sections(data)["재료:X 핵심 계정"] == 2  # 원문 줄은 글 수에 안 센다
+
+
+def test_talked_about_needs_two_watched_people_and_a_fresh_reaction(tmp_path, monkeypatch):
+    db = _db(tmp_path)
+    now = datetime.now(timezone.utc)
+    prev = now - timedelta(hours=20)
+    old, new = prev - timedelta(hours=5), now - timedelta(hours=1)
+    _post(db, "hot", "OpenAI", "user:swyx", now - timedelta(days=2), old, text="Introducing a model")
+    _post(db, "r1", "swyx", "user:swyx", now - timedelta(days=2), old, kind="quote", ref="hot", ref_author="OpenAI")
+    _post(db, "r2", "theo", "user:theo", now - timedelta(hours=10), new, kind="reply", ref="hot", ref_author="OpenAI")
+    # 한 명만 반응 / 보는 계정이 아닌 사람 / 다른 계정 페이지에서 딸려 온 글은 세지 않는다
+    _post(db, "solo", "x1", "user:swyx", now - timedelta(days=1), new, text="한 명만")
+    _post(db, "s1", "swyx", "user:swyx", now - timedelta(hours=9), new, kind="quote", ref="solo", ref_author="x1")
+    _post(db, "s2", "stranger", "user:stranger", now - timedelta(hours=9), new, kind="quote", ref="solo", ref_author="x1")
+    _post(db, "s3", "theo", "user:swyx", now - timedelta(hours=9), new, kind="quote", ref="solo", ref_author="x1")
+    # 반응이 모두 지난 브리핑 전에 들어온 화제는 다시 올리지 않는다
+    _post(db, "stale", "y1", "user:swyx", now - timedelta(days=3), old)
+    for k, h in (("t1", "swyx"), ("t2", "theo")):
+        _post(db, k, h, f"user:{h}", now - timedelta(days=2), old, kind="quote", ref="stale", ref_author="y1")
+    got = briefing.talked_about(db, ["swyx", "theo"], prev.isoformat())
+    assert [(o["id"], sorted(who)) for o, who in got] == [("hot", ["swyx", "theo"])]
+    data = _material(monkeypatch, db, ["swyx", "theo"], now - timedelta(hours=21), late_since=prev.isoformat())
+    assert data.startswith("# 여러 사람이 반응한 글")
+    assert "[2명: " in data and "Introducing a model" in data
+    assert funnel.sections(data)["재료:여러 사람이 반응한 글"] == 1
+
+
+def test_briefing_rules_ask_for_official_and_talked_links():
+    assert "가장 공식적인 링크 1~2개만" not in briefing.BRIEFING_RULES
+    assert "공식 출처 하나와" in briefing.BRIEFING_RULES and "# 여러 사람이 반응한 글" in briefing.BRIEFING_RULES

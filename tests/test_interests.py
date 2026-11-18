@@ -180,7 +180,7 @@ def test_build_data_includes_late_seen_posts_of_rotating_accounts(monkeypatch):
     assert all(f"글 {i} 끝" in data for i in ("2", "4", "6", "8", "91", "92", "93", "bl"))
     assert all(f"글 {i} 끝" not in data for i in ("1", "2b", "3", "5", "7", "90", "99"))
     # 늦게 본 글은 반응 큰 순 5개: 2·8(100) + 93·92·91 — 90(50)·99(1)은 밀림
-    assert sum(f"글 bw{n} 끝" in data for n in range(30)) == 25
+    assert sum(f"글 bw{n} 끝" in data for n in range(30)) == 30  # 계정당 개수 상한은 없앴다 (594번 중 4번만 걸렸다)
     ask = briefing.build_data({}, db, since.isoformat())
     assert "글 2 끝" not in ask and "글 bl 끝" not in ask and "글 4 끝" in ask
 
