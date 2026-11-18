@@ -6,11 +6,12 @@
 import json
 import logging
 import random
+import re
 from datetime import datetime, timezone
 from urllib.parse import quote
 
 from popme import chrome
-from popme.collectors import VIA_X_CHECK, VIA_X_SEARCH, VIA_X_USER, NeedLogin, dump_raw, reached_since
+from popme.collectors import VIA_X_CHECK, VIA_X_LIST, VIA_X_SEARCH, VIA_X_USER, NeedLogin, dump_raw, reached_since
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +22,20 @@ BLOCK_MARKERS = ("/login", "/i/flow/login", "/account/access", "/i/flow/consent"
 # 돌아가며 보는 계정(since_by)은 며칠 치를 내려가야 해서 스크롤 상한을 따로. 5~6일에 한 번 여는 계정이라
 # 하루로 나누면 매일 열어 1번 스크롤하던 때와 요청 수가 같다. 그래도 못 닿으면 로그를 남긴다
 DEEP_SCROLLS = 6
+LIST_SCROLLS = 20  # 리스트 한 번에 최대 스크롤. 한 번에 글 약 90개 — 계정 100개의 하루치가 5번 안팎 (2026-11 시험)
+
+
+def list_id(url):
+    """리스트 주소 → ID (x.com/i/lists/123…). 숫자만 줘도 된다. 모르는 모양이면 None."""
+    m = re.search(r"(?:lists/)?(\d{6,})", url or "")
+    return m.group(1) if m else None
+
+
+def _list_reached(tweets, since):
+    """마지막 응답의 글이 절반 넘게 since보다 오래됐으면 그 아래는 이미 받은 구간이다.
+    응답에는 인용·리트윗 원문(더 오래된 글)도 섞여 오므로 하나가 아니라 절반으로 본다."""
+    dated = [t["created_at"] for t in tweets if t.get("created_at")]
+    return bool(dated) and sum(1 for c in dated if c < since) * 2 > len(dated)
 
 
 def _unwrap(t):
@@ -196,10 +211,69 @@ def check_profiles(ctx, handles, progress=lambda s: None, users=None):
     return out
 
 
+def _visit_list(page, url, via, since, sink, ops_seen, users=None):
+    """리스트 타임라인 → 받은 글 수. since(UTC ISO)까지 내려가면 멈춘다 (최대 LIST_SCROLLS번).
+    리스트는 보는 계정 전체의 글을 시간순으로 한 페이지에 준다 — 계정 페이지를 30개씩 돌아가며 열면 한 바퀴에 5일쯤 걸려,
+    그 사이 글의 56%가 어느 브리핑에도 못 들어갔다(2026-11-04~18). 계정 페이지가 안 주는 리트윗도 온다."""
+    responses, parsed = [], []
+
+    def handler(r):
+        if "/i/api/graphql/" in r.url and not any(s in _op(r.url) for s in SKIP_OPS):
+            responses.append(r)
+
+    def drain():
+        while len(parsed) < len(responses):
+            r = responses[len(parsed)]
+            ops_seen.add(_op(r.url))
+            try:
+                data = r.json()
+            except Exception:
+                data = None
+            tweets = []
+            if data is not None:
+                walk(data, tweets, users)
+            parsed.append((r, data, tweets))
+
+    page.on("response", handler)
+    done = 0
+    try:
+        page.goto(url, wait_until="domcontentloaded", timeout=45000)
+        page.wait_for_timeout(random.uniform(3000, 5000))
+        if any(m in page.url for m in BLOCK_MARKERS):
+            raise NeedLogin(f"X 로그인이 필요해요 ({page.url})")
+        for _ in range(LIST_SCROLLS):
+            drain()
+            last = next((ts for _, _, ts in reversed(parsed) if ts), [])
+            if since and _list_reached(last, since):
+                break
+            page.evaluate("window.scrollBy(0, document.body.scrollHeight)")
+            page.wait_for_timeout(random.uniform(2500, 5000))
+            done += 1
+    finally:
+        page.remove_listener("response", handler)
+    drain()
+    if since and done == LIST_SCROLLS:
+        log.info("X 리스트: 스크롤 %d번으로 %s까지 못 내려감", done, since[:16])
+    got = 0
+    for r, data, tweets in parsed:
+        if not tweets:
+            continue
+        dump_raw("x", f"{via}_{_op(r.url)}".replace(":", "_").replace("/", "_")[:60], data)
+        for t in tweets:
+            t["via"] = via
+        sink.extend(tweets)
+        got += len(tweets)
+    log.info("X 리스트: 트윗 %d개 (GraphQL 응답 %d개, 스크롤 %d번)", got, len(responses), done)
+    return got
+
+
 def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None, on_batch=None, since_by=None,
-            visited=None):
+            visited=None, list_since=None):
     """accounts: 핵심 계정 handle 목록. since(UTC ISO): 계정 페이지는 이 시각 이전 글까지만 스크롤.
     since_by({handle 소문자: UTC ISO}): 그 계정만 다른 시각까지, 스크롤도 DEEP_SCROLLS번까지 (돌아가며 보는 계정 — 지난번에 본 시각).
+    [x] list_url이 있으면 계정 페이지를 다 본 뒤 리스트도 본다 (list_since까지). 같은 글은 처음 받은 경로(via)가 남으므로
+    맨 마지막에 봐야 날마다 여는 계정의 글이 계정 페이지 경로로 남는다 — 리스트로 옮기기 전 나란히 견줘 보는 기간.
+    리스트를 정상으로 봤으면 visited에 "list:<ID>"를 넣는다.
     visited(list): 정상으로 연 계정 페이지(글이 0개여도)의 handle을 차례로 넣는다 (중간에 실패해도 그때까지 본 것).
     users(dict): 응답에 실린 계정 규모(팔로워 등)를 모아 둘 곳. 반환: 파싱된 트윗 리스트.
     on_batch(새 트윗들): 페이지 하나를 볼 때마다 — 중간에 끊겨도 모은 데까지 저장되게."""
@@ -211,12 +285,9 @@ def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None,
     out, empty_streak, ops_seen = [], 0, set()
     try:
         targets = []
-        if xcfg.get("list_url"):
-            targets.append((xcfg["list_url"], "list"))
-        else:
-            handles = list(accounts)
-            random.shuffle(handles)
-            targets += [(f"https://x.com/{h}", f"{VIA_X_USER}{h}") for h in handles]
+        handles = list(accounts)
+        random.shuffle(handles)
+        targets += [(f"https://x.com/{h}", f"{VIA_X_USER}{h}") for h in handles]
         targets += [(f"https://x.com/search?q={quote(q)}&src=typed_query&f=top", f"{VIA_X_SEARCH}{i}")
                     for i, q in enumerate(xcfg.get("discovery_searches", []))]
 
@@ -242,6 +313,15 @@ def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None,
                 raise RuntimeError("X에서 연속으로 글을 못 찾았어요. X 응답 구조가 바뀐 것 같아요 "
                                    f"(로그에 받은 API 이름 기록: {', '.join(sorted(ops_seen))[:120]})")
             page.wait_for_timeout(random.uniform(4000, 9000))
+        lid = list_id(xcfg.get("list_url"))
+        if lid:
+            progress("X 리스트 수집 중")
+            before = len(out)
+            if _visit_list(page, f"https://x.com/i/lists/{lid}", f"{VIA_X_LIST}{lid}", list_since or since, out, ops_seen,
+                           users) and visited is not None:
+                visited.append(f"{VIA_X_LIST}{lid}")
+            if on_batch and len(out) > before:
+                on_batch(out[before:])
     finally:
         page.close()
     return out

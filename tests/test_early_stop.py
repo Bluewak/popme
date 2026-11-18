@@ -156,3 +156,37 @@ def test_threads_profile_owner_followers_from_separate_script(monkeypatch):
     users = {}
     threads._visit(page, "https://www.threads.com/@me", "th-check:me", 2, [], users=users)
     assert users["me"]["followers"] == 12345
+
+
+class ListPage(FakePage):
+    """리스트 페이지: 휠 대신 페이지 안 스크롤(evaluate)로 더 불러온다."""
+
+    def evaluate(self, _js):
+        self.scrolls += 1
+        self.emit()
+
+
+LIST_GQL = "https://x.com/i/api/graphql/abc/ListLatestTweetsTimeline"
+
+
+def test_x_list_scrolls_until_since_then_stops(monkeypatch):
+    monkeypatch.setattr(x, "dump_raw", lambda *a, **k: None)
+    page = ListPage([x_batch(0, NEW), x_batch(10, NEW), x_batch(20, OLD), x_batch(30, OLD)])
+    page.goto = lambda url, **_: (setattr(page, "url", LIST_GQL), page.emit())
+    out = []
+    got = x._visit_list(page, "https://x.com/i/lists/123456789", "list:123456789", SINCE, out, set())
+    assert page.scrolls == 2 and got == 15 and {t["via"] for t in out} == {"list:123456789"}
+
+
+def test_x_list_reached_needs_most_of_the_last_batch_old():
+    """인용·리트윗 원문(오래된 글)이 몇 개 섞여도 멈추지 않는다."""
+    new, old = post("a", NEW), post("b", OLD)
+    assert not x._list_reached([new, new, old], SINCE)
+    assert x._list_reached([new, old, old], SINCE)
+    assert not x._list_reached([], SINCE)
+
+
+def test_list_id_accepts_url_or_number():
+    assert x.list_id("https://x.com/i/lists/2122938785910669775") == "2122938785910669775"
+    assert x.list_id("2122938785910669775") == "2122938785910669775"
+    assert x.list_id("") is None and x.list_id("https://x.com/me") is None

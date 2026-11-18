@@ -77,6 +77,20 @@ def x_plan(cfg, db, since, limit=X_VISIT_LIMIT, gaps=None):
     return fixed + pick, since_by
 
 
+def list_since(cfg, since):
+    """X 리스트를 어디까지 내려 볼지: 지난번에 본 시각 1시간 전 (X_LOOKBACK 안). 처음이면 since."""
+    from popme.collectors.x import list_id
+    lid = list_id(cfg.get("x", {}).get("list_url"))
+    seen = _visits().get(f"list:{lid}") if lid else None
+    if not seen:
+        return since
+    try:
+        start = datetime.fromisoformat(seen) - timedelta(hours=1)
+    except (TypeError, ValueError):
+        return since
+    return max(start, datetime.now(timezone.utc) - X_LOOKBACK).isoformat()
+
+
 def mark_x_visited(handles):
     """실제로 글을 받아 온 계정 페이지의 본 시각을 남긴다 (x_plan이 다음에 오래 안 본 것부터 고르고, 어디까지 내려 볼지 정할 때)."""
     if not handles:

@@ -242,13 +242,13 @@ def quoted_original(db, t):
 def talked_about(db, handles, fresh_after):
     """여러 사람이 반응한 글 → [(원문, [반응한 handle])], 반응한 사람 수 순.
     보는 X 계정(handles) 중 TALKED_MIN명 이상이 TALKED_DAYS 안에 그 원문을 인용·답글했고, 그 반응 중 하나라도
-    fresh_after 뒤에 받은 것 (지난 브리핑에 이미 올린 화제를 다시 올리지 않게). 반응은 그 계정 페이지에서 받은 자기 글만 센다.
+    fresh_after 뒤에 받은 것 (지난 브리핑에 이미 올린 화제를 다시 올리지 않게). 반응은 그 계정 페이지나 X 리스트에서 받은 자기 글만 센다.
     좋아요 수는 이 신호가 못 된다: 보는 계정의 반응 큰 글 상위는 대부분 AI 밖 글이었다(2026-11, 35개 중 6개)."""
     watched = {h.lower() for h in handles}
     floor = (datetime.now(timezone.utc) - timedelta(days=TALKED_DAYS)).isoformat()
     who, fresh = {}, set()
     for r in db.q("SELECT ref_id, author, collected_at FROM tweets WHERE platform='x' AND kind IN ('quote', 'reply') "
-                  "AND ref_id IS NOT NULL AND created_at >= ? AND lower(via) = 'user:' || lower(author) "
+                  "AND ref_id IS NOT NULL AND created_at >= ? AND (lower(via) = 'user:' || lower(author) OR via LIKE 'list:%') "
                   "AND lower(COALESCE(ref_author, '')) <> lower(author)", floor):
         if r["author"].lower() not in watched:
             continue

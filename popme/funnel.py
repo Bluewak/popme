@@ -15,11 +15,11 @@ MIN_MEAN = 5      # 평소 값이 이보다 작으면 흔들림이 커서 견주
 LABELS = {
     "재료:여러 사람이 반응한 글": "여러 사람이 반응한 글", "재료:X 핵심 계정": "X 계정 글", "재료:한국어 X 반응 큰 글": "한국어 X 검색 글", "재료:Threads 계정": "Threads 계정 글",
     "재료:한국어 Threads 반응 큰 글": "Threads 검색·태그 글", "재료:RSS": "RSS 글",
-    "받음:X 계정": "새로 받은 X 계정 글", "받음:X 검색": "새로 받은 X 검색 글", "받음:Threads 계정": "새로 받은 Threads 계정 글",
+    "받음:X 계정": "새로 받은 X 계정 글", "받음:X 리스트": "새로 받은 X 리스트 글", "받음:X 검색": "새로 받은 X 검색 글", "받음:Threads 계정": "새로 받은 Threads 계정 글",
     "받음:Threads 검색·태그": "새로 받은 Threads 검색·태그 글", "받음:RSS": "새로 받은 RSS 글",
     "카드:X·Threads 링크": "X·Threads 링크를 단 카드",
 }
-VIA_GROUP = [("user:", "X 계정"), ("search:", "X 검색"), ("th-user:", "Threads 계정"),
+VIA_GROUP = [("user:", "X 계정"), ("list:", "X 리스트"), ("search:", "X 검색"), ("th-user:", "Threads 계정"),
              ("th-search:", "Threads 검색·태그"), ("th-tag:", "Threads 검색·태그")]
 
 
