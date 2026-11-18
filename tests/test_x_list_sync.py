@@ -182,3 +182,19 @@ def test_quiet_members_are_rechecked_on_the_dialog(monkeypatch, tmp_path):
     assert accounts.list_todo(cfg, db) == ([], [], "popme")
     s = json.loads(accounts.X_LIST.read_text(encoding="utf-8"))
     assert s["members"]["quiet"] < s["checked"]["quiet"]  # 넣은 때는 그대로, 확인한 때만 새로
+
+
+def test_quiet_member_check_that_failed_waits_like_adds(monkeypatch, tmp_path):
+    """Codex 리뷰(#61): 조용한 계정 확인이 실패하면 7일 쉰다 — 매번 다시 시도하며 확인 자리(5개)를 막지 않게."""
+    from popme.db import DB
+    db = DB(tmp_path / "t.db")
+    _watch(monkeypatch, ["loud", "quiet"])
+    cfg = _cfg()
+    accounts.list_todo(cfg, db, "popme")
+    for h in ("loud", "quiet"):
+        accounts.mark_list(cfg, h, "added")
+        _member_since(h, 6)
+    _heard(db, "loud")
+    assert accounts.list_todo(cfg, db) == (["quiet"], [], "popme")
+    accounts.mark_list(cfg, "quiet", "failed")
+    assert accounts.list_todo(cfg, db) == ([], [], "popme")

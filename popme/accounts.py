@@ -175,13 +175,15 @@ def list_todo(cfg, db, name=None):
             return False
     adds = [h for h in order if h.lower() not in s["members"] and not failed_recently(h.lower())][:room]
     removes = [h for h in s["members"] if h in s["gone"] and due(h) and not failed_recently(h)][:room - len(adds)]
-    return adds + _quiet_members(s, db, lid, src, now, room - len(adds) - len(removes)), removes, name
+    quiet = _quiet_members(s, db, lid, src, now, room - len(adds) - len(removes), failed_recently)
+    return adds + quiet, removes, name
 
 
-def _quiet_members(s, db, lid, src, now, room):
+def _quiet_members(s, db, lid, src, now, room, failed_recently=lambda h: False):
     """기록(x-list.json)상 멤버인데 리스트에서 LIST_QUIET 동안 글이 하나도 안 온 보는 계정 → 다시 넣어 본다(넣기 대화상자가
     이미 체크돼 있으면 저장하지 않고 닫음 = 확인만). 기록은 앱이 넣은 것만 알아서, X에서 손으로 뺀 계정은 리스트에도 없고
-    계정 페이지 돌아가며 보기에서도 빠져 글을 못 받는다. 리스트를 LIST_QUIET 넘게 보고 있었을 때만, 같은 계정은 LIST_RECHECK에 한 번."""
+    계정 페이지 돌아가며 보기에서도 빠져 글을 못 받는다. 리스트를 LIST_QUIET 넘게 보고 있었을 때만, 같은 계정은 LIST_RECHECK에 한 번.
+    확인이 실패한 계정은 넣기·빼기처럼 LIST_RETRY 동안 쉰다 — 안 그러면 매번 다시 시도하며 LIST_CHECKS 자리를 막는다."""
     if room <= 0 or db is None:
         return []
     try:
@@ -203,7 +205,7 @@ def _quiet_members(s, db, lid, src, now, room):
         return now - joined >= LIST_QUIET and now - checked >= LIST_RECHECK
     if now - first < LIST_QUIET:
         return []
-    quiet = [h for h in s["members"] if h in src and h not in heard and stale(h)]
+    quiet = [h for h in s["members"] if h in src and h not in heard and stale(h) and not failed_recently(h)]
     return quiet[:min(room, LIST_CHECKS)]
 
 
