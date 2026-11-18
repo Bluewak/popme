@@ -106,19 +106,28 @@ def _save_list_state(s):
 
 
 def list_members(cfg):
-    """리스트에 넣은 계정(소문자) — 단 리스트를 LIST_FRESH 안에 정상으로 봤을 때만. 아니면 빈 집합
-    (리스트를 못 읽는 동안 그 계정들을 계정 페이지로라도 보게)."""
+    """계정 페이지 대신 리스트로 받는 계정(소문자) — 리스트를 LIST_FRESH 안에 정상으로 봤을 때만. 아니면 빈 집합
+    (리스트를 못 읽는 동안 그 계정들을 계정 페이지로라도 보게).
+    리스트에 넣은 뒤 계정 페이지를 한 번 더 본 계정만: 리스트는 넣은 다음 읽기부터 이어 받으므로, 지난번 계정 페이지와 그 사이
+    (돌아가며 보기라 며칠일 수 있다)는 계정 페이지로 메워야 한다. 계정 페이지는 리스트보다 먼저 보므로 그 뒤로는 끊기지 않는다 (Codex 리뷰 #61)."""
     from popme.collectors.x import list_id
     lid = list_id(cfg.get("x", {}).get("list_url"))
     if not lid:
         return set()
+    visits = _visits()
     try:
-        seen = datetime.fromisoformat(_visits().get(f"list:{lid}") or "")
+        seen = datetime.fromisoformat(visits.get(f"list:{lid}") or "")
     except ValueError:
         return set()
     if datetime.now(timezone.utc) - seen > LIST_FRESH:
         return set()
-    return set(_list_state(lid)["members"])
+
+    def caught_up(h, joined):
+        try:
+            return datetime.fromisoformat(visits[h]) >= datetime.fromisoformat(joined)
+        except (KeyError, TypeError, ValueError):
+            return False
+    return {h for h, joined in _list_state(lid)["members"].items() if caught_up(h, joined)}
 
 
 def watch_sources(cfg, db):

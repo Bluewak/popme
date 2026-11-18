@@ -84,6 +84,7 @@ def test_list_members_leave_page_rotation_only_while_the_list_is_fresh(monkeypat
     for h in ["fixed1"] + rotating[:15]:
         accounts.mark_list(cfg, h, "added")
     _list_seen(3)
+    accounts.mark_x_visited(["fixed1"] + rotating[:15])  # 넣은 뒤 계정 페이지로 한 번 메움
     handles, _ = accounts.x_plan(cfg, None, datetime.now(timezone.utc).isoformat(), limit=11)
     assert handles[0] == "fixed1"  # 고정 계정은 리스트에 있어도 계정 페이지로 (견줄 기준)
     assert set(handles[1:]) == set(rotating[15:])  # 리스트에 없는 5개만 돌아가며 — 자리가 남아 모두
@@ -211,7 +212,28 @@ def test_rotating_accounts_that_all_fit_still_backfill_from_last_visit(monkeypat
     now = datetime.now(timezone.utc)
     visits = {"list:123456789": (now - timedelta(hours=3)).isoformat()}
     visits.update({h: (now - timedelta(days=4)).isoformat() for h in rotating[15:]})
+    visits.update({h: now.isoformat() for h in rotating[:15]})  # 리스트 계정은 넣은 뒤 한 번 메움
     accounts.X_VISITS.write_text(json.dumps(visits), encoding="utf-8")
     handles, since_by = accounts.x_plan(cfg, None, (now - timedelta(days=1)).isoformat(), limit=11)
     assert set(handles[1:]) == set(rotating[15:])
     assert set(since_by) == set(rotating[15:])  # 어제 브리핑 시각이 아니라 나흘 전(지난번 본 때)부터
+
+
+def test_new_list_member_keeps_its_page_visit_until_the_gap_is_filled(monkeypatch):
+    """Codex 리뷰(#61): 나흘 전에 본 계정을 오늘 리스트에 넣으면, 리스트는 오늘부터만 이어 받는다 —
+    그 사이는 계정 페이지로 한 번 메운 뒤에야 돌아가며 보기에서 뺀다."""
+    _watch(monkeypatch, ["fixed1", "a", "b"])
+    cfg = _cfg()
+    now = datetime.now(timezone.utc)
+    accounts.X_VISITS.write_text(json.dumps({"a": (now - timedelta(days=4)).isoformat()}), encoding="utf-8")
+    accounts.list_todo(cfg, None, "popme")
+    accounts.mark_list(cfg, "a", "added")
+    _list_seen(1)
+    accounts.X_VISITS.write_text(json.dumps({**json.loads(accounts.X_VISITS.read_text(encoding="utf-8")),
+                                             "a": (now - timedelta(days=4)).isoformat()}), encoding="utf-8")
+    assert accounts.list_members(cfg) == set()
+    handles, since_by = accounts.x_plan(cfg, None, (now - timedelta(days=1)).isoformat(), limit=11)
+    assert "a" in handles and "a" in since_by  # 나흘 전부터 계정 페이지로
+    accounts.mark_x_visited(["a"])
+    assert accounts.list_members(cfg) == {"a"}
+    assert "a" not in accounts.x_plan(cfg, None, now.isoformat(), limit=11)[0]
