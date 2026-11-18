@@ -8,7 +8,7 @@ status = "ready"
 topic = 'ent'                 # filter = true인 출처를 거를 판별 규칙 (popme/topics.py)
 criteria = """
 - 범위: 기업의 AI 도입 — 모델 단종·가격·리전, 엔터프라이즈 기능, AI 보안·장애, 국내 규제·국내 LLM·클라우드, 도입 현장의 경험담과 업계 흐름.
-- 버린다: SDK·CLI 패치, 소비자용 기능, 벤더 마케팅·행사 홍보, 단순 투자·인수 보도.
+- 버린다: SDK·CLI 패치, 소비자용 기능, 벤더 마케팅·행사 홍보.
 - 쓸 때: Preview와 GA를 구분하고 날짜·대상 모델·영향 받는 경로(직접 API/Azure/Bedrock/Google)를 적는다. 벤치마크 수치는 「~라는 주장」으로.
 """
 discovery = '엔터프라이즈 도입·클라우드 AI·AI 보안·국내 규제에 실질 정보를 주는 사람'

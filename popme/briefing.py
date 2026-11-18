@@ -46,7 +46,11 @@ __CRITERIA__
   써 본 사람의 평가·비교·불만, 새로 뜨는 흐름도 소식이다 (데이터의 X·Threads·커뮤니티 구획).
   잡담·홍보·과장은 버린다.
 - 같은 소식은 카드 하나. 같은 모델·릴리스·사건이 공식 블로그·여러 커뮤니티·여러 사람 글에 동시에 실리는 일이 흔하다
-  (오픈 모델 하나가 열 곳 넘게 실리기도 한다). 그럴 땐 가장 공식적인 링크 1~2개만 고르고 카드는 하나로 합친다.
+  (오픈 모델 하나가 열 곳 넘게 실리기도 한다). 그럴 땐 카드는 하나로 합치고, 링크는 공식 출처 하나와
+  가장 화제가 된 글(X·Threads·커뮤니티) 하나를 단다. 공식 출처가 없으면 화제가 된 글만.
+- 「# 여러 사람이 반응한 글」은 내가 보는 사람 여럿이 같은 글에 반응한 것이다 — 업계에서 화제가 됐다는 신호다.
+  범위 안이면 공식 발표가 없어도 소식으로 고른다. 인용 글 아래 「↳ 원문」은 그 사람이 반응한 대상 글이다.
+- 업계 사건(투자·인수·인사 이동·경쟁사의 새 제품)도 범위 안 회사·도구·모델에 관한 것이면 고른다.
 - 인물의 말은 공식 변경내역·저장소(RSS 항목)와 맞춰 본다. 공식 출처로 확인되면 "확인됨", 사람 말뿐이면 "미확인".
 - 일정은 위젯이 따로 보여주므로 넣지 않는다.
 - "발굴" 카드는 데이터에 "# 발굴 후보" 목록이 있을 때만, 그 목록 안의 사람만. 대표글로 품질을 판단해
@@ -211,6 +215,56 @@ def late_posts(db, handle, since_iso, seen_after):
 
 
 SEARCH_LINES = 15  # 검색·태그 구획의 줄 수 (좋아요순)
+TALKED_DAYS = 7    # 「여러 사람이 반응한 글」: 이 기간 안의 반응을 센다 (돌아가며 보는 계정의 반응은 며칠에 걸쳐 들어온다)
+TALKED_MIN = 2     # 보는 계정 중 이만큼 반응해야
+TALKED_LINES = 15
+
+
+def _clip(text, n):
+    s = " ".join((text or "").split())
+    return s[:n] + ("…" if len(s) > n else "")
+
+
+def _status(t):
+    return t["link"] or f"https://x.com/{t['author']}/status/{t['id']}"
+
+
+def quoted_original(db, t):
+    """인용 글 t가 인용한 원문 (DB에 있고 남의 글일 때) 또는 None.
+    인용 글의 34%는 원문을 인용하는 사람 말뿐이고 그중 41%는 80자 미만이다(2026-11). 원문 작성자가 보는 계정이 아니면
+    원문이 재료에 없어서, 모델은 「neat」「1.0」만 보고 무슨 소식인지 알 수 없었다 (Grok Bot 1.0, Harness Leaderboard 등)."""
+    if t["kind"] != "quote" or not t["ref_id"]:
+        return None
+    rows = db.q("SELECT * FROM tweets WHERE id = ?", t["ref_id"])
+    return rows[0] if rows and (rows[0]["author"] or "").lower() != (t["author"] or "").lower() else None
+
+
+def talked_about(db, handles, fresh_after):
+    """여러 사람이 반응한 글 → [(원문, [반응한 handle])], 반응한 사람 수 순.
+    보는 X 계정(handles) 중 TALKED_MIN명 이상이 TALKED_DAYS 안에 그 원문을 인용·답글했고, 그 반응 중 하나라도
+    fresh_after 뒤에 받은 것 (지난 브리핑에 이미 올린 화제를 다시 올리지 않게). 반응은 그 계정 페이지에서 받은 자기 글만 센다.
+    좋아요 수는 이 신호가 못 된다: 보는 계정의 반응 큰 글 상위는 대부분 AI 밖 글이었다(2026-11, 35개 중 6개)."""
+    watched = {h.lower() for h in handles}
+    floor = (datetime.now(timezone.utc) - timedelta(days=TALKED_DAYS)).isoformat()
+    who, fresh = {}, set()
+    for r in db.q("SELECT ref_id, author, collected_at FROM tweets WHERE platform='x' AND kind IN ('quote', 'reply') "
+                  "AND ref_id IS NOT NULL AND created_at >= ? AND lower(via) = 'user:' || lower(author) "
+                  "AND lower(COALESCE(ref_author, '')) <> lower(author)", floor):
+        if r["author"].lower() not in watched:
+            continue
+        who.setdefault(r["ref_id"], {})[r["author"].lower()] = r["author"]
+        if not fresh_after or r["collected_at"] > fresh_after:
+            fresh.add(r["ref_id"])
+    out = []
+    for ref, people in sorted(who.items(), key=lambda kv: -len(kv[1])):
+        if len(people) < TALKED_MIN or ref not in fresh:
+            continue
+        rows = db.q("SELECT * FROM tweets WHERE id = ?", ref)
+        if rows:
+            out.append((rows[0], list(people.values())))
+        if len(out) >= TALKED_LINES:
+            break
+    return out
 
 
 def build_data(cfg, db, since_iso, with_events=False, late_since=None):
@@ -220,15 +274,27 @@ def build_data(cfg, db, since_iso, with_events=False, late_since=None):
         _, ev = events_block(db, cfg)
         parts.append("# 일정 (TimeTree)\n" + ev)
 
+    accts = accounts.core_accounts(cfg, db)
+    talked = talked_about(db, [a["handle"] for a in accts], late_since or since_iso)
+    if talked:
+        parts.append("# 여러 사람이 반응한 글 (내가 보는 계정 중 N명이 인용·답글 — 화제 신호)")
+        parts += [f"- [{len(who)}명: {', '.join('@' + h for h in who)}] @{o['author']} ♥{o['likes']}: {_clip(o['text'], 500)}"
+                  f" | {_status(o)}" for o, who in talked]
+
     parts.append("# X 핵심 계정" + (" (돌아가며 보는 계정은 며칠에 한 번 열어서, 이번에 처음 본 며칠 전 글도 있다"
                                     " — 앞의 날짜를 보고 쓴다)" if late_since else ""))
-    for a in accounts.core_accounts(cfg, db):
+    for a in accts:
         rows = db.q("SELECT * FROM tweets WHERE platform='x' AND author = ? COLLATE NOCASE AND created_at >= ? "
                     "ORDER BY created_at", a["handle"], since_iso)
         late = late_posts(db, a["handle"], since_iso, late_since) if late_since else []
         if rows or late:
             parts.append(f"## @{a['handle']} ({a['name']}) — {a['group']} / {a['focus']}")
-            parts += [_tweet_line(t) for t in late + rows[-25:]]  # 사이 글은 25개 자르기와 따로 (구간 글에 밀리지 않게)
+            # 계정당 개수 상한은 두지 않는다 (예전 25개는 2026-11-04~18 브리핑 594번 중 4번만 걸렸다)
+            for t in late + rows:
+                parts.append(_tweet_line(t))
+                o = quoted_original(db, t)
+                if o:  # 「- 」로 시작하지 않아 funnel의 줄 수에 안 들어간다
+                    parts.append(f"  ↳ 원문 @{o['author']} ♥{o['likes']}: {_clip(o['text'], 500)} | {_status(o)}")
 
     ko = db.q(f"SELECT * FROM tweets WHERE via LIKE '{VIA_X_SEARCH}%' AND lang='ko' AND created_at >= ? "
               f"ORDER BY likes DESC LIMIT {SEARCH_LINES}", since_iso)
