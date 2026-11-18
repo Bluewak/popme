@@ -221,11 +221,12 @@ class DB:
                         c.execute("UPDATE events SET deleted=1, change_kind='deleted', changed_at=? WHERE id=?",
                                   (ts, r["id"]))
 
-    def retire_calendars(self, source, keep=None, holidays=True):
+    def retire_calendars(self, source, keep=None, holidays=True, keep_legacy=False):
         """지금 일정 출처(source)가 아닌 캘린더의 일정을 지운다 → 지운 수. 수집이 실패했는지가 아니라 설정만 보고 정한다.
         예전엔 TimeTree → 구글 ICS로 바꾸거나 「안 씀」으로 바꿔도 예전 일정이 위젯에 계속 남았다.
         keep: 같은 출처 안에서 설정에 있는 캘린더 앞 부분들 (ics·caldav, 뺀 캘린더의 일정도 지운다).
         공휴일은 출처마다 id가 달라(TimeTree 숫자 / 구글 ICS uid@…) 바꾸면 두 번씩 보였다 — 다른 출처 것은 지운다.
+        keep_legacy: 예전 순서 id(ics0…)를 남긴다 — 새 id로 아직 다 못 받았을 때.
         「지워짐」 표시 대신 행을 지운다 (출처를 바꿀 때 「최근 지워짐」이 한꺼번에 뜨지 않게)."""
         def owner(cal_id):
             p = cal_id.split(":", 1)[0]
@@ -244,7 +245,8 @@ class DB:
                 from_ics = "@" in r["id"]
                 drop = from_ics if source == "timetree" else (not from_ics or not holidays)
             else:
-                drop = kind != source or (keep is not None and p not in keep)
+                legacy = keep_legacy and re.fullmatch(r"ics\d+", p)
+                drop = kind != source or (keep is not None and p not in keep and not legacy)
             if drop:
                 gone.append(r["id"])
         if gone:

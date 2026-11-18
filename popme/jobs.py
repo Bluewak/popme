@@ -194,9 +194,13 @@ class Jobs:
             cal = self.cfg.get("calendar", {})
             holidays = cal.get("holidays", True)
             if source == "ics":
-                self.db.upsert_events(*ics.collect(self.cfg, progress, warnings))
+                events, synced = ics.collect(self.cfg, progress, warnings)
+                self.db.upsert_events(events, synced)
                 keep = {ics.calendar_id(c).split(":", 1)[0] for c in cal.get("ics", []) if (c.get("url") or "").strip()}
-                self.db.retire_calendars("ics", keep, holidays)
+                # 예전 순서 id(ics0…) 일정은 설정된 캘린더가 모두 새 id로 받아졌을 때만 지운다
+                # (하나라도 받기에 실패하면 그 캘린더의 예전 일정이 남아 있어야 위젯이 비지 않는다)
+                done = {s.split(":", 1)[0] for s in synced}
+                self.db.retire_calendars("ics", keep, holidays, keep_legacy=not keep <= done)
             elif source == "caldav":
                 self.db.upsert_events(*caldav.collect(self.cfg, progress, warnings))
                 keep = {caldav.calendar_id(c).split(":", 1)[0]

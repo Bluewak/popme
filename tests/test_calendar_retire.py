@@ -56,3 +56,11 @@ def test_old_order_ids_are_dropped_after_switching_to_address_ids(tmp_path):
     db = DB(tmp_path / "t.db")
     db.upsert_events([ev("ics0:a", "ics0:집"), ev("ics1a2b3c4d:a", "ics1a2b3c4d:집")], ["ics1a2b3c4d:집"])
     assert db.retire_calendars("ics", {"ics1a2b3c4d"}) == 1 and titles(db) == ["ics1a2b3c4d:a"]
+
+
+def test_old_order_ids_stay_while_a_calendar_has_not_synced_yet(tmp_path):
+    """업그레이드 뒤 첫 수집에서 캘린더 하나가 받기에 실패해도 그 캘린더의 예전 일정이 남는다."""
+    db = DB(tmp_path / "t.db")
+    db.upsert_events([ev("ics0:a", "ics0:집"), ev("ics1a2b3c4d:a", "ics1a2b3c4d:집")], ["ics1a2b3c4d:집"])
+    assert db.retire_calendars("ics", {"ics1a2b3c4d", "ics99999999"}, keep_legacy=True) == 0
+    assert titles(db) == ["ics0:a", "ics1a2b3c4d:a"]
