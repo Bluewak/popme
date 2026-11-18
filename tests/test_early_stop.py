@@ -169,20 +169,45 @@ class ListPage(FakePage):
 LIST_GQL = "https://x.com/i/api/graphql/abc/ListLatestTweetsTimeline"
 
 
+def list_batch(entries):
+    """리스트 응답: 타임라인 글마다 itemContent.tweet_results 한 칸."""
+    return {"data": {"list": {"tweets_timeline": {"timeline": {"instructions": [{"entries": [
+        {"content": {"itemContent": {"tweet_results": {"result": t}}}} for t in entries]}]}}}}}
+
+
+def retweet_of_old_quote(i, when):
+    """최근 리트윗 → 오래된 인용 글 → 더 오래된 원문. walk로 펼치면 셋 중 둘이 오래된 글."""
+    original = x_tweet(f"o{i}", "c", OLD)
+    quote = {**x_tweet(f"q{i}", "b", OLD), "quoted_status_result": {"result": original}}
+    rt = x_tweet(f"r{i}", "a", when)
+    rt["legacy"]["retweeted_status_result"] = {"result": quote}
+    return rt
+
+
 def test_x_list_scrolls_until_since_then_stops(monkeypatch):
     monkeypatch.setattr(x, "dump_raw", lambda *a, **k: None)
-    page = ListPage([x_batch(0, NEW), x_batch(10, NEW), x_batch(20, OLD), x_batch(30, OLD)])
+    batch = lambda start, when: list_batch([x_tweet(start + i, "me", when) for i in range(5)])
+    page = ListPage([batch(0, NEW), batch(10, NEW), batch(20, OLD), batch(30, OLD)])
     page.goto = lambda url, **_: (setattr(page, "url", LIST_GQL), page.emit())
     out = []
     got = x._visit_list(page, "https://x.com/i/lists/123456789", "list:123456789", SINCE, out, set())
     assert page.scrolls == 2 and got == 15 and {t["via"] for t in out} == {"list:123456789"}
 
 
+def test_x_list_does_not_stop_on_old_originals_inside_new_retweets(monkeypatch):
+    """Codex 리뷰(#61): 최근 리트윗이 오래된 인용 글을 담고 있으면 펼친 글의 2/3가 오래된 글 — 그래도 멈추지 않는다."""
+    monkeypatch.setattr(x, "dump_raw", lambda *a, **k: None)
+    page = ListPage([list_batch([retweet_of_old_quote(i, NEW) for i in range(5)]),
+                     list_batch([retweet_of_old_quote(10 + i, NEW) for i in range(5)]),
+                     list_batch([x_tweet(20 + i, "me", OLD) for i in range(5)])])
+    page.goto = lambda url, **_: (setattr(page, "url", LIST_GQL), page.emit())
+    x._visit_list(page, "https://x.com/i/lists/123456789", "list:123456789", SINCE, [], set())
+    assert page.scrolls == 2
+
+
 def test_x_list_reached_needs_most_of_the_last_batch_old():
-    """인용·리트윗 원문(오래된 글)이 몇 개 섞여도 멈추지 않는다."""
-    new, old = post("a", NEW), post("b", OLD)
-    assert not x._list_reached([new, new, old], SINCE)
-    assert x._list_reached([new, old, old], SINCE)
+    assert not x._list_reached([NEW, NEW, OLD], SINCE)
+    assert x._list_reached([NEW, OLD, OLD], SINCE)
     assert not x._list_reached([], SINCE)
 
 

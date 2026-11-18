@@ -72,11 +72,29 @@ def list_name(data, lid):
     return found[0] if found else None
 
 
-def _list_reached(tweets, since):
-    """마지막 응답의 글이 절반 넘게 since보다 오래됐으면 그 아래는 이미 받은 구간이다.
-    응답에는 인용·리트윗 원문(더 오래된 글)도 섞여 오므로 하나가 아니라 절반으로 본다."""
-    dated = [t["created_at"] for t in tweets if t.get("created_at")]
-    return bool(dated) and sum(1 for c in dated if c < since) * 2 > len(dated)
+def timeline_entries(obj, out=None):
+    """응답에서 타임라인에 직접 올라온 글의 created_at만 (리트윗이면 리트윗한 시각). walk는 인용·리트윗 원문까지 펼쳐서,
+    최근 리트윗이 오래된 인용 글을 담고 있으면 펼친 글의 2/3가 오래된 글이 된다 — 그걸로 멈출지 정하면 새 글을 남기고 멈췄다."""
+    out = [] if out is None else out
+    if isinstance(obj, dict):
+        item = obj.get("itemContent")
+        if isinstance(item, dict) and "tweet_results" in item:
+            p = parse_tweet((item["tweet_results"] or {}).get("result") or {})
+            if p and p["created_at"]:
+                out.append(p["created_at"])
+            return out
+        for v in obj.values():
+            timeline_entries(v, out)
+    elif isinstance(obj, list):
+        for v in obj:
+            timeline_entries(v, out)
+    return out
+
+
+def _list_reached(dates, since):
+    """마지막 응답의 타임라인 글(timeline_entries)이 절반 넘게 since보다 오래됐으면 그 아래는 이미 받은 구간이다.
+    하나가 아니라 절반: 고정글이나 늦게 퍼진 리트윗 하나로 멈추지 않게."""
+    return bool(dates) and sum(1 for c in dates if c < since) * 2 > len(dates)
 
 
 def _unwrap(t):
@@ -256,7 +274,7 @@ def _visit_list(page, url, via, since, sink, ops_seen, users=None, meta=None):
     """리스트 타임라인 → 받은 글 수. since(UTC ISO)까지 내려가면 멈춘다 (최대 LIST_SCROLLS번).
     리스트는 보는 계정 전체의 글을 시간순으로 한 페이지에 준다 — 계정 페이지를 30개씩 돌아가며 열면 한 바퀴에 5일쯤 걸려,
     그 사이 글의 56%가 어느 브리핑에도 못 들어갔다(2026-11-04~18). 계정 페이지가 안 주는 리트윗도 온다."""
-    responses, parsed = [], []
+    responses, parsed, tops = [], [], []  # tops: 응답마다 타임라인 글의 시각
 
     def handler(r):
         if "/i/api/graphql/" in r.url and not any(s in _op(r.url) for s in SKIP_OPS):
@@ -273,6 +291,7 @@ def _visit_list(page, url, via, since, sink, ops_seen, users=None, meta=None):
             tweets = []
             if data is not None:
                 walk(data, tweets, users)
+                tops.append(timeline_entries(data))
                 if meta is not None and "name" not in meta:
                     name = list_name(data, via.split(":", 1)[-1])
                     if name:
@@ -288,7 +307,7 @@ def _visit_list(page, url, via, since, sink, ops_seen, users=None, meta=None):
             raise NeedLogin(f"X 로그인이 필요해요 ({page.url})")
         for _ in range(LIST_SCROLLS):
             drain()
-            last = next((ts for _, _, ts in reversed(parsed) if ts), [])
+            last = next((d for d in reversed(tops) if d), [])
             if since and _list_reached(last, since):
                 break
             page.evaluate("window.scrollBy(0, document.body.scrollHeight)")
