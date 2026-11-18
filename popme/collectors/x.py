@@ -31,9 +31,10 @@ def list_id(url):
     return m.group(1) if m else None
 
 
-def add_to_list(page, handle, list_name):
-    """계정 페이지 「…」 → Add/remove from Lists → list_name 줄을 체크 → Save. → "added" | "already" (이미 체크돼 있음).
-    사람이 하듯 한 번에 한 계정. 실패하면 예외 (계정이 없어졌거나 화면이 바뀜)."""
+def set_list_membership(page, handle, list_name, member=True):
+    """계정 페이지 「…」 → Add/remove from Lists → list_name 줄 체크를 member에 맞춘다 → Save.
+    → "added" | "already" (넣으려는데 이미 있음) | "removed" | "absent" (빼려는데 이미 없음). 사람이 하듯 한 번에 한 계정.
+    실패하면 예외 (계정이 없어졌거나 화면이 바뀜)."""
     page.goto(f"https://x.com/{handle}", wait_until="domcontentloaded", timeout=45000)
     page.wait_for_timeout(random.uniform(3500, 5500))
     if any(m in page.url for m in BLOCK_MARKERS):
@@ -44,18 +45,18 @@ def add_to_list(page, handle, list_name):
     page.wait_for_timeout(random.uniform(2000, 3000))
     dlg = page.get_by_role("dialog")
     row = dlg.locator("[data-testid=listCell]").filter(has_text=list_name).first
-    if row.get_attribute("aria-checked", timeout=15000) == "true":
+    if (row.get_attribute("aria-checked", timeout=15000) == "true") == member:
         page.keyboard.press("Escape")
-        return "already"
+        return "already" if member else "absent"
     row.click()
     page.wait_for_timeout(random.uniform(800, 1400))
     dlg.get_by_role("button", name="Save").first.click(timeout=15000)
     page.wait_for_timeout(random.uniform(1500, 2500))
-    return "added"
+    return "added" if member else "removed"
 
 
 def list_name(data, lid):
-    """리스트 화면의 응답에서 리스트 이름 (add_to_list가 대화상자에서 줄을 찾을 때). 없으면 None."""
+    """리스트 화면의 응답에서 리스트 이름 (set_list_membership이 대화상자에서 줄을 찾을 때). 없으면 None."""
     found = []
 
     def walk_(o):
@@ -371,20 +372,21 @@ def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None,
     return out
 
 
-def sync_list(ctx, handles, name, on_result, progress=lambda s: None):
-    """보는 계정 중 리스트에 아직 없는 handles를 하나씩 넣는다 (사람 속도, 계정 사이 6~12초).
-    on_result(handle, "added" | "already" | "failed")로 하나씩 알린다 — 중간에 끊겨도 넣은 데까지 남게.
+def sync_list(ctx, adds, removes, name, on_result, progress=lambda s: None):
+    """리스트에 adds를 넣고 removes를 뺀다 (사람 속도, 계정 사이 6~12초).
+    on_result(handle, set_list_membership 결과 | "failed")로 하나씩 알린다 — 중간에 끊겨도 한 데까지 남게.
     로그인이 풀렸으면 멈춘다 (NeedLogin을 그대로 올린다)."""
+    work = [(h, True) for h in adds] + [(h, False) for h in removes]
     page = chrome.new_page(ctx)
     try:
-        for i, h in enumerate(handles):
-            progress(f"X 리스트에 계정 넣는 중 {i + 1}/{len(handles)}")
+        for i, (h, member) in enumerate(work):
+            progress(f"X 리스트 정리 중 {i + 1}/{len(work)}")
             try:
-                on_result(h, add_to_list(page, h, name))
+                on_result(h, set_list_membership(page, h, name, member))
             except NeedLogin:
                 raise
             except Exception as e:
-                log.warning("X 리스트에 @%s 넣기 실패: %s", h, e)
+                log.warning("X 리스트 @%s %s 실패: %s", h, "넣기" if member else "빼기", e)
                 on_result(h, "failed")
             page.wait_for_timeout(random.uniform(6000, 12000))
     finally:

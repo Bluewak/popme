@@ -250,13 +250,13 @@ class Jobs:
         progress("X 완료")
 
     def _sync_x_list(self, ctx, name, warnings, progress):
-        """보는 계정 중 X 리스트에 아직 없는 것을 하루 LIST_ADD_PER_DAY개까지 넣는다. 실패해도 수집은 그대로
+        """X 리스트를 보는 계정에 맞춘다 (넣기·빼기 합쳐 하루 LIST_ADD_PER_DAY개, accounts.list_todo). 실패해도 수집은 그대로
         (리스트에 없는 계정은 계정 페이지로 돌아가며 본다)."""
-        todo, name = accounts.list_todo(self.cfg, self.db, name)
-        if not todo:
+        adds, removes, name = accounts.list_todo(self.cfg, self.db, name)
+        if not adds and not removes:
             return
         try:
-            x.sync_list(ctx, todo, name, lambda h, r: accounts.mark_list(self.cfg, h, r), progress)
+            x.sync_list(ctx, adds, removes, name, lambda h, r: accounts.mark_list(self.cfg, h, r), progress)
         except NeedLogin as e:
             warnings.append(str(e))
         except Exception as e:
