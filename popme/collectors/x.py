@@ -44,7 +44,13 @@ def set_list_membership(page, handle, list_name, member=True):
     page.get_by_role("menuitem").filter(has_text="List").first.click(timeout=15000)
     page.wait_for_timeout(random.uniform(2000, 3000))
     dlg = page.get_by_role("dialog")
-    row = dlg.locator("[data-testid=listCell]").filter(has_text=list_name).first
+    # 이름이 정확히 같은 줄 하나만. 「AI」로 찾으면 「AI research」도 걸려 엉뚱한 리스트를 바꿀 수 있다 (Codex 리뷰 #61)
+    rows = dlg.locator("[data-testid=listCell]").filter(has=page.get_by_text(list_name, exact=True))
+    n = rows.count()
+    if n != 1:
+        page.keyboard.press("Escape")
+        raise RuntimeError(f"리스트 「{list_name}」 줄이 {n}개예요 (1개여야 함)")
+    row = rows.first
     if (row.get_attribute("aria-checked", timeout=15000) == "true") == member:
         page.keyboard.press("Escape")
         return "already" if member else "absent"
@@ -271,7 +277,8 @@ def check_profiles(ctx, handles, progress=lambda s: None, users=None):
 
 
 def _visit_list(page, url, via, since, sink, ops_seen, users=None, meta=None):
-    """리스트 타임라인 → 받은 글 수. since(UTC ISO)까지 내려가면 멈춘다 (최대 LIST_SCROLLS번).
+    """리스트 타임라인 → (받은 글 수, since까지 내려갔는가). since(UTC ISO)까지 내려가면 멈춘다 (최대 LIST_SCROLLS번).
+    못 내려갔으면 「봤다」로 남기면 안 된다 — 다음 기준 시각이 지금으로 당겨져 그 사이 글을 영영 못 받는다 (Codex 리뷰 #61).
     리스트는 보는 계정 전체의 글을 시간순으로 한 페이지에 준다 — 계정 페이지를 30개씩 돌아가며 열면 한 바퀴에 5일쯤 걸려,
     그 사이 글의 56%가 어느 브리핑에도 못 들어갔다(2026-11-04~18). 계정 페이지가 안 주는 리트윗도 온다."""
     responses, parsed, tops = [], [], []  # tops: 응답마다 타임라인 글의 시각
@@ -316,8 +323,9 @@ def _visit_list(page, url, via, since, sink, ops_seen, users=None, meta=None):
     finally:
         page.remove_listener("response", handler)
     drain()
-    if since and done == LIST_SCROLLS:
-        log.info("X 리스트: 스크롤 %d번으로 %s까지 못 내려감", done, since[:16])
+    complete = not since or _list_reached(next((d for d in reversed(tops) if d), []), since)
+    if not complete:
+        log.info("X 리스트: 스크롤 %d번으로 %s까지 못 내려감 — 본 것으로 남기지 않음", done, since[:16])
     got = 0
     for r, data, tweets in parsed:
         if not tweets:
@@ -328,7 +336,7 @@ def _visit_list(page, url, via, since, sink, ops_seen, users=None, meta=None):
         sink.extend(tweets)
         got += len(tweets)
     log.info("X 리스트: 트윗 %d개 (GraphQL 응답 %d개, 스크롤 %d번)", got, len(responses), done)
-    return got
+    return got, complete
 
 
 def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None, on_batch=None, since_by=None,
@@ -337,7 +345,7 @@ def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None,
     since_by({handle 소문자: UTC ISO}): 그 계정만 다른 시각까지, 스크롤도 DEEP_SCROLLS번까지 (돌아가며 보는 계정 — 지난번에 본 시각).
     [x] list_url이 있으면 계정 페이지를 다 본 뒤 리스트도 본다 (list_since까지). 같은 글은 처음 받은 경로(via)가 남으므로
     맨 마지막에 봐야 날마다 여는 계정의 글이 계정 페이지 경로로 남는다 — 리스트로 옮기기 전 나란히 견줘 보는 기간.
-    리스트를 정상으로 봤으면 visited에 "list:<ID>"를 넣는다. list_meta(dict)에는 리스트 이름을 담는다 (동기화용).
+    리스트를 list_since까지 다 봤으면 visited에 "list:<ID>"를 넣는다. list_meta(dict)에는 리스트 이름을 담는다 (동기화용).
     visited(list): 정상으로 연 계정 페이지(글이 0개여도)의 handle을 차례로 넣는다 (중간에 실패해도 그때까지 본 것).
     users(dict): 응답에 실린 계정 규모(팔로워 등)를 모아 둘 곳. 반환: 파싱된 트윗 리스트.
     on_batch(새 트윗들): 페이지 하나를 볼 때마다 — 중간에 끊겨도 모은 데까지 저장되게."""
@@ -381,8 +389,11 @@ def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None,
         if lid:
             progress("X 리스트 수집 중")
             before = len(out)
-            if _visit_list(page, f"https://x.com/i/lists/{lid}", f"{VIA_X_LIST}{lid}", list_since or since, out, ops_seen,
-                           users, list_meta) and visited is not None:
+            got, complete = _visit_list(page, f"https://x.com/i/lists/{lid}", f"{VIA_X_LIST}{lid}", list_since or since, out,
+                                        ops_seen, users, list_meta)
+            # 끝까지 못 내려갔으면 본 것으로 남기지 않는다: 다음에도 같은 기준 시각부터 읽고,
+            # 48시간이 지나면 리스트 계정이 다시 계정 페이지로 돌아간다 (accounts.list_members)
+            if got and complete and visited is not None:
                 visited.append(f"{VIA_X_LIST}{lid}")
             if on_batch and len(out) > before:
                 on_batch(out[before:])
