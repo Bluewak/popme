@@ -191,3 +191,22 @@ def test_talked_about_needs_two_watched_people_and_a_fresh_reaction(tmp_path, mo
 def test_briefing_rules_ask_for_official_and_talked_links():
     assert "가장 공식적인 링크 1~2개만" not in briefing.BRIEFING_RULES
     assert "공식 출처 하나와" in briefing.BRIEFING_RULES and "# 여러 사람이 반응한 글" in briefing.BRIEFING_RULES
+
+
+def test_list_since_starts_from_last_list_visit(tmp_path, monkeypatch):
+    since = (datetime.now(timezone.utc) - timedelta(hours=20)).isoformat()
+    cfg = {"x": {"list_url": "https://x.com/i/lists/123456789"}}
+    assert accounts.list_since(cfg, since) == since  # 처음
+    seen = datetime.now(timezone.utc) - timedelta(days=2)
+    accounts.X_VISITS.write_text(json.dumps({"list:123456789": seen.isoformat()}), encoding="utf-8")
+    assert accounts.list_since(cfg, since) == (seen - timedelta(hours=1)).isoformat()
+    assert accounts.list_since({"x": {}}, since) == since
+
+
+def test_talked_about_counts_reactions_seen_on_the_list(tmp_path):
+    db = _db(tmp_path)
+    now = datetime.now(timezone.utc)
+    _post(db, "hot", "OpenAI", "list:1", now - timedelta(hours=9), now - timedelta(hours=1))
+    _post(db, "r1", "swyx", "list:1", now - timedelta(hours=8), now - timedelta(hours=1), kind="quote", ref="hot", ref_author="OpenAI")
+    _post(db, "r2", "theo", "user:theo", now - timedelta(hours=8), now - timedelta(hours=1), kind="quote", ref="hot", ref_author="OpenAI")
+    assert [o["id"] for o, _ in briefing.talked_about(db, ["swyx", "theo"], None)] == ["hot"]

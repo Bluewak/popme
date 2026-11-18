@@ -58,6 +58,7 @@ def no_custom_profiles(monkeypatch, tmp_path):
 def no_x_visits(monkeypatch, tmp_path):
     from popme import accounts
     monkeypatch.setattr(accounts, "X_VISITS", tmp_path / "x-visits.json")
+    monkeypatch.setattr(accounts, "X_LIST", tmp_path / "x-list.json")
 
 
 @pytest.fixture(autouse=True)

@@ -1,4 +1,6 @@
 """계정 페이지 '열자마자 판단': 지난 브리핑 이전 글까지 내려왔으면 스크롤을 멈춘다."""
+import pytest
+
 from popme.collectors import reached_since, threads, x
 
 SINCE = "2026-10-08T00:00:00+00:00"
@@ -156,3 +158,161 @@ def test_threads_profile_owner_followers_from_separate_script(monkeypatch):
     users = {}
     threads._visit(page, "https://www.threads.com/@me", "th-check:me", 2, [], users=users)
     assert users["me"]["followers"] == 12345
+
+
+class ListPage(FakePage):
+    """리스트 페이지: 휠 대신 페이지 안 스크롤(evaluate)로 더 불러온다."""
+
+    def evaluate(self, _js):
+        self.scrolls += 1
+        self.emit()
+
+
+LIST_GQL = "https://x.com/i/api/graphql/abc/ListLatestTweetsTimeline"
+
+
+def list_batch(entries):
+    """리스트 응답: 타임라인 글마다 itemContent.tweet_results 한 칸."""
+    return {"data": {"list": {"tweets_timeline": {"timeline": {"instructions": [{"entries": [
+        {"content": {"itemContent": {"tweet_results": {"result": t}}}} for t in entries]}]}}}}}
+
+
+def retweet_of_old_quote(i, when):
+    """최근 리트윗 → 오래된 인용 글 → 더 오래된 원문. walk로 펼치면 셋 중 둘이 오래된 글."""
+    original = x_tweet(f"o{i}", "c", OLD)
+    quote = {**x_tweet(f"q{i}", "b", OLD), "quoted_status_result": {"result": original}}
+    rt = x_tweet(f"r{i}", "a", when)
+    rt["legacy"]["retweeted_status_result"] = {"result": quote}
+    return rt
+
+
+def test_x_list_scrolls_until_since_then_stops(monkeypatch):
+    monkeypatch.setattr(x, "dump_raw", lambda *a, **k: None)
+    batch = lambda start, when: list_batch([x_tweet(start + i, "me", when) for i in range(5)])
+    page = ListPage([batch(0, NEW), batch(10, NEW), batch(20, OLD), batch(30, OLD)])
+    page.goto = lambda url, **_: (setattr(page, "url", LIST_GQL), page.emit())
+    out = []
+    got, complete = x._visit_list(page, "https://x.com/i/lists/123456789", "list:123456789", SINCE, out, set())
+    assert page.scrolls == 2 and got == 15 and complete and {t["via"] for t in out} == {"list:123456789"}
+
+
+def test_x_list_not_complete_when_scrolls_run_out(monkeypatch):
+    """Codex 리뷰(#61): since까지 못 내려갔으면 받은 글은 두되 「다 봤다」고 하지 않는다 (본 것으로 남기면 그 사이 글을 영영 놓침)."""
+    monkeypatch.setattr(x, "dump_raw", lambda *a, **k: None)
+    monkeypatch.setattr(x, "LIST_SCROLLS", 2)
+    batch = lambda start: list_batch([x_tweet(start + i, "me", NEW) for i in range(5)])
+    page = ListPage([batch(0), batch(10), batch(20), batch(30)])
+    page.goto = lambda url, **_: (setattr(page, "url", LIST_GQL), page.emit())
+    got, complete = x._visit_list(page, "https://x.com/i/lists/123456789", "list:123456789", SINCE, [], set())
+    assert page.scrolls == 2 and got == 15 and not complete
+
+
+def test_x_list_does_not_stop_on_old_originals_inside_new_retweets(monkeypatch):
+    """Codex 리뷰(#61): 최근 리트윗이 오래된 인용 글을 담고 있으면 펼친 글의 2/3가 오래된 글 — 그래도 멈추지 않는다."""
+    monkeypatch.setattr(x, "dump_raw", lambda *a, **k: None)
+    page = ListPage([list_batch([retweet_of_old_quote(i, NEW) for i in range(5)]),
+                     list_batch([retweet_of_old_quote(10 + i, NEW) for i in range(5)]),
+                     list_batch([x_tweet(20 + i, "me", OLD) for i in range(5)])])
+    page.goto = lambda url, **_: (setattr(page, "url", LIST_GQL), page.emit())
+    x._visit_list(page, "https://x.com/i/lists/123456789", "list:123456789", SINCE, [], set())
+    assert page.scrolls == 2
+
+
+def test_x_list_reached_needs_most_of_the_last_batch_old():
+    assert not x._list_reached([NEW, NEW, OLD], SINCE)
+    assert x._list_reached([NEW, OLD, OLD], SINCE)
+    assert not x._list_reached([], SINCE)
+
+
+def test_list_id_accepts_url_or_number():
+    assert x.list_id("https://x.com/i/lists/2122938785910669775") == "2122938785910669775"
+    assert x.list_id("2122938785910669775") == "2122938785910669775"
+    assert x.list_id("") is None and x.list_id("https://x.com/me") is None
+
+
+class _Rows:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def filter(self, has=None, has_text=None):
+        if has is not None:
+            return _Rows([r for r in self.rows if r["name"] == has])  # get_by_text(exact=True) → 이름 그대로
+        return _Rows([r for r in self.rows if has_text in r["name"]])
+
+    def count(self):
+        return len(self.rows)
+
+    @property
+    def first(self):
+        return _Row(self.rows[0])
+
+
+class _Row:
+    def __init__(self, r):
+        self.r = r
+
+    def get_attribute(self, _name, **_):
+        return "true" if self.r["checked"] else "false"
+
+    def click(self, **_):
+        self.r["checked"] = not self.r["checked"]
+
+
+class _Clickable:
+    def __init__(self, page, rows=None):
+        self.page, self.rows = page, rows
+
+    def locator(self, _sel):
+        return _Rows(self.page.lists) if self.rows is None else self
+
+    def filter(self, **_):
+        return self
+
+    def get_by_role(self, *_a, **_k):
+        return self
+
+    @property
+    def first(self):
+        return self
+
+    def click(self, **_):
+        pass
+
+
+class MembershipPage:
+    """프로필 「…」 → List → 대화상자. lists: [{"name", "checked"}]."""
+
+    def __init__(self, lists):
+        self.lists, self.url, self.pressed = lists, "", []
+        self.keyboard = type("K", (), {"press": lambda _s, k: self.pressed.append(k)})()
+
+    def goto(self, url, **_):
+        self.url = url
+
+    def wait_for_timeout(self, _ms):
+        pass
+
+    def locator(self, _sel):
+        return _Clickable(self, rows=False)
+
+    def get_by_role(self, role, **_):
+        return _Clickable(self) if role == "dialog" else _Clickable(self, rows=False)
+
+    def get_by_text(self, text, exact=False):
+        assert exact
+        return text
+
+
+def test_list_membership_picks_exact_name_not_substring():
+    """Codex 리뷰(#61): 「AI」를 찾을 때 「AI research」를 고르면 엉뚱한 리스트를 바꾼다."""
+    lists = [{"name": "AI research", "checked": False}, {"name": "AI", "checked": False}]
+    assert x.set_list_membership(MembershipPage(lists), "someone", "AI") == "added"
+    assert lists == [{"name": "AI research", "checked": False}, {"name": "AI", "checked": True}]
+
+
+def test_list_membership_refuses_when_name_is_ambiguous_or_missing():
+    for lists in ([{"name": "AI", "checked": False}, {"name": "AI", "checked": False}], [{"name": "AI research", "checked": False}]):
+        page = MembershipPage(lists)
+        with pytest.raises(RuntimeError):
+            x.set_list_membership(page, "someone", "AI")
+        assert page.pressed == ["Escape"] and not any(r["checked"] for r in lists)

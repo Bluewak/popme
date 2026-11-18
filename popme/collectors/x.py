@@ -6,11 +6,12 @@
 import json
 import logging
 import random
+import re
 from datetime import datetime, timezone
 from urllib.parse import quote
 
 from popme import chrome
-from popme.collectors import VIA_X_CHECK, VIA_X_SEARCH, VIA_X_USER, NeedLogin, dump_raw, reached_since
+from popme.collectors import VIA_X_CHECK, VIA_X_LIST, VIA_X_SEARCH, VIA_X_USER, NeedLogin, dump_raw, reached_since
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +22,85 @@ BLOCK_MARKERS = ("/login", "/i/flow/login", "/account/access", "/i/flow/consent"
 # 돌아가며 보는 계정(since_by)은 며칠 치를 내려가야 해서 스크롤 상한을 따로. 5~6일에 한 번 여는 계정이라
 # 하루로 나누면 매일 열어 1번 스크롤하던 때와 요청 수가 같다. 그래도 못 닿으면 로그를 남긴다
 DEEP_SCROLLS = 6
+LIST_SCROLLS = 20  # 리스트 한 번에 최대 스크롤. 한 번에 글 약 90개 — 계정 100개의 하루치가 5번 안팎 (2026-11 시험)
+
+
+def list_id(url):
+    """리스트 주소 → ID (x.com/i/lists/123…). 숫자만 줘도 된다. 모르는 모양이면 None."""
+    m = re.search(r"(?:lists/)?(\d{6,})", url or "")
+    return m.group(1) if m else None
+
+
+def set_list_membership(page, handle, list_name, member=True):
+    """계정 페이지 「…」 → Add/remove from Lists → list_name 줄 체크를 member에 맞춘다 → Save.
+    → "added" | "already" (넣으려는데 이미 있음) | "removed" | "absent" (빼려는데 이미 없음). 사람이 하듯 한 번에 한 계정.
+    실패하면 예외 (계정이 없어졌거나 화면이 바뀜)."""
+    page.goto(f"https://x.com/{handle}", wait_until="domcontentloaded", timeout=45000)
+    page.wait_for_timeout(random.uniform(3500, 5500))
+    if any(m in page.url for m in BLOCK_MARKERS):
+        raise NeedLogin(f"X 로그인이 필요해요 ({page.url})")
+    page.locator("[data-testid=userActions]").first.click(timeout=15000)
+    page.wait_for_timeout(random.uniform(900, 1600))
+    page.get_by_role("menuitem").filter(has_text="List").first.click(timeout=15000)
+    page.wait_for_timeout(random.uniform(2000, 3000))
+    dlg = page.get_by_role("dialog")
+    # 이름이 정확히 같은 줄 하나만. 「AI」로 찾으면 「AI research」도 걸려 엉뚱한 리스트를 바꿀 수 있다 (Codex 리뷰 #61)
+    rows = dlg.locator("[data-testid=listCell]").filter(has=page.get_by_text(list_name, exact=True))
+    n = rows.count()
+    if n != 1:
+        page.keyboard.press("Escape")
+        raise RuntimeError(f"리스트 「{list_name}」 줄이 {n}개예요 (1개여야 함)")
+    row = rows.first
+    if (row.get_attribute("aria-checked", timeout=15000) == "true") == member:
+        page.keyboard.press("Escape")
+        return "already" if member else "absent"
+    row.click()
+    page.wait_for_timeout(random.uniform(800, 1400))
+    dlg.get_by_role("button", name="Save").first.click(timeout=15000)
+    page.wait_for_timeout(random.uniform(1500, 2500))
+    return "added" if member else "removed"
+
+
+def list_name(data, lid):
+    """리스트 화면의 응답에서 리스트 이름 (set_list_membership이 대화상자에서 줄을 찾을 때). 없으면 None."""
+    found = []
+
+    def walk_(o):
+        if isinstance(o, dict):
+            if str(o.get("id_str") or o.get("rest_id") or "") == lid and o.get("name") and "member_count" in o:
+                found.append(o["name"])
+            for v in o.values():
+                walk_(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk_(v)
+    walk_(data)
+    return found[0] if found else None
+
+
+def timeline_entries(obj, out=None):
+    """응답에서 타임라인에 직접 올라온 글의 created_at만 (리트윗이면 리트윗한 시각). walk는 인용·리트윗 원문까지 펼쳐서,
+    최근 리트윗이 오래된 인용 글을 담고 있으면 펼친 글의 2/3가 오래된 글이 된다 — 그걸로 멈출지 정하면 새 글을 남기고 멈췄다."""
+    out = [] if out is None else out
+    if isinstance(obj, dict):
+        item = obj.get("itemContent")
+        if isinstance(item, dict) and "tweet_results" in item:
+            p = parse_tweet((item["tweet_results"] or {}).get("result") or {})
+            if p and p["created_at"]:
+                out.append(p["created_at"])
+            return out
+        for v in obj.values():
+            timeline_entries(v, out)
+    elif isinstance(obj, list):
+        for v in obj:
+            timeline_entries(v, out)
+    return out
+
+
+def _list_reached(dates, since):
+    """마지막 응답의 타임라인 글(timeline_entries)이 절반 넘게 since보다 오래됐으면 그 아래는 이미 받은 구간이다.
+    하나가 아니라 절반: 고정글이나 늦게 퍼진 리트윗 하나로 멈추지 않게."""
+    return bool(dates) and sum(1 for c in dates if c < since) * 2 > len(dates)
 
 
 def _unwrap(t):
@@ -196,10 +276,76 @@ def check_profiles(ctx, handles, progress=lambda s: None, users=None):
     return out
 
 
+def _visit_list(page, url, via, since, sink, ops_seen, users=None, meta=None):
+    """리스트 타임라인 → (받은 글 수, since까지 내려갔는가). since(UTC ISO)까지 내려가면 멈춘다 (최대 LIST_SCROLLS번).
+    못 내려갔으면 「봤다」로 남기면 안 된다 — 다음 기준 시각이 지금으로 당겨져 그 사이 글을 영영 못 받는다 (Codex 리뷰 #61).
+    리스트는 보는 계정 전체의 글을 시간순으로 한 페이지에 준다 — 계정 페이지를 30개씩 돌아가며 열면 한 바퀴에 5일쯤 걸려,
+    그 사이 글의 56%가 어느 브리핑에도 못 들어갔다(2026-11-04~18). 계정 페이지가 안 주는 리트윗도 온다."""
+    responses, parsed, tops = [], [], []  # tops: 응답마다 타임라인 글의 시각
+
+    def handler(r):
+        if "/i/api/graphql/" in r.url and not any(s in _op(r.url) for s in SKIP_OPS):
+            responses.append(r)
+
+    def drain():
+        while len(parsed) < len(responses):
+            r = responses[len(parsed)]
+            ops_seen.add(_op(r.url))
+            try:
+                data = r.json()
+            except Exception:
+                data = None
+            tweets = []
+            if data is not None:
+                walk(data, tweets, users)
+                tops.append(timeline_entries(data))
+                if meta is not None and "name" not in meta:
+                    name = list_name(data, via.split(":", 1)[-1])
+                    if name:
+                        meta["name"] = name
+            parsed.append((r, data, tweets))
+
+    page.on("response", handler)
+    done = 0
+    try:
+        page.goto(url, wait_until="domcontentloaded", timeout=45000)
+        page.wait_for_timeout(random.uniform(3000, 5000))
+        if any(m in page.url for m in BLOCK_MARKERS):
+            raise NeedLogin(f"X 로그인이 필요해요 ({page.url})")
+        for _ in range(LIST_SCROLLS):
+            drain()
+            last = next((d for d in reversed(tops) if d), [])
+            if since and _list_reached(last, since):
+                break
+            page.evaluate("window.scrollBy(0, document.body.scrollHeight)")
+            page.wait_for_timeout(random.uniform(2500, 5000))
+            done += 1
+    finally:
+        page.remove_listener("response", handler)
+    drain()
+    complete = not since or _list_reached(next((d for d in reversed(tops) if d), []), since)
+    if not complete:
+        log.info("X 리스트: 스크롤 %d번으로 %s까지 못 내려감 — 본 것으로 남기지 않음", done, since[:16])
+    got = 0
+    for r, data, tweets in parsed:
+        if not tweets:
+            continue
+        dump_raw("x", f"{via}_{_op(r.url)}".replace(":", "_").replace("/", "_")[:60], data)
+        for t in tweets:
+            t["via"] = via
+        sink.extend(tweets)
+        got += len(tweets)
+    log.info("X 리스트: 트윗 %d개 (GraphQL 응답 %d개, 스크롤 %d번)", got, len(responses), done)
+    return got, complete
+
+
 def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None, on_batch=None, since_by=None,
-            visited=None):
+            visited=None, list_since=None, list_meta=None):
     """accounts: 핵심 계정 handle 목록. since(UTC ISO): 계정 페이지는 이 시각 이전 글까지만 스크롤.
     since_by({handle 소문자: UTC ISO}): 그 계정만 다른 시각까지, 스크롤도 DEEP_SCROLLS번까지 (돌아가며 보는 계정 — 지난번에 본 시각).
+    [x] list_url이 있으면 계정 페이지를 다 본 뒤 리스트도 본다 (list_since까지). 같은 글은 처음 받은 경로(via)가 남으므로
+    맨 마지막에 봐야 날마다 여는 계정의 글이 계정 페이지 경로로 남는다 — 리스트로 옮기기 전 나란히 견줘 보는 기간.
+    리스트를 list_since까지 다 봤으면 visited에 "list:<ID>"를 넣는다. list_meta(dict)에는 리스트 이름을 담는다 (동기화용).
     visited(list): 정상으로 연 계정 페이지(글이 0개여도)의 handle을 차례로 넣는다 (중간에 실패해도 그때까지 본 것).
     users(dict): 응답에 실린 계정 규모(팔로워 등)를 모아 둘 곳. 반환: 파싱된 트윗 리스트.
     on_batch(새 트윗들): 페이지 하나를 볼 때마다 — 중간에 끊겨도 모은 데까지 저장되게."""
@@ -211,12 +357,9 @@ def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None,
     out, empty_streak, ops_seen = [], 0, set()
     try:
         targets = []
-        if xcfg.get("list_url"):
-            targets.append((xcfg["list_url"], "list"))
-        else:
-            handles = list(accounts)
-            random.shuffle(handles)
-            targets += [(f"https://x.com/{h}", f"{VIA_X_USER}{h}") for h in handles]
+        handles = list(accounts)
+        random.shuffle(handles)
+        targets += [(f"https://x.com/{h}", f"{VIA_X_USER}{h}") for h in handles]
         targets += [(f"https://x.com/search?q={quote(q)}&src=typed_query&f=top", f"{VIA_X_SEARCH}{i}")
                     for i, q in enumerate(xcfg.get("discovery_searches", []))]
 
@@ -242,6 +385,39 @@ def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None,
                 raise RuntimeError("X에서 연속으로 글을 못 찾았어요. X 응답 구조가 바뀐 것 같아요 "
                                    f"(로그에 받은 API 이름 기록: {', '.join(sorted(ops_seen))[:120]})")
             page.wait_for_timeout(random.uniform(4000, 9000))
+        lid = list_id(xcfg.get("list_url"))
+        if lid:
+            progress("X 리스트 수집 중")
+            before = len(out)
+            got, complete = _visit_list(page, f"https://x.com/i/lists/{lid}", f"{VIA_X_LIST}{lid}", list_since or since, out,
+                                        ops_seen, users, list_meta)
+            # 끝까지 못 내려갔으면 본 것으로 남기지 않는다: 다음에도 같은 기준 시각부터 읽고,
+            # 48시간이 지나면 리스트 계정이 다시 계정 페이지로 돌아간다 (accounts.list_members)
+            if got and complete and visited is not None:
+                visited.append(f"{VIA_X_LIST}{lid}")
+            if on_batch and len(out) > before:
+                on_batch(out[before:])
     finally:
         page.close()
     return out
+
+
+def sync_list(ctx, adds, removes, name, on_result, progress=lambda s: None):
+    """리스트에 adds를 넣고 removes를 뺀다 (사람 속도, 계정 사이 6~12초).
+    on_result(handle, set_list_membership 결과 | "failed")로 하나씩 알린다 — 중간에 끊겨도 한 데까지 남게.
+    로그인이 풀렸으면 멈춘다 (NeedLogin을 그대로 올린다)."""
+    work = [(h, True) for h in adds] + [(h, False) for h in removes]
+    page = chrome.new_page(ctx)
+    try:
+        for i, (h, member) in enumerate(work):
+            progress(f"X 리스트 정리 중 {i + 1}/{len(work)}")
+            try:
+                on_result(h, set_list_membership(page, h, name, member))
+            except NeedLogin:
+                raise
+            except Exception as e:
+                log.warning("X 리스트 @%s %s 실패: %s", h, "넣기" if member else "빼기", e)
+                on_result(h, "failed")
+            page.wait_for_timeout(random.uniform(6000, 12000))
+    finally:
+        page.close()

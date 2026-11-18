@@ -27,6 +27,14 @@ X_VISITS = config.DATA_DIR / "x-visits.json"  # 계정 페이지를 마지막으
 # 예전엔 수집도 브리핑도 「지난 브리핑 이후」만 봐서 사이 글이 빠졌다 — 2026-11-16 한 번에 226개
 # (@sundarpichai의 Gemini 4 Carbon·TPU 발표, @deepseek_ai의 API 공개 등)
 X_LOOKBACK = timedelta(days=7)
+X_LIST = config.DATA_DIR / "x-list.json"  # 리스트 기록 {"list", "name", "members"·"failed"·"gone": {handle 소문자: ISO}, "src": {handle: direct|interest}, "added": {날짜: 수}}
+LIST_ADD_PER_DAY = 30   # 하루에 리스트에 넣고 빼는 계정 수 (합) (사람이 리스트를 처음 만들 때 한자리에서 넣는 정도. X는 「공격적인 리스트 추가」를 금지한다)
+LIST_RETRY = timedelta(days=7)  # 넣기·빼기 실패한 계정은 이만큼 뒤에 다시
+LIST_QUIET = timedelta(days=5)   # 기록상 멤버인데 리스트에서 이만큼 글이 안 왔으면 진짜 들어 있는지 확인
+LIST_RECHECK = timedelta(days=14)  # 같은 계정은 이만큼에 한 번만 확인 (원래 조용한 계정이 매번 걸리지 않게)
+LIST_CHECKS = 5                 # 한 번에 확인하는 수
+LIST_GRACE = timedelta(days=14)  # 관심사에 딸린 계정이 보는 계정에서 빠진 뒤 리스트에서 빼기까지
+LIST_FRESH = timedelta(hours=48)  # 리스트를 이만큼 안에 정상으로 봤을 때만 리스트 멤버를 계정 페이지 방문에서 뺀다
 X_LATE_PER_ACCOUNT = 5  # 사이 글은 계정당 반응 큰 이만큼만 (다 넣으면 2026-11-16 브리핑의 X 글이 42개 → 426개)
 
 
@@ -49,11 +57,12 @@ def x_plan(cfg, db, since, limit=X_VISIT_LIMIT, gaps=None):
     accts = core_accounts(cfg, db)
     mine = {a["handle"].lower() for a in cfg.get("x", {}).get("accounts", [])}
     fixed = [a["handle"] for a in accts if a["handle"].lower() in mine]
-    rotating = [a["handle"] for a in accts if a["handle"].lower() not in mine]
+    on_list = list_members(cfg)  # 리스트로 매번 받는 계정 — 그 자리를 아직 리스트에 없는 계정에
+    rotating = [a["handle"] for a in accts if a["handle"].lower() not in mine and a["handle"].lower() not in on_list]
     room = max(10, limit - len(fixed))
-    if len(rotating) <= room:
-        return fixed + rotating, {}
     seen = _visits()
+    # 다 들어가도 계정별로 어디까지 볼지는 계산한다: 리스트로 계정이 빠져 남은 계정이 한 번에 다 들어가게 되면
+    # 며칠 못 본 계정도 since까지만 보고 그 사이 글을 놓쳤다 (Codex 리뷰 #61)
     pick = sorted(rotating, key=lambda h: seen.get(h.lower(), ""))[:room]
     lap = -(-len(rotating) // room)  # 하루 한 번 모을 때 한 바퀴 날수
     if gaps is not None and lap > X_LOOKBACK.days:
@@ -75,6 +84,177 @@ def x_plan(cfg, db, since, limit=X_VISIT_LIMIT, gaps=None):
     if gaps is not None and late:
         gaps.append(f"X 계정 {late}개는 {X_LOOKBACK.days}일 넘게 못 봐서 그 앞 글은 못 받았어요")
     return fixed + pick, since_by
+
+
+def _list_state(lid):
+    try:
+        s = json.loads(X_LIST.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        s = {}
+    if s.get("list") != lid:  # 다른 리스트로 바꿨으면 처음부터
+        s = {"list": lid}
+    for k in ("members", "failed", "added", "src", "gone", "checked"):
+        s.setdefault(k, {})
+    return s
+
+
+def _save_list_state(s):
+    try:
+        atomic_write_text(X_LIST, json.dumps(s, ensure_ascii=False, indent=1))
+    except OSError:
+        log.warning("X 리스트 기록 저장 실패", exc_info=True)
+
+
+def list_members(cfg):
+    """계정 페이지 대신 리스트로 받는 계정(소문자) — 리스트를 LIST_FRESH 안에 정상으로 봤을 때만. 아니면 빈 집합
+    (리스트를 못 읽는 동안 그 계정들을 계정 페이지로라도 보게).
+    리스트에 넣은 뒤 계정 페이지를 한 번 더 본 계정만: 리스트는 넣은 다음 읽기부터 이어 받으므로, 지난번 계정 페이지와 그 사이
+    (돌아가며 보기라 며칠일 수 있다)는 계정 페이지로 메워야 한다. 계정 페이지는 리스트보다 먼저 보므로 그 뒤로는 끊기지 않는다 (Codex 리뷰 #61)."""
+    from popme.collectors.x import list_id
+    lid = list_id(cfg.get("x", {}).get("list_url"))
+    if not lid:
+        return set()
+    visits = _visits()
+    try:
+        seen = datetime.fromisoformat(visits.get(f"list:{lid}") or "")
+    except ValueError:
+        return set()
+    if datetime.now(timezone.utc) - seen > LIST_FRESH:
+        return set()
+
+    def caught_up(h, joined):
+        try:
+            return datetime.fromisoformat(visits[h]) >= datetime.fromisoformat(joined)
+        except (KeyError, TypeError, ValueError):
+            return False
+    return {h for h, joined in _list_state(lid)["members"].items() if caught_up(h, joined)}
+
+
+def watch_sources(cfg, db):
+    """보는 X 계정(소문자) → "direct"(내가 정한 핵심 계정·발굴로 추가한 계정) | "interest"(고른 관심사에 딸린 계정)."""
+    src = {a["handle"].lower(): "direct" for a in cfg.get("x", {}).get("accounts", [])}
+    for c in discovery.added(db, "x"):
+        src.setdefault(c["handle"].lower(), "direct")
+    for a in catalog.x_accounts(cfg):
+        src.setdefault(a["handle"].lower(), "interest")
+    return src
+
+
+def list_todo(cfg, db, name=None):
+    """리스트에 넣고 뺄 계정 → (넣을 handles, 뺄 handles, 리스트 이름). 둘을 합쳐 오늘 남은 몫(LIST_ADD_PER_DAY)만큼, 넣기 먼저.
+    - 넣기: 보는 계정 중 아직 안 넣었고 최근(LIST_RETRY)에 실패하지 않은 것.
+    - 빼기: 보는 계정에서 빠진 리스트 멤버. 내가 정한 계정(direct)을 지웠으면 바로, 관심사에 딸린 계정이면
+      LIST_GRACE 뒤 (관심사를 껐다 켤 때 넣고 빼기를 되풀이하지 않게 — X에서 가장 자동화처럼 보이는 모양이다).
+      그 사이 다시 보는 계정이 되면 빼지 않는다."""
+    from popme.collectors.x import list_id
+    xcfg = cfg.get("x", {})
+    lid = list_id(xcfg.get("list_url"))
+    if not lid or not xcfg.get("list_sync", True):
+        return [], [], None
+    s = _list_state(lid)
+    if name:
+        s["name"] = name
+    now = datetime.now(timezone.utc)
+    src = watch_sources(cfg, db)
+    order = [a["handle"] for a in core_accounts(cfg, db)]
+    s["src"].update(src)  # 보는 동안의 출처를 남겨 둔다 — 빠진 뒤에 바로 뺄지 기다릴지 정할 때
+    for h in s["members"]:
+        if h in src:
+            s["gone"].pop(h, None)
+        else:
+            s["gone"].setdefault(h, now.isoformat())
+    _save_list_state(s)
+    name = s.get("name")
+    if not name:
+        return [], [], None  # 리스트를 한 번 정상으로 봐야 이름을 안다
+    room = max(LIST_ADD_PER_DAY - s["added"].get(now.strftime("%Y-%m-%d"), 0), 0)
+
+    def failed_recently(h):
+        try:
+            return now - datetime.fromisoformat(s["failed"][h]) < LIST_RETRY
+        except (KeyError, ValueError):
+            return False
+
+    def due(h):
+        if s["src"].get(h) == "direct":
+            return True
+        try:
+            return now - datetime.fromisoformat(s["gone"][h]) >= LIST_GRACE
+        except (KeyError, ValueError):
+            return False
+    adds = [h for h in order if h.lower() not in s["members"] and not failed_recently(h.lower())][:room]
+    removes = [h for h in s["members"] if h in s["gone"] and due(h) and not failed_recently(h)][:room - len(adds)]
+    quiet = _quiet_members(s, db, lid, src, now, room - len(adds) - len(removes), failed_recently)
+    return adds + quiet, removes, name
+
+
+def _quiet_members(s, db, lid, src, now, room, failed_recently=lambda h: False):
+    """기록(x-list.json)상 멤버인데 리스트에서 LIST_QUIET 동안 글이 하나도 안 온 보는 계정 → 다시 넣어 본다(넣기 대화상자가
+    이미 체크돼 있으면 저장하지 않고 닫음 = 확인만). 기록은 앱이 넣은 것만 알아서, X에서 손으로 뺀 계정은 리스트에도 없고
+    계정 페이지 돌아가며 보기에서도 빠져 글을 못 받는다. 리스트를 LIST_QUIET 넘게 보고 있었을 때만, 같은 계정은 LIST_RECHECK에 한 번.
+    확인이 실패한 계정은 넣기·빼기처럼 LIST_RETRY 동안 쉰다 — 안 그러면 매번 다시 시도하며 LIST_CHECKS 자리를 막는다."""
+    if room <= 0 or db is None:
+        return []
+    try:
+        first = min(datetime.fromisoformat(v) for v in s["members"].values()) if s["members"] else now
+    except ValueError:
+        return []
+    since = (now - LIST_QUIET).isoformat()
+    heard = {r["a"] for r in db.q("SELECT DISTINCT lower(t.author) AS a FROM sightings s JOIN tweets t ON t.id = s.id "
+                                  "WHERE s.via = ? AND s.seen_at >= ?", f"list:{lid}", since)}
+    if not heard:
+        return []  # 리스트에서 아무 글도 못 받았으면 리스트를 못 본 것 — 계정 탓이 아니다
+
+    def stale(h):
+        try:
+            joined = datetime.fromisoformat(s["members"][h])
+            checked = datetime.fromisoformat(s["checked"].get(h) or "1970-01-01T00:00:00+00:00")
+        except ValueError:
+            return False
+        return now - joined >= LIST_QUIET and now - checked >= LIST_RECHECK
+    if now - first < LIST_QUIET:
+        return []
+    quiet = [h for h in s["members"] if h in src and h not in heard and stale(h) and not failed_recently(h)]
+    return quiet[:min(room, LIST_CHECKS)]
+
+
+def mark_list(cfg, handle, result):
+    """set_list_membership 결과를 남긴다. X에 쓴 것(added·removed)만 하루 몫에 센다."""
+    from popme.collectors.x import list_id
+    lid = list_id(cfg.get("x", {}).get("list_url"))
+    if not lid:
+        return
+    s = _list_state(lid)
+    now = datetime.now(timezone.utc)
+    h = handle.lower()
+    if result in ("added", "already"):
+        if result == "added" or h not in s["members"]:
+            s["members"][h] = now.isoformat()
+        s["checked"][h] = now.isoformat()
+        s["failed"].pop(h, None)
+    elif result in ("removed", "absent"):
+        for k in ("members", "src", "gone", "failed", "checked"):
+            s[k].pop(h, None)
+    else:
+        s["failed"][h] = now.isoformat()
+    if result in ("added", "removed"):
+        today = now.strftime("%Y-%m-%d")
+        s["added"] = {today: s["added"].get(today, 0) + 1}  # 오늘 것만 남긴다 (넣기·빼기 합)
+    _save_list_state(s)
+
+
+def list_since(cfg, since):
+    """X 리스트를 어디까지 내려 볼지: 지난번에 본 시각 1시간 전 (X_LOOKBACK 안). 처음이면 since."""
+    from popme.collectors.x import list_id
+    lid = list_id(cfg.get("x", {}).get("list_url"))
+    seen = _visits().get(f"list:{lid}") if lid else None
+    if not seen:
+        return since
+    try:
+        start = datetime.fromisoformat(seen) - timedelta(hours=1)
+    except (TypeError, ValueError):
+        return since
+    return max(start, datetime.now(timezone.utc) - X_LOOKBACK).isoformat()
 
 
 def mark_x_visited(handles):
