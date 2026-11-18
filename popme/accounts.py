@@ -30,6 +30,9 @@ X_LOOKBACK = timedelta(days=7)
 X_LIST = config.DATA_DIR / "x-list.json"  # 리스트 기록 {"list", "name", "members"·"failed"·"gone": {handle 소문자: ISO}, "src": {handle: direct|interest}, "added": {날짜: 수}}
 LIST_ADD_PER_DAY = 30   # 하루에 리스트에 넣고 빼는 계정 수 (합) (사람이 리스트를 처음 만들 때 한자리에서 넣는 정도. X는 「공격적인 리스트 추가」를 금지한다)
 LIST_RETRY = timedelta(days=7)  # 넣기·빼기 실패한 계정은 이만큼 뒤에 다시
+LIST_QUIET = timedelta(days=5)   # 기록상 멤버인데 리스트에서 이만큼 글이 안 왔으면 진짜 들어 있는지 확인
+LIST_RECHECK = timedelta(days=14)  # 같은 계정은 이만큼에 한 번만 확인 (원래 조용한 계정이 매번 걸리지 않게)
+LIST_CHECKS = 5                 # 한 번에 확인하는 수
 LIST_GRACE = timedelta(days=14)  # 관심사에 딸린 계정이 보는 계정에서 빠진 뒤 리스트에서 빼기까지
 LIST_FRESH = timedelta(hours=48)  # 리스트를 이만큼 안에 정상으로 봤을 때만 리스트 멤버를 계정 페이지 방문에서 뺀다
 X_LATE_PER_ACCOUNT = 5  # 사이 글은 계정당 반응 큰 이만큼만 (다 넣으면 2026-11-16 브리핑의 X 글이 42개 → 426개)
@@ -90,7 +93,7 @@ def _list_state(lid):
         s = {}
     if s.get("list") != lid:  # 다른 리스트로 바꿨으면 처음부터
         s = {"list": lid}
-    for k in ("members", "failed", "added", "src", "gone"):
+    for k in ("members", "failed", "added", "src", "gone", "checked"):
         s.setdefault(k, {})
     return s
 
@@ -172,7 +175,36 @@ def list_todo(cfg, db, name=None):
             return False
     adds = [h for h in order if h.lower() not in s["members"] and not failed_recently(h.lower())][:room]
     removes = [h for h in s["members"] if h in s["gone"] and due(h) and not failed_recently(h)][:room - len(adds)]
-    return adds, removes, name
+    return adds + _quiet_members(s, db, lid, src, now, room - len(adds) - len(removes)), removes, name
+
+
+def _quiet_members(s, db, lid, src, now, room):
+    """기록(x-list.json)상 멤버인데 리스트에서 LIST_QUIET 동안 글이 하나도 안 온 보는 계정 → 다시 넣어 본다(넣기 대화상자가
+    이미 체크돼 있으면 저장하지 않고 닫음 = 확인만). 기록은 앱이 넣은 것만 알아서, X에서 손으로 뺀 계정은 리스트에도 없고
+    계정 페이지 돌아가며 보기에서도 빠져 글을 못 받는다. 리스트를 LIST_QUIET 넘게 보고 있었을 때만, 같은 계정은 LIST_RECHECK에 한 번."""
+    if room <= 0 or db is None:
+        return []
+    try:
+        first = min(datetime.fromisoformat(v) for v in s["members"].values()) if s["members"] else now
+    except ValueError:
+        return []
+    since = (now - LIST_QUIET).isoformat()
+    heard = {r["a"] for r in db.q("SELECT DISTINCT lower(t.author) AS a FROM sightings s JOIN tweets t ON t.id = s.id "
+                                  "WHERE s.via = ? AND s.seen_at >= ?", f"list:{lid}", since)}
+    if not heard:
+        return []  # 리스트에서 아무 글도 못 받았으면 리스트를 못 본 것 — 계정 탓이 아니다
+
+    def stale(h):
+        try:
+            joined = datetime.fromisoformat(s["members"][h])
+            checked = datetime.fromisoformat(s["checked"].get(h) or "1970-01-01T00:00:00+00:00")
+        except ValueError:
+            return False
+        return now - joined >= LIST_QUIET and now - checked >= LIST_RECHECK
+    if now - first < LIST_QUIET:
+        return []
+    quiet = [h for h in s["members"] if h in src and h not in heard and stale(h)]
+    return quiet[:min(room, LIST_CHECKS)]
 
 
 def mark_list(cfg, handle, result):
@@ -185,10 +217,12 @@ def mark_list(cfg, handle, result):
     now = datetime.now(timezone.utc)
     h = handle.lower()
     if result in ("added", "already"):
-        s["members"][h] = now.isoformat()
+        if result == "added" or h not in s["members"]:
+            s["members"][h] = now.isoformat()
+        s["checked"][h] = now.isoformat()
         s["failed"].pop(h, None)
     elif result in ("removed", "absent"):
-        for k in ("members", "src", "gone", "failed"):
+        for k in ("members", "src", "gone", "failed", "checked"):
             s[k].pop(h, None)
     else:
         s["failed"][h] = now.isoformat()

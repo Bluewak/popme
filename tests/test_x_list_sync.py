@@ -149,3 +149,36 @@ def test_adds_and_removes_share_the_daily_budget(monkeypatch):
         accounts.mark_list(cfg, h, "added")
     adds, removes, _ = accounts.list_todo(cfg, None)
     assert len(adds) == accounts.LIST_ADD_PER_DAY - 5 and removes == []
+
+
+def _member_since(h, days):
+    s = json.loads(accounts.X_LIST.read_text(encoding="utf-8"))
+    s["members"][h] = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    s["checked"].pop(h, None)
+    accounts.X_LIST.write_text(json.dumps(s), encoding="utf-8")
+
+
+def _heard(db, author, via="list:123456789"):
+    db.upsert_tweets([{"id": f"t-{author}", "author": author, "text": "글", "created_at": datetime.now(timezone.utc).isoformat(),
+                       "lang": "en", "likes": 1, "urls": "[]", "kind": "post", "ref_author": None, "via": via}])
+
+
+def test_quiet_members_are_rechecked_on_the_dialog(monkeypatch, tmp_path):
+    """기록상 멤버인데 리스트에서 5일째 글이 없으면 넣기 대화상자로 확인 (X에서 손으로 뺐을 수 있다). 14일에 한 번."""
+    from popme.db import DB
+    db = DB(tmp_path / "t.db")
+    _watch(monkeypatch, ["loud", "quiet", "new"])
+    cfg = _cfg()
+    accounts.list_todo(cfg, db, "popme")
+    for h in ("loud", "quiet", "new"):
+        accounts.mark_list(cfg, h, "added")
+    assert accounts.list_todo(cfg, db) == ([], [], "popme")  # 리스트에서 아직 아무것도 못 받음
+    _heard(db, "loud")
+    for h in ("loud", "quiet"):
+        _member_since(h, 6)
+    _member_since("new", 2)  # 넣은 지 얼마 안 됨
+    assert accounts.list_todo(cfg, db) == (["quiet"], [], "popme")
+    accounts.mark_list(cfg, "quiet", "already")  # 들어 있었다 — 14일 동안 다시 안 본다
+    assert accounts.list_todo(cfg, db) == ([], [], "popme")
+    s = json.loads(accounts.X_LIST.read_text(encoding="utf-8"))
+    assert s["members"]["quiet"] < s["checked"]["quiet"]  # 넣은 때는 그대로, 확인한 때만 새로
