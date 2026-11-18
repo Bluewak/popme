@@ -60,9 +60,9 @@ def x_plan(cfg, db, since, limit=X_VISIT_LIMIT, gaps=None):
     on_list = list_members(cfg)  # 리스트로 매번 받는 계정 — 그 자리를 아직 리스트에 없는 계정에
     rotating = [a["handle"] for a in accts if a["handle"].lower() not in mine and a["handle"].lower() not in on_list]
     room = max(10, limit - len(fixed))
-    if len(rotating) <= room:
-        return fixed + rotating, {}
     seen = _visits()
+    # 다 들어가도 계정별로 어디까지 볼지는 계산한다: 리스트로 계정이 빠져 남은 계정이 한 번에 다 들어가게 되면
+    # 며칠 못 본 계정도 since까지만 보고 그 사이 글을 놓쳤다 (Codex 리뷰 #61)
     pick = sorted(rotating, key=lambda h: seen.get(h.lower(), ""))[:room]
     lap = -(-len(rotating) // room)  # 하루 한 번 모을 때 한 바퀴 날수
     if gaps is not None and lap > X_LOOKBACK.days:

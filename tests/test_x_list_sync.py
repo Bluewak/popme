@@ -198,3 +198,20 @@ def test_quiet_member_check_that_failed_waits_like_adds(monkeypatch, tmp_path):
     assert accounts.list_todo(cfg, db) == (["quiet"], [], "popme")
     accounts.mark_list(cfg, "quiet", "failed")
     assert accounts.list_todo(cfg, db) == ([], [], "popme")
+
+
+def test_rotating_accounts_that_all_fit_still_backfill_from_last_visit(monkeypatch):
+    """Codex 리뷰(#61): 리스트로 계정이 빠져 남은 계정이 한 번에 다 들어가도, 며칠 못 본 계정은 지난번 본 시각까지 내려 본다."""
+    rotating = [f"r{i}" for i in range(20)]
+    _watch(monkeypatch, ["fixed1"] + rotating)
+    cfg = _cfg()
+    accounts.list_todo(cfg, None, "popme")
+    for h in rotating[:15]:
+        accounts.mark_list(cfg, h, "added")
+    now = datetime.now(timezone.utc)
+    visits = {"list:123456789": (now - timedelta(hours=3)).isoformat()}
+    visits.update({h: (now - timedelta(days=4)).isoformat() for h in rotating[15:]})
+    accounts.X_VISITS.write_text(json.dumps(visits), encoding="utf-8")
+    handles, since_by = accounts.x_plan(cfg, None, (now - timedelta(days=1)).isoformat(), limit=11)
+    assert set(handles[1:]) == set(rotating[15:])
+    assert set(since_by) == set(rotating[15:])  # 어제 브리핑 시각이 아니라 나흘 전(지난번 본 때)부터
