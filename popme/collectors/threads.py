@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from urllib.parse import quote
 
 from popme import chrome
-from popme.collectors import NeedLogin, dump_raw, reached_since
+from popme.collectors import VIA_TH_CHECK, VIA_TH_SEARCH, VIA_TH_TAG, VIA_TH_USER, NeedLogin, dump_raw, reached_since
 
 log = logging.getLogger(__name__)
 HANGUL = re.compile(r"[가-힣]")
@@ -110,7 +110,7 @@ def check_profiles(ctx, usernames, progress=lambda s: None, users=None):
     try:
         for i, u in enumerate(usernames):
             progress(f"Threads 후보 확인 {i + 1}/{len(usernames)}")
-            _visit(page, f"https://www.threads.com/@{u}", f"th-check:{u}", 2, out, users=users)
+            _visit(page, f"https://www.threads.com/@{u}", f"{VIA_TH_CHECK}{u}", 2, out, users=users)
             page.wait_for_timeout(random.uniform(4000, 8000))
     finally:
         page.close()
@@ -125,17 +125,17 @@ def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None,
     if not any(c["name"] == "sessionid" for c in ctx.cookies(["https://www.threads.com"])):
         raise NeedLogin("Threads 로그인이 필요해요. 트레이 메뉴 > 전용 Chrome 열기에서 로그인해 주세요.")
     scrolls = int(tcfg.get("scrolls_per_page", 3))
-    targets = [(f"https://www.threads.com/@{a}", f"th-user:{a}") for a in accounts]
-    targets += [(f"https://www.threads.com/search?q={quote(q)}&serp_type=default", f"th-search:{q}")
+    targets = [(f"https://www.threads.com/@{a}", f"{VIA_TH_USER}{a}") for a in accounts]
+    targets += [(f"https://www.threads.com/search?q={quote(q)}&serp_type=default", f"{VIA_TH_SEARCH}{q}")
                 for q in tcfg.get("searches", [])]
-    targets += [(f"https://www.threads.com/search?q={quote(t)}&serp_type=tags", f"th-tag:{t}")
+    targets += [(f"https://www.threads.com/search?q={quote(t)}&serp_type=tags", f"{VIA_TH_TAG}{t}")
                 for t in tcfg.get("tags", [])]
     page = chrome.new_page(ctx)
     out, empty = [], 0
     try:
         for i, (url, via) in enumerate(targets):
             progress(f"Threads 수집 중 {i + 1}/{len(targets)}")
-            owner = via[8:] if via.startswith("th-user:") else None
+            owner = via[len(VIA_TH_USER):] if via.startswith(VIA_TH_USER) else None
             before = len(out)
             empty = empty + 1 if _visit(page, url, via, scrolls, out, owner, since, users) == 0 else 0
             if on_batch and len(out) > before:

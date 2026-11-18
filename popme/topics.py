@@ -3,7 +3,10 @@
 피드의 topic("ai", "data", "ml", "ent", "rag", "ai+data"처럼 +로 묶음)에 맞는 글만 브리핑에 넘길 때 쓴다
 (popme/briefing.py rss_items). 제목 + 요약 앞부분에서 찾는다. 규칙은 2026-10 직군별 조사에서 실제 피드에 돌려 오탐을 고친 것.
 """
+import logging
 import re
+
+log = logging.getLogger(__name__)
 
 # 일반 개발 커뮤니티(GeekNews·HN 인기)에서 AI 관련 글만 브리핑에 넘길 때 (topic = "ai").
 # 제목 + 요약 앞부분에서 찾는다. 「개발」「모델」「API」처럼 넓은 말은 넣지 않는다 — 커뮤니티 글 대부분에 걸린다.
@@ -87,11 +90,26 @@ def is_ai(item):
     return bool(AI_TOPIC.search(_text(item)))
 
 
+_warned = set()
+
+
+def unknown(topic):
+    """topic 문자열 안의 모르는 이름들 (오타 확인용)."""
+    return [t.strip() for t in (topic or "").split("+") if t.strip() and t.strip() not in TOPICS]
+
+
 def matches(item, topic):
-    """topic("ai", "data", "ml", "ent", "rag", "ai+data" …)에 맞는 글인가. topic이 없으면 늘 참, 모르는 이름은 무시."""
-    names = [t for t in (topic or "").split("+") if t.strip()]
-    pats = [p for t in names for p in TOPICS.get(t.strip(), [])]
-    if not pats:
+    """topic("ai", "data", "ml", "ent", "rag", "ai+data" …)에 맞는 글인가. topic이 없으면 늘 참.
+    모르는 이름(오타)은 「걸리지 않음」 — 예전엔 무시해서, 이름이 다 틀리면 거르기가 꺼져 모든 글이 통과했다."""
+    names = [t.strip() for t in (topic or "").split("+") if t.strip()]
+    if not names:
         return True
+    for t in unknown(topic):
+        if t not in _warned:
+            _warned.add(t)
+            log.warning("모르는 주제 이름 %r — 이 이름으로는 아무 글도 고르지 않아요 (popme/topics.py TOPICS)", t)
+    pats = [p for t in names for p in TOPICS.get(t, [])]
+    if not pats:
+        return False
     text = _text(item)
     return any(p.search(text) for p in pats)

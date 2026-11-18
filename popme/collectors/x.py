@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from urllib.parse import quote
 
 from popme import chrome
-from popme.collectors import NeedLogin, dump_raw, reached_since
+from popme.collectors import VIA_X_CHECK, VIA_X_SEARCH, VIA_X_USER, NeedLogin, dump_raw, reached_since
 
 log = logging.getLogger(__name__)
 
@@ -115,9 +115,10 @@ def _op(url):
     return url.split("?")[0].rsplit("/", 1)[-1]
 
 
-def _visit(page, url, via, scrolls, sink, ops_seen, owner=None, since=None, users=None):
+def _visit(page, url, via, scrolls, sink, ops_seen, owner=None, since=None, users=None, answered=None):
     """owner·since를 주면 (계정 페이지) 그 계정 글이 since 이전까지 내려왔을 때 스크롤을 멈춘다.
-    users(dict)에는 응답에 실린 계정 규모를 모은다."""
+    users(dict)에는 응답에 실린 계정 규모를 모은다. answered(list): 계정 타임라인 응답을 정상으로 받았으면 True를 넣는다 (timeline_ok)
+    (글이 0개여도 페이지는 정상으로 본 것 — 조용한 계정)."""
     responses, parsed = [], []  # parsed: (응답 원본, 트윗들) — 받은 응답을 차례로 풀어 둔다
 
     def handler(r):
@@ -167,7 +168,18 @@ def _visit(page, url, via, scrolls, sink, ops_seen, owner=None, since=None, user
         sink.extend(tweets)
         got += len(tweets)
     log.info("X %s: 트윗 %d개 (GraphQL 응답 %d개, 스크롤 %d번)", via, got, len(responses), done)
+    if answered is not None and any(timeline_ok(r, data) for r, data, _ in parsed):
+        answered.append(True)
     return got
+
+
+def timeline_ok(r, data):
+    """정상으로 받은 계정 타임라인 응답인가 (글이 0개여도). 오류 JSON(429 등의 {"errors": …})이나 다른 응답
+    (UserByScreenName 같은 계정 정보)만 받았으면 아니다 — 그런 날을 「봤다」로 남기면 다음 수집이 그 사이 글을 건너뛴다."""
+    if not isinstance(data, dict) or data.get("errors") or getattr(r, "status", 200) != 200:
+        return False
+    result = (((data.get("data") or {}).get("user") or {}).get("result") or {})
+    return any(k in result for k in ("timeline", "timeline_v2"))
 
 
 def check_profiles(ctx, handles, progress=lambda s: None, users=None):
@@ -177,7 +189,7 @@ def check_profiles(ctx, handles, progress=lambda s: None, users=None):
     try:
         for i, h in enumerate(handles):
             progress(f"X 후보 확인 {i + 1}/{len(handles)}")
-            _visit(page, f"https://x.com/{h}", f"check:{h}", 2, out, ops_seen, users=users)
+            _visit(page, f"https://x.com/{h}", f"{VIA_X_CHECK}{h}", 2, out, ops_seen, users=users)
             page.wait_for_timeout(random.uniform(4000, 9000))
     finally:
         page.close()
@@ -188,7 +200,7 @@ def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None,
             visited=None):
     """accounts: 핵심 계정 handle 목록. since(UTC ISO): 계정 페이지는 이 시각 이전 글까지만 스크롤.
     since_by({handle 소문자: UTC ISO}): 그 계정만 다른 시각까지, 스크롤도 DEEP_SCROLLS번까지 (돌아가며 보는 계정 — 지난번에 본 시각).
-    visited(list): 글을 받아 온 계정 페이지의 handle을 차례로 넣는다 (중간에 실패해도 그때까지 본 것).
+    visited(list): 정상으로 연 계정 페이지(글이 0개여도)의 handle을 차례로 넣는다 (중간에 실패해도 그때까지 본 것).
     users(dict): 응답에 실린 계정 규모(팔로워 등)를 모아 둘 곳. 반환: 파싱된 트윗 리스트.
     on_batch(새 트윗들): 페이지 하나를 볼 때마다 — 중간에 끊겨도 모은 데까지 저장되게."""
     xcfg = cfg.get("x", {})
@@ -204,18 +216,22 @@ def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None,
         else:
             handles = list(accounts)
             random.shuffle(handles)
-            targets += [(f"https://x.com/{h}", f"user:{h}") for h in handles]
-        targets += [(f"https://x.com/search?q={quote(q)}&src=typed_query&f=top", f"search:{i}")
+            targets += [(f"https://x.com/{h}", f"{VIA_X_USER}{h}") for h in handles]
+        targets += [(f"https://x.com/search?q={quote(q)}&src=typed_query&f=top", f"{VIA_X_SEARCH}{i}")
                     for i, q in enumerate(xcfg.get("discovery_searches", []))]
 
         for i, (url, via) in enumerate(targets):
             progress(f"X 수집 중 {i + 1}/{len(targets)}")
-            owner = via[5:] if via.startswith("user:") else None  # 검색 결과는 시간순이 아니라 멈추지 않음
+            owner = via[len(VIA_X_USER):] if via.startswith(VIA_X_USER) else None  # 검색 결과는 시간순이 아니라 멈추지 않음
             before = len(out)
             deep = bool(owner and owner.lower() in (since_by or {}))
             stop = since_by[owner.lower()] if deep else since
-            got = _visit(page, url, via, max(scrolls, DEEP_SCROLLS) if deep else scrolls, out, ops_seen, owner, stop, users)
-            if owner and got and visited is not None:
+            answered = []
+            got = _visit(page, url, via, max(scrolls, DEEP_SCROLLS) if deep else scrolls, out, ops_seen, owner, stop, users,
+                         answered)
+            # 본 것으로 남기기: 글을 받았거나, 글은 0개라도 X가 정상 응답한 페이지 (조용한 계정). 예전엔 글이 있어야만 남겨서
+            # 조용한 계정이 매번 다시 뽑혀 돌아가며 보기 자리를 차지했다. 로그인 막힘·예외는 여기 오지 않는다
+            if owner and (got or answered) and visited is not None:
                 visited.append(owner)
             if on_batch and len(out) > before:
                 on_batch(out[before:])

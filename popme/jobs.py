@@ -6,7 +6,7 @@ import threading
 import time
 from datetime import datetime
 
-from popme import briefing, catalog, chrome, config, discovery, event_weather, fieldscale, llm, sources
+from popme import briefing, catalog, chrome, config, discovery, event_weather, fieldscale, funnel, llm, sources
 from popme.collectors import NeedLogin, caldav, ics, threads, timetree, x, youtube
 from popme.db import DB
 
@@ -64,8 +64,8 @@ def chrome_closed(e):
     return any(k in s for k in ("has been closed", "target closed", "browser closed", "connection closed", "econnrefused"))
 
 
-def why(e):
-    """수집·브리핑 오류 → 사용자에게 보일 짧은 이유. 원문은 log.exception으로 남긴다."""
+def why(e, cfg=None):
+    """수집·브리핑 오류 → 사용자에게 보일 짧은 이유. 원문은 log.exception으로 남긴다. cfg: AI 이름을 쓸 설정 (없으면 기본 공급자)."""
     if isinstance(e, NeedLogin):
         return str(e)
     s = str(e).lower()
@@ -77,8 +77,8 @@ def why(e):
         return "페이지를 여는 도중에 끊겼어요"
     if "timeout" in s or "timed out" in s:
         return "페이지가 너무 오래 걸렸어요"
-    if any(k in s for k in ("limit", "quota", "429", "rate")):
-        return f"{llm.provider_name(config.load())} 사용 한도에 걸렸어요. 한도가 풀리면 「브리핑만 다시 만들기」를 눌러 주세요"
+    if llm.is_limit(s):  # config.load()를 다시 부르지 않는다 (설정 옮기기 같은 부수 효과가 있다)
+        return f"{llm.provider_name(cfg or {})} 사용 한도에 걸렸어요. 한도가 풀리면 「브리핑만 다시 만들기」를 눌러 주세요"
     if any(k in s for k in ("login", "auth", "api key", "credential", "401")):
         return "AI 로그인이 풀렸어요. 트레이 → 설정 바꾸기 → 브리핑 AI에서 로그인해 주세요"
     if "구조가 바뀐" in s:  # 수집기가 이미 사람 말로 쓴 경고
@@ -198,7 +198,7 @@ class Jobs:
         try:
             since = briefing.window_start(self.db).isoformat()  # 이보다 오래된 글까지 내려오면 스크롤 멈춤
             # 30개가 넘으면 관심사 계정은 돌아가며 — 그 계정들은 지난번에 본 시각까지 내려 본다 (since_by)
-            handles, since_by = briefing.x_plan(self.cfg, self.db, since)
+            handles, since_by = briefing.x_plan(self.cfg, self.db, since, gaps=warnings)
             users = {}  # 응답에 실려 오는 계정 규모 (발굴 인기 기준용)
             visited = []  # 실제로 글을 받아 온 계정 — 로그인이 풀리거나 창이 닫혀 못 본 계정은 「봤다」로 남기지 않는다
             try:
@@ -276,7 +276,7 @@ class Jobs:
             if self is not None:
                 self._closed.append(what)
             return f"{CHROME_CLOSED} {missed([what])} 이번에 못 모았어요"
-        return f"{what} 수집 실패: {why(e)}"
+        return f"{what} 수집 실패: {why(e, getattr(self, 'cfg', None))}"
 
     def _check_candidates(self, platform, ctx, warnings, progress):
         """발굴 1·2단계: 팔로워 기준 → 필요한 후보만 프로필을 한 번 열어 (팔로워·)꾸준함 확인 → 승인 계정 점검."""
@@ -316,6 +316,10 @@ class Jobs:
             if make_brief:
                 self._progress(f"브리핑 작성 중 ({llm.provider_name(self.cfg)})")
                 date, md, payload = briefing.make_briefing(self.cfg, self.db)
+                try:
+                    warnings += funnel.warnings(self.db, payload.get("stats") or {}, date)
+                except Exception:
+                    log.exception("평소와 견주기 실패")
                 if warnings:
                     md += "\n\n---\n수집 경고\n" + "\n".join(f"- {w}" for w in warnings)
                 self.db.save_briefing(date, md, json.dumps(payload, ensure_ascii=False))
@@ -327,7 +331,7 @@ class Jobs:
                 self.notify("chrome_closed", f"{missed(list(dict.fromkeys(self._closed)))} 이번에 못 모았어요")
         except Exception as e:
             log.exception("실행 실패")
-            reason = why(e)
+            reason = why(e, self.cfg)
             warnings.append(reason)
             self._progress(f"실패: {reason}")
             self.notify("error", f"브리핑을 못 만들었어요: {reason}")

@@ -4,9 +4,10 @@ import logging
 import re
 from datetime import datetime, timedelta, timezone
 
-from popme import agenda, clock, discovery, event_weather, llm, search
+from popme import agenda, clock, discovery, event_weather, funnel, llm, search
 from popme.character import Character
 from popme import catalog, config, topics
+from popme.collectors import VIA_TH_SEARCH, VIA_TH_TAG, VIA_X_SEARCH
 
 log = logging.getLogger(__name__)
 
@@ -46,7 +47,8 @@ __CRITERIA__
 - 일정은 위젯이 따로 보여주므로 넣지 않는다.
 - "발굴" 카드는 데이터에 "# 발굴 후보" 목록이 있을 때만, 그 목록 안의 사람만. 대표글로 품질을 판단해
   __DISCOVERY__이면 제목을 "@handle — 볼 만한 이유"로,
-  돈벌이·과장·단순 프롬프트 모음 위주면 "@handle — 비추천: 이유"로. 발굴 카드는 rel 1.
+  돈벌이·과장·단순 프롬프트 모음 위주면 "@handle — 비추천: 이유"로,
+  대표글이 없거나 판단할 근거가 모자라면 "@handle — 보류: 이유"로. 발굴 카드는 rel 1.
 
 __TITLE_RULES__
 
@@ -87,7 +89,7 @@ __TITLE_RULES__
 고칠 제목
 __LIST__"""
 
-QA_RULES = """아래 데이터와 오늘 브리핑만 근거로 질문에 답하라.
+QA_RULES = """아래 데이터와 가장 최근 브리핑만 근거로 질문에 답하라.
 "# 질문 관련 기록 검색"은 수집해 둔 전체 기간에서 이 질문의 검색어로 찾은 기록이고, 그 아래는 최근 72시간 자료다
 (검색에 걸린 게 있으면 그중 검색어가 든 줄만).
 출력은 JSON 하나만. 코드블록·설명 없이.
@@ -199,13 +201,15 @@ def _visits():
         return {}
 
 
-def x_plan(cfg, db, since, limit=X_VISIT_LIMIT):
+def x_plan(cfg, db, since, limit=X_VISIT_LIMIT, gaps=None):
     """이번 수집에서 열 X 계정 → (handle들, {handle(소문자): 그 계정 페이지를 어디까지 내려 볼지 UTC ISO}).
     내 핵심 계정([x] accounts)은 늘 보고, 발굴로 추가한 계정·관심사 계정은 남은 자리만큼 오래 안 본 것부터
     (사람 속도는 그대로 두고, 계정을 늘려도 수집 시간이 늘지 않게 — 설계 6-3). 발굴 계정도 돌아가며:
     2026-10-19 발굴 40개가 늘 보는 쪽에 있어서 한 번에 62개를 봤다.
     돌아가며 고른 계정은 지난번에 본 시각까지 내려 본다 (X_LOOKBACK 안에서). 나머지·처음 보는 계정은 since까지.
-    본 시각은 실제로 연 뒤에 mark_x_visited가 남긴다 — 로그인이 풀려 못 본 날을 「봤다」로 치지 않게."""
+    본 시각은 실제로 연 뒤에 mark_x_visited가 남긴다 — 로그인이 풀려 못 본 날을 「봤다」로 치지 않게.
+    gaps(list): 사이 글이 빠지는 경우를 사람 말로 넣는다 — 한 바퀴가 X_LOOKBACK보다 길 것 같거나, 지난번에 본 지
+    X_LOOKBACK이 넘은 계정(그 앞 글은 받지도 브리핑에 넣지도 않는다). 예전엔 조용히 빠졌다 (2026-11-01 → 11-09 같은 9건)."""
     accts = core_accounts(cfg, db)
     mine = {a["handle"].lower() for a in cfg.get("x", {}).get("accounts", [])}
     fixed = [a["handle"] for a in accts if a["handle"].lower() in mine]
@@ -215,16 +219,25 @@ def x_plan(cfg, db, since, limit=X_VISIT_LIMIT):
         return fixed + rotating, {}
     seen = _visits()
     pick = sorted(rotating, key=lambda h: seen.get(h.lower(), ""))[:room]
+    lap = -(-len(rotating) // room)  # 하루 한 번 모을 때 한 바퀴 날수
+    if gaps is not None and lap > X_LOOKBACK.days:
+        gaps.append(f"돌아가며 보는 X 계정이 {len(rotating)}개라 한 바퀴에 {lap}일쯤 걸려요. "
+                    f"{X_LOOKBACK.days}일보다 오래된 사이 글은 빠져요 (발굴 계정 정리를 권해요)")
+    late = 0
     floor = datetime.now(timezone.utc) - X_LOOKBACK
     s = datetime.fromisoformat(since)
     since_by = {}
     for h in pick:
         try:
-            start = max(datetime.fromisoformat(seen[h.lower()]) - timedelta(hours=1), floor)
+            last = datetime.fromisoformat(seen[h.lower()]) - timedelta(hours=1)
         except (KeyError, TypeError, ValueError):
             continue  # 처음 보는 계정
+        late += last < floor
+        start = max(last, floor)
         if start < s:
             since_by[h.lower()] = start.isoformat()
+    if gaps is not None and late:
+        gaps.append(f"X 계정 {late}개는 {X_LOOKBACK.days}일 넘게 못 봐서 그 앞 글은 못 받았어요")
     return fixed + pick, since_by
 
 
@@ -305,6 +318,9 @@ def late_posts(db, handle, since_iso, seen_after):
     return sorted(rows, key=lambda t: t["created_at"] or "")
 
 
+SEARCH_LINES = 15  # 검색·태그 구획의 줄 수 (좋아요순)
+
+
 def build_data(cfg, db, since_iso, with_events=False, late_since=None):
     """브리핑·질문 답변에 넘길 자료. late_since(브리핑만): 돌아가며 보는 계정의 사이 글을 이 시각 뒤에 처음 받은 것까지 넣는다."""
     parts = []
@@ -322,8 +338,8 @@ def build_data(cfg, db, since_iso, with_events=False, late_since=None):
             parts.append(f"## @{a['handle']} ({a['name']}) — {a['group']} / {a['focus']}")
             parts += [_tweet_line(t) for t in late + rows[-25:]]  # 사이 글은 25개 자르기와 따로 (구간 글에 밀리지 않게)
 
-    ko = db.q("SELECT * FROM tweets WHERE via LIKE 'search:%' AND lang='ko' AND created_at >= ? "
-              "ORDER BY likes DESC LIMIT 15", since_iso)
+    ko = db.q(f"SELECT * FROM tweets WHERE via LIKE '{VIA_X_SEARCH}%' AND lang='ko' AND created_at >= ? "
+              f"ORDER BY likes DESC LIMIT {SEARCH_LINES}", since_iso)
     if ko:
         parts.append("# 한국어 X 반응 큰 글 (검색)")
         parts += [f"- @{t['author']}: " + _tweet_line(t)[2:] for t in ko]
@@ -338,13 +354,14 @@ def build_data(cfg, db, since_iso, with_events=False, late_since=None):
                 parts.append(f"## Threads @{u}")
                 parts += [_tweet_line(t) for t in rows[-15:]]
 
-    th = db.q("SELECT * FROM tweets WHERE platform='threads' AND lang='ko' AND via NOT LIKE 'th-user:%' "
-              "AND via NOT LIKE 'th-check:%' AND created_at >= ? ORDER BY likes DESC LIMIT 15", since_iso)
+    # 검색·태그 경로만 (예전엔 「계정·후보 확인이 아닌 것」이라, 경로를 더하면 그 글이 여기 섞였다)
+    th = db.q(f"SELECT * FROM tweets WHERE platform='threads' AND lang='ko' "
+              f"AND (via LIKE '{VIA_TH_SEARCH}%' OR via LIKE '{VIA_TH_TAG}%') AND created_at >= ? ORDER BY likes DESC LIMIT {SEARCH_LINES}", since_iso)
     if th:
         parts.append("# 한국어 Threads 반응 큰 글 (검색·태그)")
         parts += [f"- @{t['author']}: " + _tweet_line(t)[2:] for t in th]
 
-    items = rss_items(cfg, db, since_iso)
+    items = rss_items(cfg, db, since_iso, late_since)
     if items:
         parts.append("# RSS (공식 변경내역·공식 발표·실사용·화제·커뮤니티 — 커뮤니티는 내 관심사 관련 글만)")
         tag_of = feed_tags(cfg)
@@ -372,25 +389,28 @@ def feed_tags(cfg):
     return out
 
 
-def rss_items(cfg, db, since_iso):
+def rss_items(cfg, db, since_iso, new_after=None):
     """브리핑에 넘길 RSS 글. 지금 받는 출처(popme/catalog.py active)의 글만, 출처마다 거르기 규칙(topic: "ai", "data",
     "ai+data" …)이 있으면 그 주제 글만 — 수집은 전부 해 두고 여기서 고른다 (관심사가 바뀌어도 같은 자료를 다른 기준으로).
-    묶음(group)마다 최신순 상한(catalog.caps). 예전엔 묶음 이름순 정렬 뒤 앞 120개라 가나다순으로 뒤인 묶음이 잘렸다."""
+    묶음(group)마다 최신순 상한(catalog.caps). 예전엔 묶음 이름순 정렬 뒤 앞 120개라 가나다순으로 뒤인 묶음이 잘렸다.
+    new_after(브리핑만, prev_briefing_at): 「이번에 처음 본 글」을 이 시각 뒤에 처음 받은 글로 센다. 없으면 since_iso 뒤."""
     feeds = {f.get("name"): f for f in catalog.active(cfg)}
     only_active = "news" in cfg  # 예전 config는 DB의 모든 출처 (옮기기 전)
     skip = {n: re.compile(f["skip"], re.I) for n, f in feeds.items() if f.get("skip")}  # 이미 저장된 시험판도
     caps = catalog.caps(cfg)
     # 넣을 글: 올라온 시각이 구간 안이거나, 이번에 처음 본 글이면서 이틀 안에 올라온 글.
     # 미러 피드(Anthropic·Claude)는 시각 없이 날짜만 줘서 0시로 찍히는데, 그러면 낮에 올라온 글이 구간 밖으로 밀린다.
-    # 처음 본 시각(collected_at)은 바뀌지 않으니 다음 날 브리핑에 또 들어가지 않는다
+    # 「처음 본」 기준은 지난 브리핑을 만든 시각이다. since(지난 브리핑 − 1시간)로 세면 브리핑 직전 수집에서 받은 글이
+    # 다음 날 또 새 글이 됐다 (2026-11-10~16 RSS 재료의 26%, 카드 링크 브리핑당 4개가 전날과 같았다)
     since = datetime.fromisoformat(since_iso)
+    first = datetime.fromisoformat(new_after) if new_after else since
     early = (since - timedelta(days=2)).isoformat()
     rows = db.q("SELECT * FROM items WHERE COALESCE(published, collected_at) >= ? "
                 "ORDER BY COALESCE(published, collected_at) DESC", early)
     groups, per_feed = {}, {}
     for r in rows:
         seen = datetime.fromisoformat(r["collected_at"])
-        new = seen >= since
+        new = seen > first if new_after else seen >= since
         # 앞날짜로 찍힌 글(예: 미리 써 둔 변경내역)은 처음 본 시각으로 — 날짜가 될 때까지 매일 다시 들어가지 않게
         posted = min(datetime.fromisoformat(r["published"]), seen) if r["published"] else seen
         if posted < since and not new:
@@ -542,9 +562,20 @@ def window_start(db):
                now - timedelta(hours=72))
 
 
+def briefing_start(db):
+    """브리핑 재료의 시작 시각 (UTC). window_start와 같은 규칙이되 기준이 오늘 전 마지막 브리핑이다 —
+    같은 날 다시 만들 때 오늘 앞 판을 기준으로 잡으면 어제 브리핑 뒤 ~ 지금 − 18시간 글이 빠졌다 (앞 판은 덮어써 남지 않는다)."""
+    prev = prev_briefing_at(db)
+    now = datetime.now(timezone.utc)
+    if not prev:
+        return now - timedelta(hours=36)
+    return max(min(datetime.fromisoformat(prev) - timedelta(hours=1), now - timedelta(hours=18)), now - timedelta(hours=72))
+
+
 def make_briefing(cfg, db):
     """반환: (날짜, Markdown, 카드 JSON)"""
-    data = build_data(cfg, db, window_start(db).isoformat(), late_since=prev_briefing_at(db))
+    prev_at = prev_briefing_at(db)
+    data = build_data(cfg, db, briefing_start(db).isoformat(), late_since=prev_at)
     ch = Character()
     user = cfg.get("user", {})
     prompt = _fill(BRIEFING_RULES, **rules_for(cfg), title_rules=TITLE_RULES, plan=user.get("plan", ""),
@@ -561,6 +592,10 @@ def make_briefing(cfg, db):
     if not payload["items"]:
         raise RuntimeError("브리핑 카드가 비어 있음")
     payload["interests"] = [p["id"] for p in chosen]  # 이 브리핑을 만들 때 고른 관심사
+    try:
+        payload["stats"] = funnel.measure(db, data, payload["items"], prev_at)  # 얼마나 들어왔나 (평소와 견줘 경고)
+    except Exception:
+        log.exception("브리핑 수 재기 실패")
     today = clock.now().strftime("%Y-%m-%d")
     header = f"# {clock.now().strftime('%m월 %d일')} 아침 브리핑\n"
     return today, to_markdown(header, payload), payload
@@ -656,7 +691,7 @@ def clean_answer(raw, data):
 
 
 def ask_data(cfg, db, kw, since=None, until=None):
-    """질문 답변에 넘길 자료 → (데이터 블록, 찾은 개수). 오늘 브리핑에, 검색에 걸린 게 있으면 그 기록·일정과
+    """질문 답변에 넘길 자료 → (데이터 블록, 찾은 개수). 가장 최근 브리핑에, 검색에 걸린 게 있으면 그 기록·일정과
     최근 72시간 자료 중 검색어가 든 줄만, 없으면 (최근 소식 전반을 묻는 질문 등) 72시간 자료를 통째로.
     예전엔 둘 다 통째로 넣어 질문마다 26만 자였다 (2026-11). 시험 세트(tools/ask_eval.py) 18문항에서
     자료는 76% 줄고 근거로 실린 정답 글은 903 → 918개. 72시간 자료를 아예 빼면 846개로 줄었다."""
@@ -669,8 +704,9 @@ def ask_data(cfg, db, kw, since=None, until=None):
     else:
         data = recent
     b = db.latest_briefing()
-    if b:
-        data = f"# 오늘 브리핑\n{b['markdown']}\n\n{data}"
+    if b:  # 아침 수집 전·브리핑이 실패한 날엔 어제 이전 것이다 — 오늘 소식처럼 답하지 않게 날짜를 붙인다
+        stale = "" if b["date"] == clock.now().strftime("%Y-%m-%d") else "(오늘 브리핑은 아직 없다)\n"
+        data = f"# 가장 최근 브리핑 ({b['date']})\n{stale}{b['markdown']}\n\n{data}"
     return data, counts
 
 

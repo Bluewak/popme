@@ -114,7 +114,7 @@ def build(cfg, field, category="", heads=(), domain=None):
 
 def scale_rules(cfg, field, domain):
     """발굴 기준 (popme/fieldscale.py) — 그 분야 유명 계정에서 출발해 타고 내려간 그 분야 자체 분포로:
-    유명 계정 찾기(채널 찾기 페르소나) → 있는지 확인(oEmbed) → 프로필을 열어(전용 Chrome, 10곳까지) 그들이 리포스트·인용·답글한
+    유명 계정 찾기(채널 찾기 페르소나) → 있는지 확인(oEmbed) → 프로필을 열어(전용 Chrome, 10곳까지) 그들이 인용·답글한
     계정과 팔로워 → 그 분야 계정만 → 상위 25%·10% 선. 실패·표본 부족이면 기준 없이(조사 중) — 첫 수집 뒤 보정이 채운다."""
     from popme import fieldscale, interests, measure
     try:

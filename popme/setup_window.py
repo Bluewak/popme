@@ -886,7 +886,7 @@ def ai_test(provider):
         err = str(e).lower()
         if any(k in err for k in ("login", "auth", "api key", "credential", "401")):
             raise ValueError(f"{name} 로그인이 필요해요. 「로그인 하기」를 눌러 주세요.")
-        if any(k in err for k in ("limit", "quota", "429", "rate")):
+        if llm.is_limit(err):
             raise ValueError(f"{name} 사용 한도에 걸렸어요. 한도가 풀리면 브리핑도 써져요. 그대로 다음으로 가도 돼요.")
         raise ValueError(f"{name}을(를) 불러 보지 못했어요: {str(e)[:200]}")
     if not answer.strip():

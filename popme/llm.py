@@ -23,6 +23,16 @@ def provider(cfg) -> str:
     return cfg.get("llm", {}).get("provider", "claude")
 
 
+# AI 사용 한도 오류인가 — 낱말 경계로. 예전엔 "rate"·"limit"가 들어 있기만 하면 한도로 봐서
+# "Failed to generate"·"size limit" 같은 오류도 「한도가 풀리면 다시」로 보였다
+LIMIT_RE = re.compile(r"\b(rate[ _-]?limit(ed)?|usage limit|\d+-hour limit|weekly limit|limit reached|quota|429|"
+                      r"resource[ _]exhausted|too many requests)\b", re.I)
+
+
+def is_limit(text) -> bool:
+    return bool(LIMIT_RE.search(str(text)))
+
+
 def provider_name(cfg) -> str:
     return {"claude": "Claude", "codex": "ChatGPT", "gemini": "Gemini"}.get(provider(cfg), provider(cfg))
 
@@ -76,6 +86,8 @@ def find_gemini(cfg) -> str:
 
 
 # Codex는 에이전트라 기본으로 셸·브라우저 등 도구가 있다. 전부 끈다 (code_mode_host를 끄면 코드 실행도 막힘)
+# codex-cli 0.166.0에선 --disable unified_exec를 줘도 `codex features list`에 true로 남는다. 그래도 실행은 code_mode_host를
+# 거쳐서 막힌다 — 2026-11-17 같은 옵션으로 whoami를 시켜 보니 "code-mode host is disabled"로 거부되고 실행되지 않았다
 CODEX_DISABLE = ["shell_tool", "unified_exec", "unified_exec_tty", "code_mode_host", "apps", "plugins",
                  "multi_agent", "browser_use", "browser_use_external", "computer_use", "in_app_browser",
                  "image_generation", "view_image", "hooks", "skill_search", "tool_suggest", "goals", "sleep_tool"]
