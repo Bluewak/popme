@@ -83,7 +83,7 @@ def why(e, cfg=None):
     if llm.is_limit(s):  # config.load()를 다시 부르지 않는다 (설정 옮기기 같은 부수 효과가 있다)
         return f"{llm.provider_name(cfg or {})} 사용 한도에 걸렸어요. 한도가 풀리면 「브리핑만 다시 만들기」를 눌러 주세요"
     if llm.is_login(s):
-        return "AI 로그인이 풀렸어요. 트레이 → 설정 바꾸기 → 브리핑 AI에서 로그인해 주세요"
+        return "AI 로그인이 풀렸어요. 트레이 → 설정 → 브리핑 AI에서 로그인해 주세요"
     if "구조가 바뀐" in s:  # 수집기가 이미 사람 말로 쓴 경고
         return str(e).split(" (로그에")[0]
     return "알 수 없는 문제가 생겼어요 (popme.log에 자세히 남겼어요)"
