@@ -192,7 +192,7 @@ def test_take_clipboard_only_returns_wanted_shape():
 
 def test_help_data_is_complete():
     """화면이 쓰는 안내 키가 다 있고, 열기 버튼은 (이름, https 주소), 자주 묻는 질문은 [질문, 답]."""
-    for key in ["google", "icloud", "icloud_ics", "naver", "outlook", "minical", "gmail", "mail_other", "login"]:
+    for key in ["google", "icloud", "icloud_ics", "naver", "outlook", "minical", "gmail", "mail_other", "login", "ai"]:
         h = sw.HELP[key]
         assert h["steps"] and all(isinstance(t, str) for t in h["steps"])
         assert all(len(f) == 2 and f[0] and f[1] for f in h.get("faq", []))

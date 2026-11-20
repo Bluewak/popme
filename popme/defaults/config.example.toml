@@ -86,7 +86,7 @@ holidays = true                    # source = "ics"·"caldav"일 때 대한민�
 #   { name = "내 캘린더", url = "https://calendar.google.com/calendar/ical/.../private-.../basic.ics" },
 #   { name = "iCloud",   url = "webcal://p00-caldav.icloud.com/published/2/..." },
 # ]
-[caldav]                           # source = "caldav"일 때. 설정 창(트레이 > 설정 바꾸기)에서 넣는 게 편해요
+[caldav]                           # source = "caldav"일 때. 설정 창(트레이 > 설정)에서 넣는 게 편해요
 server = "https://caldav.icloud.com"
 user = ""                          # Apple 계정 이메일
 password = ""                      # 「앱 암호」 (Apple 계정 비밀번호 아님). 넣으면 Windows 자격 증명 관리자로 옮기고 이 칸은 비움

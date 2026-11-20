@@ -211,6 +211,7 @@
         </div>
         <small class="hint" id="ai-hint"></small>
       </div>
+      <div id="ai-helpbox"></div>
     </div>
   </section>
 
@@ -445,6 +446,7 @@ function init() {
   $("#dav-howto").innerHTML = ol(D.help.icloud.steps);
   $("#dav-open").textContent = D.help.icloud.open[0];
   $("#via-help").innerHTML = ol(D.help.minical.steps);
+  helps.ai = mountHelp($("#ai-helpbox"), () => "ai");
   helps.minical = mountHelp($("#via-helpbox"), () => "minical");
   helps.dav = mountHelp($("#dav-helpbox"), () => "icloud");
   helps.ics = mountHelp($("#ics-helpbox"), icsKey);
@@ -616,6 +618,7 @@ function aiRender() {
     : aiPoll ? "새 창에서 설치·로그인을 마치면 여기서 저절로 알아채요. 창을 닫아 버렸으면 「창 다시 열기」를 눌러요."
     : installed ? "누르면 검은 PowerShell 창과 브라우저가 열려요. 브라우저에서 로그인만 하면 여기서 저절로 알아채요."
     : "누르면 검은 PowerShell 창이 열리고 설치 글자가 지나가요 (정상이에요). 브라우저가 열리면 로그인만 하면 여기서 저절로 알아채요.";
+  helps.ai.refresh();
   nav();
 }
 
@@ -1694,7 +1697,7 @@ async function next() {
     `<b>「${D.exists ? "지금 한 번 모아 보기" : "첫 브리핑 받아 보기"}」</b>를 누르면 창이 닫히고 POPME가 켜지자마자 소식을 모아요. 몇 분 뒤 캐릭터가 알려 줘요`,
     "「닫기」를 누르면 모으지 않고 켜기만 해요. 아침 브리핑 시각이 지나 있으면 그때 저절로 모아요",
     ...(missing.length ? [`${missing.join(", ")} 로그인은 나중에 트레이 아이콘 우클릭 → <b>전용 Chrome 열기 (로그인)</b>에서 할 수 있어요`] : []),
-    "설정을 바꾸고 싶으면 트레이 아이콘(또는 캐릭터) 우클릭 → <b>설정 바꾸기</b>",
+    "설정을 바꾸고 싶으면 트레이 아이콘(또는 캐릭터) 우클릭 → <b>설정</b>",
   ]);
   go(step + 1);
 }

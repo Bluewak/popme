@@ -173,9 +173,9 @@ function Install-Popme {
     Step "설정 창을 열어요 — 다 고르고 저장하면 설치가 이어져요"
     Push-Location $root
     try { & $py -m popme.setup_window } finally { Pop-Location }
-    if (-not (Test-Path (Join-Path $data "config.toml"))) {   # 창을 그냥 닫았으면 예시 설정으로 (나중에 트레이 > 설정 바꾸기)
+    if (-not (Test-Path (Join-Path $data "config.toml"))) {   # 창을 그냥 닫았으면 예시 설정으로 (나중에 트레이 > 설정)
         Copy-Item (Join-Path $root "popme\defaults\config.example.toml") (Join-Path $data "config.toml")
-        Write-Host "만듦: config.toml (설정 창을 닫아서 기본값으로. 트레이 > 설정 바꾸기에서 다시 고를 수 있어요)"
+        Write-Host "만듦: config.toml (설정 창을 닫아서 기본값으로. 트레이 > 설정에서 다시 고를 수 있어요)"
     }
 
     # 바로가기 아이콘(pet.ico): 캐릭터 이미지, 없으면 기본 방울. 이미지를 나중에 바꾸면 POPME가 켜질 때 다시 만든다
