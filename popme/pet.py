@@ -93,6 +93,32 @@ def write_icon(img):
     return True
 
 
+APP_ID = "POPME.Desktop"
+
+
+def set_app_id():
+    """작업표시줄 묶음 ID. 창을 만들기 전에 불러야 한다. 안 정하면 바로가기 → venv 런처 → 실제 파이썬으로 이어지는 사이에
+    바로가기 정보가 끊겨 파이썬 기본 아이콘이 뜬다."""
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_ID)
+    except OSError:
+        log.warning("앱 ID를 못 정했어요", exc_info=True)
+
+
+def set_window_icon(hwnd):
+    """브리핑 창(작업표시줄 버튼)에 pet.ico를 직접 지정 (큰 아이콘·작은 아이콘)."""
+    ico = config.ASSETS_DIR / "pet.ico"
+    if not hwnd or not ico.exists():
+        return
+    u32.LoadImageW.restype = wintypes.HANDLE
+    u32.LoadImageW.argtypes = [wintypes.HINSTANCE, wintypes.LPCWSTR, wintypes.UINT, ctypes.c_int, ctypes.c_int, wintypes.UINT]
+    u32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+    for kind, px in ((1, u32.GetSystemMetrics(11)), (0, u32.GetSystemMetrics(49))):  # ICON_BIG/SMALL, SM_CXICON/CXSMICON
+        h = u32.LoadImageW(None, str(ico), 1, px, px, 0x10)  # IMAGE_ICON, LR_LOADFROMFILE
+        if h:
+            u32.SendMessageW(hwnd, 0x80, kind, h)  # WM_SETICON
+
+
 def _refresh_shell_icons():
     ctypes.windll.shell32.SHChangeNotify(0x08000000, 0, None, None)  # SHCNE_ASSOCCHANGED: 탐색기 아이콘 캐시 새로 고침
 

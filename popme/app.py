@@ -28,7 +28,7 @@ from popme.fileio import atomic_write_text
 from popme import __version__, agenda, ask, briefing, catalog, chrome, config, discovery, event_weather, mail, planner, character, update, weather
 from popme.collectors import timetree
 from popme.jobs import CHROME_CLOSED, Jobs, calendar_source
-from popme.pet import PetWindow, icon_image, load_images, write_icon
+from popme.pet import PetWindow, icon_image, load_images, set_app_id, set_window_icon, write_icon
 
 INTERESTS_OPEN = threading.Lock()  # 관심사 설정 창은 한 번에 하나
 
@@ -719,6 +719,7 @@ def main(restart=False):
     if mail.enabled(jobs.cfg):
         api._mail = mail.Watcher(jobs.cfg, jobs.db, on_new=api._on_mail)
 
+    set_app_id()  # 작업표시줄 아이콘이 파이썬으로 뜨지 않게 (창을 만들기 전에)
     window = webview.create_window(
         "POPME", url=str(UI), js_api=api, width=SIZES["panel"][0], height=SIZES["panel"][1],
         frameless=True, easy_drag=False, on_top=True, resizable=False, hidden=True, min_size=(80, 80),
@@ -758,7 +759,7 @@ def main(restart=False):
         (api.collect_label(), lambda: api.collect_now()),
         None,
         (f"{name} 숨기기 (트레이에서 다시 보이기)", api._hide_all),
-        ("설정 바꾸기", bg(open_settings)),
+        ("설정", bg(open_settings)),
         *([(f"새 버전 받기 ({api._new_version})", api.open_update)] if api._new_version else []),
         ("종료", quit_app),
     ]
@@ -780,7 +781,7 @@ def main(restart=False):
         pystray.MenuItem(lambda i: api.collect_label(rebuild=True), lambda i, _: api.collect_now(collect=False)),
         pystray.MenuItem("전용 Chrome 열기 (로그인)", lambda i, _: api.open_chrome_login()),
         pystray.MenuItem("브리핑 폴더 열기", lambda i, _: api.open_folder()),
-        pystray.MenuItem("설정 바꾸기", lambda i, _: threading.Thread(target=open_settings, daemon=True).start()),
+        pystray.MenuItem("설정", lambda i, _: threading.Thread(target=open_settings, daemon=True).start()),
         pystray.MenuItem(lambda i: f"새 버전 받기 ({api._new_version})", lambda i, _: api.open_update(),
                          visible=lambda i: bool(api._new_version)),
         pystray.MenuItem(f"POPME v{__version__}", None, enabled=False),
@@ -795,6 +796,7 @@ def main(restart=False):
             if api._hwnd:
                 break
             time.sleep(0.1)
+        set_window_icon(api._hwnd)
         # Windows 11이 그려주는 둥근 모서리 + 캐릭터 외곽선 색 테두리 (WebView2는 창 모양 자르기가 안 먹음)
         dwm = ctypes.windll.dwmapi
         for attr, val in ((33, 2), (34, 59 | 34 << 8 | 25 << 16)):  # CORNER_PREFERENCE=ROUND, BORDER_COLOR
