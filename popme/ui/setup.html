@@ -1394,7 +1394,7 @@ function intResult(body, c, d) {
   if (!d.verified) {
     const ents = [...on(d.people), ...on(d.companies), ...(d.searches || []).map(q => ({ kind: "search", name: q, news: q, region: "kr" }))];
     think("열어서 확인하는 중", ["X 계정이 정말 있는지 열어 보는 중", "공식 사이트에 RSS가 있나 찾는 중", "이름으로 뉴스를 검색해 보는 중",
-           ...ents.slice(0, 6).map(e => `「${cut(e.name, 20)}」 확인하는 중`), "고르는 기준 쓰는 중"], "10~20초");
+           ...ents.slice(0, 6).map(e => `「${cut(e.name, 20)}」 확인하는 중`), "관심사 설명 쓰는 중"], "10~20초");
     const ok = alive();
     Promise.all([api().interest_verify(ents, d.scope),
                  api().interest_finalize(d.field, d.scope, on(d.people), on(d.companies).filter(e => e.kind !== "media"),

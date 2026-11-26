@@ -3,6 +3,7 @@ id = 'llm-apps'
 name = 'LLM 앱·RAG'
 tag = 'LLM 앱'
 summary = 'RAG·에이전트 앱: 프레임워크·벡터 DB·임베딩·문서 파싱·평가'
+about = 'RAG·에이전트 앱 — 프레임워크(LangChain·LangGraph·LlamaIndex·DSPy·MCP 등)·벡터 DB·임베딩·리랭커·문서 파싱(HWP·PDF)·평가, LLM API의 기능·가격·단종, 실제로 만들어 본 사람들의 경험과 화제.'   # 브리핑 AI가 고르는 범위 (넓게, 「버린다」 없이). 없으면 summary
 order = 5
 status = "ready"
 topic = 'rag'                 # filter = true인 출처를 거를 판별 규칙 (popme/topics.py)

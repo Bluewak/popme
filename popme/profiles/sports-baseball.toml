@@ -3,6 +3,7 @@ id = "sports-baseball"
 name = "야구"
 tag = "야구"
 summary = "KBO·MLB·국가대표·아마야구 소식"
+about = '응원 팀 경기 결과·순위·1군 등록·부상, 한국인 빅리거 기록·계약·트레이드, FA·외국인 재계약·감독 선임, 국가대표 명단, 신인 드래프트·유망주 해외 진출.'   # 브리핑 AI가 고르는 범위 (넓게, 「버린다」 없이). 없으면 summary
 order = 21
 status = "ready"
 category = ["스포츠", "야구"]

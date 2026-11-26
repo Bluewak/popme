@@ -3,6 +3,7 @@ id = "sports-soccer"
 name = "축구"
 tag = "축구"
 summary = "해외축구·K리그·국가대표·여자축구 소식"
+about = '한국 선수 출전·골·부상, 대표팀 명단, 응원 팀 결과·순위·감독 교체·이적, 협회·연맹 행정, 화제가 된 경기와 이야기.'   # 브리핑 AI가 고르는 범위 (넓게, 「버린다」 없이). 없으면 summary
 order = 20
 status = "ready"
 category = ["스포츠", "축구"]

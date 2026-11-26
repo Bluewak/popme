@@ -129,7 +129,8 @@ def rules_for(cfg):
                 + (f"\n- 고른 것: {picked} — 이것과 관련된 소식을 먼저." if picked else "")
                 + (f"\n- 보는 범위: {'·'.join(chosen_subs)} — 이 소식을 먼저." if chosen_subs else "")
                 + (used_line if used else "") + taste.line(liked))
-    criteria = "\n".join(f"[{p['tag']}] {p.get('summary') or p['name']}{crit(p)}" for p in profs)
+    # about: 기본 관심사의 넓은 범위 설명 (예전 criteria의 「범위:」 줄). 화면용 summary는 짧아서 범위가 좁아 보인다 (검토 #68)
+    criteria = "\n".join(f"[{p['tag']}] {p.get('about') or p.get('summary') or p['name']}{crit(p)}" for p in profs)
     discovery = " 또는 ".join(dict.fromkeys(p["discovery"] for p in profs if p.get("discovery"))) or "실질 정보를 주는 사람"
     tags = [p["tag"] for p in catalog.chosen(cfg)]
     if len(tags) >= 2:

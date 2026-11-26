@@ -3,6 +3,7 @@ id = 'ai-coding'
 name = 'AI 코딩 에이전트'
 tag = 'AI 코딩'
 summary = 'Claude Code·Codex 같은 AI 코딩 도구를 쓰며 개발해요'
+about = 'AI 코딩 도구(Claude Code·Codex·Cursor·Copilot 등)와 에이전트로 개발하는 방식 전반 — 요금·한도·혜택, 새 기능·모델, 보안·장애, 써 본 사람들의 평가·비교, 업계에서 화제가 된 이야기.'   # 브리핑 AI가 고르는 범위 (넓게, 「버린다」 없이). 없으면 summary
 order = 1
 status = "ready"
 topic = 'ai'                 # filter = true인 출처를 거를 판별 규칙 (popme/topics.py)

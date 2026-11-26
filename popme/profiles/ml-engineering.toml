@@ -3,6 +3,7 @@ id = 'ml-engineering'
 name = 'ML 엔지니어링'
 tag = 'ML'
 summary = '모델 서빙·학습·GPU 비용, 오픈 웨이트 모델'
+about = '모델 서빙·학습·GPU 인프라 — 프레임워크(vLLM·SGLang·PyTorch·transformers 등) 변화, 오픈 웨이트 모델, GPU·클라우드 비용, 보안 권고, 써 본 사람들의 수치·평가, 이 분야에서 화제가 된 이야기.'   # 브리핑 AI가 고르는 범위 (넓게, 「버린다」 없이). 없으면 summary
 order = 3
 status = "ready"
 topic = 'ml'                 # filter = true인 출처를 거를 판별 규칙 (popme/topics.py)

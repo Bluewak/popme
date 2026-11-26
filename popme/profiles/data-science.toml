@@ -3,6 +3,7 @@ id = 'data-science'
 name = '데이터 사이언스'
 tag = '데이터'
 summary = 'pandas·SQL·실험·통계, 데이터 플랫폼 가격·변경'
+about = '데이터 분석·실험·통계와 그 도구(pandas·Polars·DuckDB·dbt·데이터 플랫폼)의 변화·가격, LLM을 분석에 쓰는 법, 현업 사례, 데이터 쪽에서 화제가 된 논의.'   # 브리핑 AI가 고르는 범위 (넓게, 「버린다」 없이). 없으면 summary
 order = 2
 status = "ready"
 topic = 'data'                 # filter = true인 출처를 거를 판별 규칙 (popme/topics.py)

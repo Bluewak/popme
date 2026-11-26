@@ -3,6 +3,7 @@ id = "ent-kpop"
 name = "K-pop"
 tag = "K팝"
 summary = "컴백·데뷔·차트·기획사 소식"
+about = '컴백·데뷔 일정, 음반·음원·차트 성적, 투어, 멤버 입대·탈퇴·활동 중단, 기획사 공지·경영권·인수·실적·소송, 업계에서 화제가 된 이야기.'   # 브리핑 AI가 고르는 범위 (넓게, 「버린다」 없이). 없으면 summary
 order = 40
 status = "ready"
 category = ["엔터·문화", "K-pop"]

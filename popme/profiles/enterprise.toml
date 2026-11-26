@@ -3,6 +3,7 @@ id = 'enterprise'
 name = '엔터프라이즈 도입 (FDE)'
 tag = '도입'
 summary = '모델 단종·가격·리전, 엔터프라이즈 기능 GA, 국내 규제·클라우드'
+about = '기업의 AI 도입 — 모델 단종·가격·리전, 엔터프라이즈 기능, AI 보안·장애, 국내 규제·국내 LLM·클라우드, 도입 현장의 경험담과 업계 흐름.'   # 브리핑 AI가 고르는 범위 (넓게, 「버린다」 없이). 없으면 summary
 order = 4
 status = "ready"
 topic = 'ent'                 # filter = true인 출처를 거를 판별 규칙 (popme/topics.py)

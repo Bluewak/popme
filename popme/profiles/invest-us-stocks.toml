@@ -3,6 +3,7 @@ id = "invest-us-stocks"
 name = "미국주식"
 tag = "미국주식"
 summary = "빅테크·반도체·실적 시즌·Fed 소식"
+about = 'FOMC·Fed 발언, CPI·고용 같은 지표, 빅테크·반도체 실적과 가이던스, 미국 증시 마감 흐름, 관심 종목의 공식 발표.'   # 브리핑 AI가 고르는 범위 (넓게, 「버린다」 없이). 없으면 summary
 order = 31
 status = "ready"
 category = ["경제·투자", "미국주식"]

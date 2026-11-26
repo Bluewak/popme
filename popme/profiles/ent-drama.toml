@@ -3,6 +3,7 @@ id = "ent-drama"
 name = "드라마"
 tag = "드라마"
 summary = "새 드라마·OTT 오리지널·시청률 소식"
+about = '새 드라마 편성·공개일·캐스팅·시즌 제작 확정, 종영·시청률·화제성, OTT 요금제·합병·서비스 종료, 작품을 둘러싼 논란과 화제.'   # 브리핑 AI가 고르는 범위 (넓게, 「버린다」 없이). 없으면 summary
 order = 41
 status = "ready"
 category = ["엔터·문화", "드라마"]
