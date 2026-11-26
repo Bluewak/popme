@@ -435,6 +435,13 @@ STORY_STOP = {"ai", "개최", "성료", "진행", "출시", "공개", "발표", 
 
 
 _JOSA = ("에서", "으로", "에게", "에", "의", "를", "을", "이", "가", "은", "는", "와", "과", "로", "도")
+# 영어 제목의 기능어 (해외 뉴스 검색) — is·in·the만 겹쳐도 무관한 기사가 묶였다 (검토 #69). 두 글자 영어 낱말은 아예 안 센다
+EN_STOP = {"the", "and", "for", "with", "from", "after", "before", "says", "said", "new", "how", "why", "what", "who",
+           "are", "was", "were", "will", "has", "have", "had", "its", "his", "her", "their", "this", "that", "over",
+           "into", "out", "about", "more", "than", "not", "but", "can", "all", "just", "now", "next", "back", "best",
+           "here", "when", "where", "you", "your", "our", "get", "gets", "set", "sets", "big", "first", "last", "year"}
+# 날짜·횟수 같은 숫자 낱말 — 같은 날 기사끼리 「26일」만 겹쳐 묶였다. 「5000명」처럼 사건을 가르는 수치는 남긴다
+_DATEISH = re.compile(r"\d+(일|월|년|시|분|주|차|회|기|호|세)?")
 
 
 def _title_words(title):
@@ -444,23 +451,31 @@ def _title_words(title):
     def bare(w):  # 「경진대회에」 → 「경진대회」 (조사 하나만)
         j = next((j for j in _JOSA if len(w) > len(j) + 1 and w.endswith(j)), "")
         return w[:len(w) - len(j)]
-    return {bare(w.lower()) for w in _WORD.findall(t) if len(w) >= 2}
+
+    def counts(w):
+        if w.isascii() and w.isalpha():
+            return len(w) >= 3 and w not in EN_STOP
+        return len(w) >= 2 and not _DATEISH.fullmatch(w)
+    return {b for b in (bare(w.lower()) for w in _WORD.findall(t)) if counts(b)}
 
 
 def _same_story(a, b):
+    """낱말 3개 이상, 또는 2개면서 긴 쪽의 절반 이상 겹치면 같은 사건. 「2개·짧은 쪽 40%」였을 땐 「Inter Miami」만 겹친
+    다른 경기 기사가 묶였다 (검토 #69). 잘못 묶으면 기사가 숨고, 나뉘면 자리를 하나 더 쓸 뿐이라 나뉘는 쪽으로."""
     n = len(a & b)
-    return n >= 2 and n >= 0.4 * min(len(a), len(b))
+    return n >= 3 or (n >= 2 and n >= 0.5 * max(len(a), len(b)))
 
 
 def stories(rows, query=""):
-    """같은 사건 기사 묶기 → [[기사…]] 기사 많은 순(같으면 rows 순서). 묶음 안 기사 하나와 제목 낱말이 2개 이상,
-    짧은 쪽의 40% 이상 겹치면 같은 사건. 검색어 낱말과 일반어(STORY_STOP)는 세지 않는다.
+    """같은 사건 기사 묶기 → [[기사…]] 기사 많은 순(같으면 rows 순서). 묶음 안 기사 하나와 _same_story면 같은 사건.
+    검색어(와 그것으로 시작하는 낱말)·일반어(STORY_STOP)·날짜 숫자·영어 기능어는 세지 않는다.
     묶음 낱말을 합쳐 두고 견주면 묶음이 커질수록 아무 기사나 붙었다. 2026-11 실제 제목으로 시험: 다른 사건이 합쳐진 경우는 없고,
     같은 사건이 둘로 나뉘는 경우는 있다 (「몰려」·「몰렸다」 — 그래도 자리를 하나 더 쓸 뿐이다)."""
-    drop = _title_words(query) | STORY_STOP
+    q = _title_words(query)
     found = []  # [[기사마다 낱말…], [기사…]]
     for r in rows:
-        w = _title_words(r["title"] or "") - drop
+        # 검색어로 시작하는 낱말도 뺀다: 「카카오」 검색에서 「카카오톡」·「카카오뱅크」가 겹쳐 다른 사건이 묶였다 (검토 #69)
+        w = {x for x in _title_words(r["title"] or "") - STORY_STOP if not any(x.startswith(k) for k in q)}
         for seen, members in found:
             if any(_same_story(w, x) for x in seen):
                 seen.append(w)

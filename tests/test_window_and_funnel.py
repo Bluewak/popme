@@ -2,6 +2,8 @@
 import json
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from popme import accounts, ask, briefing, clock, discovery, funnel
 from popme.db import DB
 
@@ -125,9 +127,33 @@ def test_stories_group_same_event_titles():
         "카카오, AI 에이전트 실전 경진대회 개최…5,000명 지원해 100명 본선 진출 - 인공지능신문",
         "카카오, AI 에이전트 활용 인재 발굴…경진대회에 5000명 몰렸다 - 파이낸셜뉴스"]]
     got = briefing.stories(rows, "AI 경진대회 개최")
-    # 「경진대회에」·「5,000명」도 같은 낱말로 센다. 「실전 경진대회…본선 진출」은 겹침이 모자라 따로 (나뉘는 쪽으로 틀린다)
+    # 「경진대회에」·「5,000명」도 같은 낱말로 센다. 카카오 기사 5건 중 4건이 묶이고 1건은 겹침이 모자라 따로 (나뉘는 쪽으로 틀린다)
     assert [len(s) for s in got] == [4, 1, 1, 1] and all("카카오" in r["title"] for r in got[0])
-    assert "실전" not in " ".join(r["title"] for r in got[0])
+    assert all("카카오" not in r["title"] for s in got[1:] for r in s if "고교생" in r["title"])  # 다른 사건은 안 섞인다
+
+
+@pytest.mark.parametrize("query, titles", [
+    ("카카오", ["카카오, 26일 카카오톡 새 기능 업데이트 - 연합뉴스", "카카오뱅크 26일 카카오톡 송금 수수료 면제 이벤트 - 머니투데이"]),
+    ("삼성", ["삼성전자 2026년 AI 반도체 전략 발표 - 매체", "삼성전자 2026년 갤럭시 신제품 공개 일정 - 매체"]),
+    ("Son Heung-min", ["Lionel Messi is back in the Inter Miami lineup", "Why Son Heung-min is the best in the MLS",
+                       "What is next for Inter Miami in the playoffs", "LAFC to host Inter Miami in the West final"][:2]),
+])
+def test_stories_do_not_merge_on_dates_query_compounds_or_english_function_words(query, titles):
+    """검토 #69에서 재현된 잘못 묶임: 날짜(26일·2026년), 검색어로 시작하는 낱말(카카오톡·삼성전자), 영어 기능어(is·in·the)."""
+    got = briefing.stories([{"title": t} for t in titles], query)
+    assert [len(s) for s in got] == [1] * len(titles)
+
+
+def test_two_word_name_alone_does_not_merge_different_events():
+    """「Inter Miami」 두 낱말만 겹치는 다른 경기 기사들은 따로 (검토 #69 반례). 같은 사건은 낱말이 더 겹친다."""
+    rows = [{"title": t} for t in ["Lionel Messi is back in the Inter Miami lineup",
+                                   "Why Son Heung-min is the best in the MLS",
+                                   "What is next for Inter Miami in the playoffs",
+                                   "LAFC to host Inter Miami in the West final"]]
+    assert [len(s) for s in briefing.stories(rows, "Son Heung-min")] == [1, 1, 1, 1]
+    same = [{"title": "Anthropic raises $30 billion at $380 billion valuation"},
+            {"title": "Anthropic closes $30 billion round, valuation hits $380 billion"}]
+    assert [len(s) for s in briefing.stories(same, "OpenAI")] == [2]
 
 
 def test_news_search_keeps_biggest_story_over_latest_singles(tmp_path, monkeypatch):
