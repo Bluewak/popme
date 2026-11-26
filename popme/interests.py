@@ -90,9 +90,10 @@ FINAL = """분야: {field} / 범위: {scope} / 보는 방식: {lens}
 고른 사람: {people}
 고른 기업·단체: {companies}
 특히 궁금한 것: {topics}
-이 사람의 아침 브리핑에 쓸 관심사 이름과 설명을 만들어라. 브리핑은 이 한 줄 설명에 해당하는 소식을 모두 고른다
-(광고·홍보만 버린다). 그래서 설명은 분야를 넓게 담고, 「~만」처럼 좁히지 않는다.
-출력: {{"name": "관심사 이름 12자 이내", "tag": "짧은 태그 6자 이내", "summary": "한 줄 설명 30자 이내",
+이 사람의 아침 브리핑에 쓸 관심사 이름과 설명을 만들어라. 브리핑은 about(범위)에 해당하는 소식을 모두 고른다
+(광고·홍보만 버린다). 그래서 about은 분야를 넓게 담고, 「~만」·「버린다」처럼 좁히지 않는다.
+출력: {{"name": "관심사 이름 12자 이내", "tag": "짧은 태그 6자 이내", "summary": "화면에 보일 한 줄 설명 30자 이내",
+ "about": "브리핑이 고를 범위 한 문장 120자 이내 — 이 분야의 공식 발표·중요한 변화, 행사·대회·모집, 사람들 사이 화제·후기·평가를 모두 담아",
  "discovery": "새로 볼 만한 사람을 고를 기준 한 문장"}}"""
 SCOPES = {"kr": "한국어 소식만", "world": "해외 소식도 함께"}
 MIX = {"kr": "국내 위주로.", "world": "해외와 국내를 섞어서."}
@@ -302,6 +303,7 @@ def finalize(cfg, field, scope, people, companies, topics, lens=None, answers=No
                           lens=LENSES.get(lens, "특정 대상 위주"), answers=answers_text(answers),
                           companies=names(companies), topics="·".join(topics) or "(없음)")
     base = {"name": _short(field, 12), "tag": _short(field, 6), "summary": f"{_short(field, 20)} 소식",
+            "about": f"{_short(field, 40)}의 공식 발표·중요한 변화, 행사·대회·모집, 사람들 사이에서 화제가 된 이야기·후기·평가",
             "discovery": f"{_short(field, 20)} 소식을 꾸준히 전하는 사람"}
     try:
         raw = llm.parse_json(llm.ask(cfg, SYSTEM, prompt, timeout=180))
@@ -310,6 +312,7 @@ def finalize(cfg, field, scope, people, companies, topics, lens=None, answers=No
         return base
     return {"name": _short(raw.get("name"), 12) or base["name"], "tag": _short(raw.get("tag"), 6) or base["tag"],
             "summary": _short(raw.get("summary"), 30) or base["summary"],
+            "about": _short(raw.get("about"), 120) or base["about"],
             "discovery": _short(raw.get("discovery"), 80) or base["discovery"]}
 
 
@@ -400,7 +403,8 @@ def save_custom(field, scope, verified, topics, final, lens=None, kind=None, ans
     pid = f"custom-{_slug(field)}"
     lines = [f"# 관심사 설정에서 만든 관심사 ({datetime.now():%Y-%m-%d}). 「{field}」",
              f"id = {_q(pid)}", f"name = {_q(final['name'])}", f"tag = {_q(final['tag'])}",
-             f"summary = {_q(final['summary'])}", 'status = "ready"', f"scope = {_q(scope)}",
+             f"summary = {_q(final['summary'])}", f"about = {_q(final.get('about') or final['summary'])}",
+             'status = "ready"', f"scope = {_q(scope)}",
              f"discovery = {_q(final['discovery'])}", f"topics = {_q(list(topics))}",
              f"lens = {_q(lens if lens in LENSES else 'target')}", f"type = {_q(kind if kind in TYPES else '기타')}",
              "", "[answers]                     # 관심사 설정에서 고른 것 (칸 → 보기)"]

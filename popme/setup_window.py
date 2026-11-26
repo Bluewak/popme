@@ -230,7 +230,8 @@ def validate_interests(it):
                         "verified": [e for e in c.get("verified") or [] if isinstance(e, dict) and e.get("name")][:20],
                         "topics": clean(c.get("topics"), 10),
                         "final": {"name": str(f.get("name") or c["field"])[:12], "tag": str(f.get("tag") or c["field"])[:6],
-                                  "summary": str(f.get("summary") or "")[:30], "discovery": str(f.get("discovery") or "")[:80]}})
+                                  "summary": str(f.get("summary") or "")[:30], "about": str(f.get("about") or "")[:120],
+                                  "discovery": str(f.get("discovery") or "")[:80]}})
     return {"interests": {"chosen": chosen, "picks": picks, "customs": customs}}
 
 

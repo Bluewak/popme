@@ -1425,7 +1425,7 @@ function intResult(body, c, d) {
     ${cos.length ? `<h2>기업·단체</h2><div class="box">${cos.map(row).join("")}</div>` : ""}
     ${media.length ? `<h2>전문 매체</h2><div class="box">${media.map(mrow).join("")}</div>` : ""}
     ${searches.length ? `<h2>분야 뉴스</h2><div class="box">${searches.map(srow).join("")}</div>` : ""}
-    <p class="lead">「${esc(d.final.summary || d.final.name)}」에 해당하는 소식을 골라요. 광고·홍보만 빼요.</p>
+    <p class="lead">「${esc(d.final.about || d.final.summary || d.final.name)}」에 해당하는 소식을 골라요. 광고·홍보만 빼요.</p>
     <div class="row"><button id="int-redo">다시 고르기</button></div>`;
   $("#int-redo").onclick = () => { d.verified = null; d.final = null; INT.sub = d.subs.indexOf("people"); intRender(); };
   body.querySelectorAll("[data-xlogin]").forEach(a => a.onclick = async () => {

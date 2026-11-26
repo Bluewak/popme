@@ -39,12 +39,23 @@ def feeds():
     return {fid: {**f, "id": fid} for fid, f in tomllib.loads(FEEDS_PATH.read_text(encoding="utf-8"))["feed"].items()}
 
 
+def legacy_about(criteria):
+    """예전 criteria 글에서 「범위:」 줄만 → 넓은 범위 설명. 없으면 "" (summary를 쓴다). 「버린다」 등 다른 줄은 버린다."""
+    for line in str(criteria or "").splitlines():
+        s = line.strip().lstrip("-").strip()
+        if s.startswith("범위:"):
+            return s[len("범위:"):].strip()
+    return ""
+
+
 @lru_cache(maxsize=1)
 def _profiles():
     out = [tomllib.loads(p.read_text(encoding="utf-8")) for p in sorted(PROFILES_DIR.glob("*.toml"))]
     for p in sorted(CUSTOM_DIR.glob("custom-*.toml")):  # 새로 만든 관심사 — 깨진 파일은 건너뛴다
         try:
             prof = {"order": 100, **tomllib.loads(p.read_text(encoding="utf-8")), "custom": True}
+            if not prof.get("about"):  # 2026-11-26 전에 만든 관심사: criteria의 「범위:」 줄을 넓은 범위로 (파일은 그대로)
+                prof["about"] = legacy_about(prof.get("criteria"))
             for t in topics.unknown(prof.get("topic")) + [n for e in prof.get("feeds", []) if isinstance(e.get("filter"), str)
                                                             for n in topics.unknown(e["filter"])]:
                 log.warning("관심사 %s: 모르는 주제 이름 %r (그 거르기는 아무 글도 고르지 않아요)", p.name, t)
