@@ -6,10 +6,6 @@ summary = 'Claude Code·Codex 같은 AI 코딩 도구를 쓰며 개발해요'
 order = 1
 status = "ready"
 topic = 'ai'                 # filter = true인 출처를 거를 판별 규칙 (popme/topics.py)
-criteria = """
-- 범위: AI 코딩 도구(Claude Code·Codex·Cursor·Copilot 등)와 에이전트로 개발하는 방식 전반 — 요금·한도·혜택, 새 기능·모델, 보안·장애, 써 본 사람들의 평가·비교, 업계에서 화제가 된 이야기.
-- 버린다: 「10배 빨라짐」 류 홍보·과장, 프롬프트 모음·돈벌이 글, 동작이 안 바뀌는 패치 릴리스, 시험판(alpha·beta·rc·nightly).
-"""
 discovery = '에이전트·Claude Code·Codex·개발 도구에 실질 정보를 주는 사람'
 topics = ['요금·한도·혜택', '장애·보안', '새 기능·바뀐 기본값', '에이전트 사용법', '새 도구·오픈소스']   # 「특히 궁금한 것」 보기 (관심사 설정 ⑤)
 

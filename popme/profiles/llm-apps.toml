@@ -6,11 +6,6 @@ summary = 'RAG·에이전트 앱: 프레임워크·벡터 DB·임베딩·문서 
 order = 5
 status = "ready"
 topic = 'rag'                 # filter = true인 출처를 거를 판별 규칙 (popme/topics.py)
-criteria = """
-- 범위: RAG·에이전트 앱 — 프레임워크(LangChain·LangGraph·LlamaIndex·DSPy·MCP 등)·벡터 DB·임베딩·리랭커·문서 파싱(HWP·PDF)·평가, LLM API의 기능·가격·단종, 실제로 만들어 본 사람들의 경험과 화제.
-- 버린다: 개념 설명·입문, 「RAG is dead」 류 단정, 벤더 고객사례·웨비나·제휴 공지, rc·nightly·dev, 결과가 안 바뀌는 패치.
-- 쓸 때: 깨지는 변경은 영향 버전·옮기는 법을, 벤더 수치는 「~라는 주장」으로.
-"""
 discovery = 'RAG·검색·임베딩·문서 파싱·LLM 앱 평가에 실질 정보를 주는 사람'
 topics = ['프레임워크 큰 변경', '벡터 DB·검색', '임베딩·리랭커', '평가·관측', '문서 파싱(HWP·PDF)', '에이전트 보안']   # 「특히 궁금한 것」 보기 (관심사 설정 ⑤)
 

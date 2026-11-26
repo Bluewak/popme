@@ -21,7 +21,7 @@ def test_one_interest_gives_its_summary_not_its_criteria_list():
     ds = next(p for p in catalog.profiles() if p["id"] == "data-science")
     text = prompt(news("data-science"))
     assert f"[{ds['tag']}] {ds['summary']}" in text and ds["discovery"] in text
-    assert ds["criteria"].strip().splitlines()[0] not in text
+    assert "버린다:" not in text and "범위:" not in text  # 예전 관심사별 넣을 것·버릴 것 목록
     assert "버리는 것은 광고·홍보" in text
     assert "- tags:" not in text and '"tags"' not in text
     assert not re.search(r"__[A-Z_]+__", text)  # 안 채운 자리 없음

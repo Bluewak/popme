@@ -234,9 +234,21 @@ def test_suggest_cleans_ai_answer(monkeypatch):
 
 
 def test_finalize_falls_back(monkeypatch):
-    monkeypatch.setattr(interests.llm, "ask", lambda *a, **k: '{"name": "축구 소식", "criteria": ["하나"]}')
+    seen = {}
+    monkeypatch.setattr(interests.llm, "ask", lambda cfg, system, prompt, **k: seen.setdefault("p", prompt) and
+                        '{"name": "축구 소식", "criteria": ["하나"]}')
     f = interests.finalize({}, "축구", "world", [], [], [])
-    assert f["name"] == "축구 소식" and len(f["criteria"]) == 3  # 기준이 모자라면 정해진 문장
+    assert f["name"] == "축구 소식" and f["summary"] == "축구 소식"  # 빠진 칸은 정해진 문장
+    assert "criteria" not in f and "criteria" not in seen["p"]  # 넣을 것·버릴 것 기준은 이제 만들지 않는다
+
+
+def test_saved_custom_has_no_criteria(monkeypatch):
+    monkeypatch.setattr(interests, "news_count", lambda e, scope: 3)
+    final = {"name": "보드게임", "tag": "보드게임", "summary": "보드게임 신작·대회 소식", "discovery": "리뷰어"}
+    pid = interests.save_custom("보드게임", "kr", [{"kind": "search", "name": "보드게임", "region": "kr",
+                                                  "news": "보드게임", "news_count": 3}], [], final)
+    p = next(x for x in catalog.profiles() if x["id"] == pid)
+    assert p["summary"] == "보드게임 신작·대회 소식" and "criteria" not in p
 
 
 def test_verify_and_save_custom(monkeypatch):
