@@ -261,7 +261,8 @@ def test_verify_and_save_custom(monkeypatch):
     assert "news" not in quiet  # 기사가 안 나오는 검색어도
     cfg = news(interests=[pid])
     assert {a["handle"] for a in catalog.x_accounts(cfg)} == {"ManCity"}
-    assert "- 이적 먼저" in briefing.rules_for(cfg)["criteria"]
+    crit = briefing.rules_for(cfg)["criteria"]
+    assert "[축구] 축구 소식" in crit and "가십 빼기" not in crit  # 저장은 하되 지시문엔 이름·설명만
 
 
 def test_save_picks_and_preset_view():
@@ -511,7 +512,7 @@ def test_pack_subs_filter_feeds_people_and_scope():
     assert team["kind"] == "target" and team["news"] == "전북 현대 축구"  # 고른 응원 팀도 뉴스로 받는다
     assert all(catalog.in_subs(e, ["K리그"]) for e in ents if e["kind"] != "target")
     crit = briefing.rules_for(kl)["criteria"]
-    assert "보는 범위: K리그만" in crit and "응원하는 팀: 전북 현대" in crit
+    assert "보는 범위: K리그 — 이 소식을 먼저" in crit and "K리그만" not in crit and "응원하는 팀: 전북 현대" in crit
 
 
 def test_pack_view_and_save_subs():

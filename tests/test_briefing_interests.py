@@ -16,17 +16,20 @@ def prompt(cfg):
                           persona="", name="", n_lines=3)
 
 
-def test_one_interest_uses_its_criteria_without_tags():
+def test_one_interest_gives_its_summary_not_its_criteria_list():
+    """관심사 파일의 criteria(넣을 것·버릴 것 목록)는 지시문에 넣지 않는다 — 이름·한 줄 설명만 (2026-11 AI TOP 100)."""
     ds = next(p for p in catalog.profiles() if p["id"] == "data-science")
     text = prompt(news("data-science"))
-    assert ds["criteria"].strip() in text and ds["discovery"] in text
+    assert f"[{ds['tag']}] {ds['summary']}" in text and ds["discovery"] in text
+    assert ds["criteria"].strip().splitlines()[0] not in text
+    assert "버리는 것은 광고·홍보" in text
     assert "- tags:" not in text and '"tags"' not in text
     assert not re.search(r"__[A-Z_]+__", text)  # 안 채운 자리 없음
 
 
 def test_nothing_chosen_falls_back_to_ai_coding():
     ai = next(p for p in catalog.profiles() if p["id"] == "ai-coding")
-    assert ai["criteria"].strip() in prompt(news())
+    assert f"[{ai['tag']}] {ai['summary']}" in prompt(news())
 
 
 def test_two_interests_join_criteria_and_ask_tags():
