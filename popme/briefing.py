@@ -416,8 +416,8 @@ def rss_items(cfg, db, since_iso, new_after=None):
         q = feed["id"].split(":", 2)[2] if (feed.get("id") or "").startswith("news:") else ""
         for rank, story in enumerate(stories(rs, q)[:feed["cap"]]):
             top = {**story[0], "_rank": rank, "_n": len(story)}
-            if len(story) > 1:
-                top["title"] = f"{top['title']} (같은 소식 기사 {len(story)}건)"
+            if len(story) > 1:  # 묶인 기사의 다른 제목도 보인다 — 잘못 묶여도 그 소식이 숨지 않게 (2차 검토 #69)
+                top["title"] = f"{top['title']} (같은 소식 기사 {len(story)}건{_other_titles(story)})"
             groups.setdefault(feed.get("group") or top["grp"], []).append(top)
     for g in groups.values():
         # 묶음 상한에 잘릴 때: 검색마다 가장 큰 사건부터 돌아가며 (다른 출처 글은 0순위 그대로 최신순)
@@ -440,8 +440,25 @@ EN_STOP = {"the", "and", "for", "with", "from", "after", "before", "says", "said
            "are", "was", "were", "will", "has", "have", "had", "its", "his", "her", "their", "this", "that", "over",
            "into", "out", "about", "more", "than", "not", "but", "can", "all", "just", "now", "next", "back", "best",
            "here", "when", "where", "you", "your", "our", "get", "gets", "set", "sets", "big", "first", "last", "year"}
-# 날짜·횟수 같은 숫자 낱말 — 같은 날 기사끼리 「26일」만 겹쳐 묶였다. 「5000명」처럼 사건을 가르는 수치는 남긴다
-_DATEISH = re.compile(r"\d+(일|월|년|시|분|주|차|회|기|호|세)?")
+# 날짜·기간·횟수 낱말 — 같은 날 기사끼리 「26일」「3분기」만 겹쳐 묶였다. 「5000명」처럼 사건을 가르는 수치는 남긴다
+_DATEISH = re.compile(r"\d+(일|월|년|시|분|주|차|회|기|호|세|분기|반기)?|[상하]반기|[1-4]q|q[1-4]|fy\d+|\d+h")
+OTHER_TITLES = 3  # 묶인 사건 줄에 붙일 다른 제목 수
+
+
+def _other_titles(story):
+    """묶인 기사 중 대표가 아닌 것의 제목(「 - 매체」 뺌, 다른 것만, 60자) → 「 — 다른 제목: a / b」."""
+    seen, out = {_bare_title(story[0]["title"])}, []
+    for r in story[1:]:
+        t = _bare_title(r["title"])
+        if t and t not in seen and len(out) < OTHER_TITLES:
+            seen.add(t)
+            out.append(t[:60])
+    return f" — 다른 제목: {' / '.join(out)}" if out else ""
+
+
+def _bare_title(title):
+    t = title or ""
+    return (t.rsplit(" - ", 1)[0] if " - " in t else t).strip()
 
 
 def _title_words(title):
@@ -460,17 +477,18 @@ def _title_words(title):
 
 
 def _same_story(a, b):
-    """낱말 3개 이상, 또는 2개면서 긴 쪽의 절반 이상 겹치면 같은 사건. 「2개·짧은 쪽 40%」였을 땐 「Inter Miami」만 겹친
-    다른 경기 기사가 묶였다 (검토 #69). 잘못 묶으면 기사가 숨고, 나뉘면 자리를 하나 더 쓸 뿐이라 나뉘는 쪽으로."""
+    """낱말이 2개 이상, 짧은 쪽의 40% 이상 겹치면 같은 사건. 제목만으로는 잘못 묶임과 나뉨을 함께 줄일 수 없었다
+    (2차 검토: 조이면 같은 사건 12쌍 중 6쌍만 묶여, 나뉜 한 사건이 검색 자리 5개를 다 차지해 다른 사건을 밀었다).
+    그래서 같은 사건을 잘 묶는 쪽으로 두고, 잘못 묶여도 숨지 않게 묶인 다른 제목을 대표 줄에 붙인다 (_other_titles)."""
     n = len(a & b)
-    return n >= 3 or (n >= 2 and n >= 0.5 * max(len(a), len(b)))
+    return n >= 2 and n >= 0.4 * min(len(a), len(b))
 
 
 def stories(rows, query=""):
     """같은 사건 기사 묶기 → [[기사…]] 기사 많은 순(같으면 rows 순서). 묶음 안 기사 하나와 _same_story면 같은 사건.
     검색어(와 그것으로 시작하는 낱말)·일반어(STORY_STOP)·날짜 숫자·영어 기능어는 세지 않는다.
-    묶음 낱말을 합쳐 두고 견주면 묶음이 커질수록 아무 기사나 붙었다. 2026-11 실제 제목으로 시험: 다른 사건이 합쳐진 경우는 없고,
-    같은 사건이 둘로 나뉘는 경우는 있다 (「몰려」·「몰렸다」 — 그래도 자리를 하나 더 쓸 뿐이다)."""
+    묶음 낱말을 합쳐 두고 견주면 묶음이 커질수록 아무 기사나 붙었다. 틀로 쓰는 제목(실적·리콜·경기 결과)은 다른 사건끼리
+    묶일 수 있다 — rss_items가 묶인 다른 제목을 함께 보여 준다."""
     q = _title_words(query)
     found = []  # [[기사마다 낱말…], [기사…]]
     for r in rows:

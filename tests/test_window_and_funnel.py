@@ -144,16 +144,46 @@ def test_stories_do_not_merge_on_dates_query_compounds_or_english_function_words
     assert [len(s) for s in got] == [1] * len(titles)
 
 
-def test_two_word_name_alone_does_not_merge_different_events():
-    """「Inter Miami」 두 낱말만 겹치는 다른 경기 기사들은 따로 (검토 #69 반례). 같은 사건은 낱말이 더 겹친다."""
+def test_searched_person_is_not_merged_into_other_events_and_same_event_groups():
+    """영어 기능어(is·in·the)로는 묶이지 않아 찾던 사람 기사는 따로 남는다 (검토 #69 반례). 같은 사건은 묶인다."""
     rows = [{"title": t} for t in ["Lionel Messi is back in the Inter Miami lineup",
                                    "Why Son Heung-min is the best in the MLS",
                                    "What is next for Inter Miami in the playoffs",
                                    "LAFC to host Inter Miami in the West final"]]
-    assert [len(s) for s in briefing.stories(rows, "Son Heung-min")] == [1, 1, 1, 1]
+    got = briefing.stories(rows, "Son Heung-min")
+    assert any(len(s) == 1 and "Son Heung-min" in s[0]["title"] for s in got)
     same = [{"title": "Anthropic raises $30 billion at $380 billion valuation"},
             {"title": "Anthropic closes $30 billion round, valuation hits $380 billion"}]
     assert [len(s) for s in briefing.stories(same, "OpenAI")] == [2]
+
+
+@pytest.mark.parametrize("title, period", [("삼성전자, 3분기 영업이익 10조 돌파 - 매체", "3분기"),
+                                           ("삼성전자 3Q 영업이익 시장 전망 상회 - 매체", "3q"),
+                                           ("카카오 상반기 실적 발표 - 매체", "상반기"),
+                                           ("카카오, 26일 카카오톡 업데이트 - 매체", "26일")])
+def test_period_words_do_not_count(title, period):
+    """날짜·기간 낱말은 세지 않는다 — 같은 날 다른 회사 실적이 이것만으로 묶이지 않게 (2차 검토 #69)."""
+    words = briefing._title_words(title)
+    assert period not in words
+    assert len(words) >= 2  # 기간 낱말만 빠지고 나머지는 남는다
+
+
+def test_merged_story_line_shows_the_other_titles(tmp_path, monkeypatch):
+    """잘못 묶여도 숨지 않게: 묶인 사건 줄에 다른 제목(최대 3개)을 붙인다 (2차 검토 #69)."""
+    from popme import catalog
+    db = _db(tmp_path)
+    now = datetime.now(timezone.utc)
+    titles = ["Tesla recalls 200,000 Model Y vehicles over seatbelt issue - Reuters",
+              "Tesla recalls 100,000 Cybertruck vehicles over panel issue - CNBC",
+              "Tesla recalls 200,000 Model Y vehicles over seatbelt issue - AP"]
+    db.upsert_items([{"url": f"https://n/{i}", "source": "뉴스 · Tesla (해외)", "grp": "뉴스", "summary": "", "title": t,
+                      "published": (now - timedelta(minutes=i)).isoformat()} for i, t in enumerate(titles)])
+    feed = {"id": "news:world:Tesla", "name": "뉴스 · Tesla (해외)", "group": "뉴스", "cap": 5, "interests": {}}
+    monkeypatch.setattr(catalog, "active", lambda cfg: [feed])
+    monkeypatch.setattr(catalog, "caps", lambda cfg: {"뉴스": 13})
+    got = [r["title"] for r in briefing.rss_items({"news": {}}, db, (now - timedelta(days=1)).isoformat())]
+    line = " ".join(got)
+    assert "Cybertruck" in line and line.count("Model Y vehicles over seatbelt issue") <= 2  # 같은 제목은 한 번 더 안 붙인다
 
 
 def test_news_search_keeps_biggest_story_over_latest_singles(tmp_path, monkeypatch):
