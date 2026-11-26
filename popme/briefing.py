@@ -214,7 +214,29 @@ def late_posts(db, handle, since_iso, seen_after):
     return sorted(rows, key=lambda t: t["created_at"] or "")
 
 
+def late_lines(db, where, args, since_iso, seen_after, limit):
+    """검색·태그·Threads 계정 글 중 since_iso 전에 올라왔지만 seen_after(지난 브리핑) 뒤에 처음 받은 글 (X_LOOKBACK 안),
+    반응 큰 limit개를 시간순으로. 늦게 받은 글은 「올라온 시각」 구간 밖이라 어느 브리핑에도 못 들어갔다 —
+    2026-10-31 카카오 AI TOP 100 예선 후기(Threads 태그, ♥150+)는 사흘 넘게 늦게 받아 빠졌다 (W44 Threads 태그 지연 중앙값 71시간)."""
+    if not seen_after:
+        return []
+    early = (datetime.fromisoformat(since_iso) - X_LOOKBACK).isoformat()
+    rows = db.q(f"SELECT * FROM tweets WHERE {where} AND created_at < ? AND created_at >= ? AND collected_at > ? "
+                f"ORDER BY likes DESC LIMIT {int(limit)}", *args, since_iso, early, seen_after)
+    return sorted(rows, key=lambda t: t["created_at"] or "")
+
+
+def threads_late(db, user, since_iso, seen_after):
+    """Threads 계정의 늦게 받은 글. X late_posts처럼 그 계정 글을 seen_after 전에도 받은 적이 있을 때만 (새로 더한 계정의 지난 글이 쏟아지지 않게)."""
+    if not seen_after or not db.q("SELECT 1 FROM tweets WHERE platform='threads' AND author = ? COLLATE NOCASE "
+                                  "AND collected_at <= ? LIMIT 1", user, seen_after):
+        return []
+    return late_lines(db, "platform='threads' AND author = ? COLLATE NOCASE", [user], since_iso, seen_after,
+                      X_LATE_PER_ACCOUNT)
+
+
 SEARCH_LINES = 15  # 검색·태그 구획의 줄 수 (좋아요순)
+SEARCH_LATE_LINES = 5  # 그중 늦게 받은 며칠 전 글 몫 (따로 더한다 — 오래된 글은 좋아요가 많아 새 글을 밀어내므로)
 TALKED_DAYS = 7    # 「여러 사람이 반응한 글」: 이 기간 안의 반응을 센다 (돌아가며 보는 계정의 반응은 며칠에 걸쳐 들어온다)
 TALKED_MIN = 2     # 보는 계정 중 이만큼 반응해야
 TALKED_LINES = 15
@@ -296,28 +318,32 @@ def build_data(cfg, db, since_iso, with_events=False, late_since=None):
                 if o:  # 「- 」로 시작하지 않아 funnel의 줄 수에 안 들어간다
                     parts.append(f"  ↳ 원문 @{o['author']} ♥{o['likes']}: {_clip(o['text'], 500)} | {_status(o)}")
 
-    ko = db.q(f"SELECT * FROM tweets WHERE via LIKE '{VIA_X_SEARCH}%' AND lang='ko' AND created_at >= ? "
-              f"ORDER BY likes DESC LIMIT {SEARCH_LINES}", since_iso)
-    if ko:
-        parts.append("# 한국어 X 반응 큰 글 (검색)")
-        parts += [f"- @{t['author']}: " + _tweet_line(t)[2:] for t in ko]
+    late_note = " (늦게 받은 며칠 전 글도 있다 — 앞의 날짜를 보고 쓴다)"
+    ko_where = f"via LIKE '{VIA_X_SEARCH}%' AND lang='ko'"
+    ko = db.q(f"SELECT * FROM tweets WHERE {ko_where} AND created_at >= ? ORDER BY likes DESC LIMIT {SEARCH_LINES}", since_iso)
+    ko_late = late_lines(db, ko_where, [], since_iso, late_since, SEARCH_LATE_LINES)
+    if ko or ko_late:
+        parts.append("# 한국어 X 반응 큰 글 (검색)" + (late_note if ko_late else ""))
+        parts += [f"- @{t['author']}: " + _tweet_line(t)[2:] for t in ko_late + ko]
 
     th_users = accounts.threads_accounts(cfg, db)
     if th_users:
-        parts.append("# Threads 계정")
+        parts.append("# Threads 계정" + (late_note if late_since else ""))
         for u in th_users:
             rows = db.q("SELECT * FROM tweets WHERE platform='threads' AND author = ? COLLATE NOCASE "
                         "AND created_at >= ? ORDER BY created_at", u, since_iso)
-            if rows:
+            late = threads_late(db, u, since_iso, late_since)
+            if rows or late:
                 parts.append(f"## Threads @{u}")
-                parts += [_tweet_line(t) for t in rows[-15:]]
+                parts += [_tweet_line(t) for t in late + rows[-15:]]
 
     # 검색·태그 경로만 (예전엔 「계정·후보 확인이 아닌 것」이라, 경로를 더하면 그 글이 여기 섞였다)
-    th = db.q(f"SELECT * FROM tweets WHERE platform='threads' AND lang='ko' "
-              f"AND (via LIKE '{VIA_TH_SEARCH}%' OR via LIKE '{VIA_TH_TAG}%') AND created_at >= ? ORDER BY likes DESC LIMIT {SEARCH_LINES}", since_iso)
-    if th:
-        parts.append("# 한국어 Threads 반응 큰 글 (검색·태그)")
-        parts += [f"- @{t['author']}: " + _tweet_line(t)[2:] for t in th]
+    th_where = f"platform='threads' AND lang='ko' AND (via LIKE '{VIA_TH_SEARCH}%' OR via LIKE '{VIA_TH_TAG}%')"
+    th = db.q(f"SELECT * FROM tweets WHERE {th_where} AND created_at >= ? ORDER BY likes DESC LIMIT {SEARCH_LINES}", since_iso)
+    th_late = late_lines(db, th_where, [], since_iso, late_since, SEARCH_LATE_LINES)
+    if th or th_late:
+        parts.append("# 한국어 Threads 반응 큰 글 (검색·태그)" + (late_note if th_late else ""))
+        parts += [f"- @{t['author']}: " + _tweet_line(t)[2:] for t in th_late + th]
 
     items = rss_items(cfg, db, since_iso, late_since)
     if items:
@@ -365,7 +391,7 @@ def rss_items(cfg, db, since_iso, new_after=None):
     early = (since - timedelta(days=2)).isoformat()
     rows = db.q("SELECT * FROM items WHERE COALESCE(published, collected_at) >= ? "
                 "ORDER BY COALESCE(published, collected_at) DESC", early)
-    groups, per_feed = {}, {}
+    groups, capped = {}, {}
     for r in rows:
         seen = datetime.fromisoformat(r["collected_at"])
         new = seen > first if new_after else seen >= since
@@ -380,13 +406,69 @@ def rss_items(cfg, db, since_iso, new_after=None):
             continue
         if r["source"] in skip and skip[r["source"]].search(r["title"] or ""):
             continue
-        if feed and feed.get("cap"):  # 뉴스 검색: 한 사람·기업이 묶음을 다 차지하지 않게 최신 몇 건만
-            per_feed[r["source"]] = per_feed.get(r["source"], 0) + 1
-            if per_feed[r["source"]] > feed["cap"]:
-                continue
+        if feed and feed.get("cap"):  # 뉴스 검색: 아래에서 같은 사건끼리 묶어 고른다
+            capped.setdefault(r["source"], (feed, []))[1].append(r)
+            continue
         groups.setdefault((feed or {}).get("group") or r["grp"], []).append(r)  # 묶음을 옮긴 출처는 지금 묶음으로
+    # 뉴스 검색: 한 사람·기업이 묶음을 다 차지하지 않게 사건 cap개만, 기사 많은 사건부터. 예전엔 최신 기사 cap개라
+    # 하루 17건 중 지자체 행사 기사에 카카오 AI TOP 100(기사 10건+)이 밀릴 수 있었다 (2026-11-23은 시각이 맞아 겨우 들어감)
+    for feed, rs in capped.values():
+        q = feed["id"].split(":", 2)[2] if (feed.get("id") or "").startswith("news:") else ""
+        for rank, story in enumerate(stories(rs, q)[:feed["cap"]]):
+            top = {**story[0], "_rank": rank, "_n": len(story)}
+            if len(story) > 1:
+                top["title"] = f"{top['title']} (같은 소식 기사 {len(story)}건)"
+            groups.setdefault(feed.get("group") or top["grp"], []).append(top)
+    for g in groups.values():
+        # 묶음 상한에 잘릴 때: 검색마다 가장 큰 사건부터 돌아가며 (다른 출처 글은 0순위 그대로 최신순)
+        g.sort(key=lambda r: (r.get("_rank", 0), -r.get("_n", 1)))
+        for r in g:
+            r.pop("_rank", None)
+            r.pop("_n", None)
     order = list(caps) + sorted(g for g in groups if g not in caps)
     return [r for g in order for r in groups.get(g, [])[:caps.get(g, catalog.EXTRA_CAP)]]
+
+
+_WORD = re.compile(r"[0-9A-Za-z가-힣]+")
+# 사건을 가르지 않는 일반어 — 이것만 겹쳐서는 같은 사건이 아니다 (「LG CNS 고교생 경진대회 개최」와 「카카오 경진대회 개최」)
+STORY_STOP = {"ai", "개최", "성료", "진행", "출시", "공개", "발표", "대회", "참가", "모집", "참여", "선정", "시상", "인공지능"}
+
+
+_JOSA = ("에서", "으로", "에게", "에", "의", "를", "을", "이", "가", "은", "는", "와", "과", "로", "도")
+
+
+def _title_words(title):
+    t = title.rsplit(" - ", 1)[0] if " - " in title else title  # 뉴스 검색 제목 끝의 「 - 매체 이름」
+    t = re.sub(r"(?<=\d),(?=\d)", "", t)  # 5,000명 → 5000명
+
+    def bare(w):  # 「경진대회에」 → 「경진대회」 (조사 하나만)
+        j = next((j for j in _JOSA if len(w) > len(j) + 1 and w.endswith(j)), "")
+        return w[:len(w) - len(j)]
+    return {bare(w.lower()) for w in _WORD.findall(t) if len(w) >= 2}
+
+
+def _same_story(a, b):
+    n = len(a & b)
+    return n >= 2 and n >= 0.4 * min(len(a), len(b))
+
+
+def stories(rows, query=""):
+    """같은 사건 기사 묶기 → [[기사…]] 기사 많은 순(같으면 rows 순서). 묶음 안 기사 하나와 제목 낱말이 2개 이상,
+    짧은 쪽의 40% 이상 겹치면 같은 사건. 검색어 낱말과 일반어(STORY_STOP)는 세지 않는다.
+    묶음 낱말을 합쳐 두고 견주면 묶음이 커질수록 아무 기사나 붙었다. 2026-11 실제 제목으로 시험: 다른 사건이 합쳐진 경우는 없고,
+    같은 사건이 둘로 나뉘는 경우는 있다 (「몰려」·「몰렸다」 — 그래도 자리를 하나 더 쓸 뿐이다)."""
+    drop = _title_words(query) | STORY_STOP
+    found = []  # [[기사마다 낱말…], [기사…]]
+    for r in rows:
+        w = _title_words(r["title"] or "") - drop
+        for seen, members in found:
+            if any(_same_story(w, x) for x in seen):
+                seen.append(w)
+                members.append(r)
+                break
+        else:
+            found.append([[w], [r]])
+    return [members for _, members in sorted(found, key=lambda f: -len(f[1]))]
 
 
 def _fill(template, **kw):

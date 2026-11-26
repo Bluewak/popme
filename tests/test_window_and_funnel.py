@@ -73,6 +73,82 @@ def test_threads_section_takes_only_search_paths(tmp_path, monkeypatch):
     assert "글 t1" in data and "글 t2" not in data
 
 
+def _bare(monkeypatch, th_users=()):
+    monkeypatch.setattr(accounts, "core_accounts", lambda cfg, db: [])
+    monkeypatch.setattr(accounts, "threads_accounts", lambda cfg, db: list(th_users))
+    monkeypatch.setattr(briefing, "rss_items", lambda *a, **k: [])
+    monkeypatch.setattr(briefing.discovery, "candidates", lambda db, limit=5: [])
+
+
+def test_late_threads_tag_posts_go_in_once(tmp_path, monkeypatch):
+    """2026-10-31 AI TOP 100 예선 후기: Threads 태그 글을 사흘 늦게 받아 「올라온 시각」 구간 밖이라 빠졌다.
+    지난 브리핑 뒤에 처음 받은 며칠 전 글은 넣는다 (지난 브리핑 전에 받은 글·7일 넘은 글은 안 넣는다)."""
+    db = _db(tmp_path)
+    _bare(monkeypatch)
+    now = datetime.now(timezone.utc)
+    prev = now - timedelta(hours=20)
+    since = (prev - timedelta(hours=1)).isoformat()
+    _tw(db, "late", now - timedelta(days=3), now - timedelta(hours=2), "th-tag:인공지능AI", "threads", likes=155)
+    _tw(db, "shown", now - timedelta(days=3), prev - timedelta(hours=2), "th-tag:인공지능AI", "threads")
+    _tw(db, "ancient", now - timedelta(days=9), now - timedelta(hours=2), "th-tag:인공지능AI", "threads")
+    _tw(db, "xlate", now - timedelta(days=2), now - timedelta(hours=2), "search:0")
+    data = briefing.build_data({}, db, since, late_since=prev.isoformat())
+    assert "글 late" in data and "글 shown" not in data and "글 ancient" not in data and "글 xlate" in data
+    assert "늦게 받은 며칠 전 글도 있다" in data
+    assert "글 late" not in briefing.build_data({}, db, since)  # 질문 답변(late_since 없음)은 예전 그대로
+
+
+def test_late_threads_account_posts_only_for_accounts_seen_before(tmp_path, monkeypatch):
+    """새로 더한 Threads 계정의 지난 글이 쏟아지지 않게, 지난 브리핑 전에도 글을 받은 계정만."""
+    db = _db(tmp_path)
+    _bare(monkeypatch, ["a1", "a2"])
+    now = datetime.now(timezone.utc)
+    prev = now - timedelta(hours=20)
+    since = (prev - timedelta(hours=1)).isoformat()
+    _tw(db, "1", now - timedelta(days=2), now - timedelta(hours=2), "th-user:a1", "threads")  # author a1
+    db.upsert_tweets([{"id": "old1", "author": "a1", "text": "예전 글", "created_at": (now - timedelta(days=5)).isoformat(),
+                       "lang": "ko", "likes": 1, "urls": "[]", "kind": "post", "via": "th-user:a1", "platform": "threads"}])
+    db.conn().execute("UPDATE tweets SET collected_at=? WHERE id='old1'", ((prev - timedelta(days=4)).isoformat(),))
+    db.conn().commit()
+    _tw(db, "2", now - timedelta(days=2), now - timedelta(hours=2), "th-user:a2", "threads")  # a2는 처음 본 계정
+    data = briefing.build_data({}, db, since, late_since=prev.isoformat())
+    assert "글 1" in data and "글 2" not in data
+
+
+def test_stories_group_same_event_titles():
+    rows = [{"title": t} for t in [
+        "네이버, 고교생 로봇 대회 개최…AI 로봇 대결 - 뉴시스",
+        "카카오 'AI TOP 100' 본선 개최, AI에이전트 운용 역량 확인 - 뉴스핌",
+        "5시간 만에 5000명 몰렸다…카카오 ‘AI TOP 100’, 에이전트 운용 실력 겨뤄 - 이데일리",
+        "LG CNS, 고교생 AI 경진대회 '챌린지데이' 개최 - 뉴스드림",
+        "카카오,대국민 AI 경진대회 'AI TOP 100' 3기 성료 - 뉴스드림",
+        "카카오, AI 에이전트 실전 경진대회 개최…5,000명 지원해 100명 본선 진출 - 인공지능신문",
+        "카카오, AI 에이전트 활용 인재 발굴…경진대회에 5000명 몰렸다 - 파이낸셜뉴스"]]
+    got = briefing.stories(rows, "AI 경진대회 개최")
+    # 「경진대회에」·「5,000명」도 같은 낱말로 센다. 「실전 경진대회…본선 진출」은 겹침이 모자라 따로 (나뉘는 쪽으로 틀린다)
+    assert [len(s) for s in got] == [4, 1, 1, 1] and all("카카오" in r["title"] for r in got[0])
+    assert "실전" not in " ".join(r["title"] for r in got[0])
+
+
+def test_news_search_keeps_biggest_story_over_latest_singles(tmp_path, monkeypatch):
+    """뉴스 검색은 최신 기사 cap개가 아니라 사건 cap개, 기사 많은 사건부터 — 늦게 올라온 단발 기사에 큰 사건이 밀리지 않게."""
+    from popme import catalog
+    db = _db(tmp_path)
+    now = datetime.now(timezone.utc)
+    rows = [{"title": f"{place} 경진대회 열려 - 매체{i}", "published": now - timedelta(minutes=i)}
+            for i, place in enumerate(["금천구", "동작구", "세종시", "창원대", "강동대", "경운대"])]
+    rows += [{"title": f"카카오 TOP 100 본선 5000명 몰려 - 매체{i}", "published": now - timedelta(hours=3, minutes=i)}
+             for i in range(3)]
+    db.upsert_items([{"url": f"https://n/{i}", "source": "뉴스 · AI 경진대회 개최", "grp": "뉴스", "summary": "",
+                      "title": r["title"], "published": r["published"].isoformat()} for i, r in enumerate(rows)])
+    feed = {"id": "news:kr:AI 경진대회 개최", "name": "뉴스 · AI 경진대회 개최", "group": "뉴스", "cap": 5, "interests": {}}
+    monkeypatch.setattr(catalog, "active", lambda cfg: [feed])
+    monkeypatch.setattr(catalog, "caps", lambda cfg: {"뉴스": 13})
+    got = [r["title"] for r in briefing.rss_items({"news": {}}, db, (now - timedelta(days=1)).isoformat())]
+    assert len(got) == 5 and got[0].startswith("카카오 TOP 100") and got[0].endswith("(같은 소식 기사 3건)")
+    assert "경운대 경진대회 열려 - 매체5" not in got  # 단발 기사 중 가장 오래된 것이 빠진다
+
+
 def test_verdict_found_anywhere_near_the_start():
     assert discovery.verdict_of("판단 보류: 대표글 없음") == ("대표글 없음", "보류")
     assert discovery.verdict_of("보류: 근거 부족") == ("근거 부족", "보류")
