@@ -106,9 +106,22 @@ def test_caps_grow_with_interests_but_stay_bounded():
     one = catalog.caps(news(interests=["ai-coding"]))
     assert one == catalog.profiles()[0]["caps"] or sum(one.values()) <= catalog.TOTAL_CAP[1]
     all5 = catalog.caps(news(interests=[p["id"] for p in catalog.profiles()]))
-    assert sum(all5.values()) <= 240 and min(all5.values()) >= 2
+    rest = sum(n for g, n in all5.items() if g != catalog.NEWS_GROUP)
+    assert all5[catalog.NEWS_GROUP] == catalog.NEWS_FLOOR_MAX  # 검색이 많아도 바닥은 여기까지
+    assert rest <= 240 and min(all5.values()) >= 2  # 뉴스 바닥만큼만 전체 상한을 넘을 수 있다
     assert sum(all5.values()) > sum(one.values())
     assert catalog.caps({"rss": []}) == catalog.LEGACY_CAPS  # 옮기기 전
+
+
+def test_news_cap_keeps_two_stories_per_search(monkeypatch):
+    """관심사가 많아 같은 비율로 줄여도 뉴스 묶음은 검색 하나당 사건 2건 (2026-11-26: 검색 14개에 13건이었다)."""
+    feeds = [{"name": f"뉴스 · {i}", "group": catalog.NEWS_GROUP, "cap": catalog.NEWS_PER_FEED, "interests": {}}
+             for i in range(14)] + [{"name": "공식", "group": "공식 발표", "interests": {}}]
+    monkeypatch.setattr(catalog, "active", lambda cfg: feeds)
+    monkeypatch.setattr(catalog, "chosen", lambda cfg: [{"caps": {catalog.NEWS_GROUP: 20, "공식 발표": 400}}] * 3)
+    monkeypatch.setattr(catalog, "entities", lambda cfg, p: [])
+    caps = catalog.caps({"news": {}})
+    assert caps[catalog.NEWS_GROUP] == 28 and caps["공식 발표"] < 400
 
 
 def test_legacy_config_used_as_is():

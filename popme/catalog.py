@@ -27,6 +27,9 @@ TOTAL_CAP = {0: 140, 1: 140, 2: 200}  # 고른 관심사 수 → 브리핑에 �
 NEWS_URL = "https://news.google.com/rss/search?q={q}+when:2d&{loc}"
 NEWS_LOC = {"kr": "hl=ko&gl=KR&ceid=KR:ko", "world": "hl=en-US&gl=US&ceid=US:en"}
 NEWS_GROUP, NEWS_CAP, NEWS_PER_FEED = "뉴스", 15, 5  # 관심사 하나당 뉴스 상한, 한 사람·기업당 상한 (한 명이 다 차지하지 않게)
+# 뉴스 묶음 바닥: 뉴스 검색 하나당 사건 이만큼은 넘긴다. 전체 상한에 맞춰 같은 비율로 줄이면 관심사 6개에서
+# 검색 14개에 13건이라 검색마다 1순위 사건도 다 못 들어갔다 (2026-11-26)
+NEWS_STORIES_FLOOR, NEWS_FLOOR_MAX = 2, 40  # 바닥도 이만큼까지 (관심사 12개를 다 고르면 검색 94개 → 188건이라)
 # 구글 뉴스에 섞여 드는 엉뚱한 사이트 (제목 끝 「 - 언론사」). 2026-10-19 「삼성전자 HBM」 70건 중 37건이 이것
 NEWS_SPAM = ["Calgary Roughnecks", "Vietnam.vn"]  # Vietnam.vn: 기계번역 기사 (2026-10 축구·야구 조사)
 # 예전 config(관심사 없음)의 묶음별 상한 — 옮기기 전까지만 쓴다
@@ -261,7 +264,8 @@ def active(cfg):
 
 
 def caps(cfg):
-    """묶음 → 브리핑에 넘길 상한. 고른 관심사들의 상한을 더하고, 전체 상한을 넘으면 같은 비율로 줄인다."""
+    """묶음 → 브리핑에 넘길 상한. 고른 관심사들의 상한을 더하고, 전체 상한을 넘으면 같은 비율로 줄인다.
+    뉴스 묶음은 줄인 뒤에도 뉴스 검색 하나당 NEWS_STORIES_FLOOR건(최대 NEWS_FLOOR_MAX)은 남긴다 (그만큼 전체 상한을 넘을 수 있다)."""
     if "news" not in cfg:
         return dict(LEGACY_CAPS)
     total = {}
@@ -271,12 +275,16 @@ def caps(cfg):
             total[g] = total.get(g, 0) + n
         if NEWS_GROUP not in p.get("caps", {}) and any(e.get("news") for e in entities(cfg, p)):
             total[NEWS_GROUP] = total.get(NEWS_GROUP, 0) + NEWS_CAP
-    for f in active(cfg):
+    feeds = active(cfg)
+    for f in feeds:
         total.setdefault(f["group"], EXTRA_CAP)
     limit = TOTAL_CAP.get(len(picked), 240)
     s = sum(total.values())
     if s > limit:
         total = {g: max(2, n * limit // s) for g, n in total.items()}
+    searches = sum(1 for f in feeds if f.get("cap") and f["group"] == NEWS_GROUP)
+    if searches and NEWS_GROUP in total:
+        total[NEWS_GROUP] = max(total[NEWS_GROUP], min(searches * NEWS_STORIES_FLOOR, NEWS_FLOOR_MAX))
     return total
 
 
