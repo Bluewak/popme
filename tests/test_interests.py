@@ -234,9 +234,37 @@ def test_suggest_cleans_ai_answer(monkeypatch):
 
 
 def test_finalize_falls_back(monkeypatch):
-    monkeypatch.setattr(interests.llm, "ask", lambda *a, **k: '{"name": "축구 소식", "criteria": ["하나"]}')
+    seen = {}
+    monkeypatch.setattr(interests.llm, "ask", lambda cfg, system, prompt, **k: seen.setdefault("p", prompt) and
+                        '{"name": "축구 소식", "criteria": ["하나"]}')
     f = interests.finalize({}, "축구", "world", [], [], [])
-    assert f["name"] == "축구 소식" and len(f["criteria"]) == 3  # 기준이 모자라면 정해진 문장
+    assert f["name"] == "축구 소식" and f["summary"] == "축구 소식"  # 빠진 칸은 정해진 문장
+    assert "criteria" not in f and "criteria" not in seen["p"]  # 넣을 것·버릴 것 기준은 이제 만들지 않는다
+    assert "화제" in f["about"] and "대회" in f["about"] and '"about"' in seen["p"]  # 넓은 범위는 만든다
+
+
+def test_saved_custom_has_no_criteria(monkeypatch):
+    monkeypatch.setattr(interests, "news_count", lambda e, scope: 3)
+    final = {"name": "보드게임", "tag": "보드게임", "summary": "보드게임 신작·대회 소식",
+             "about": "보드게임 신작·수입·대회·행사와 플레이어들의 후기·화제", "discovery": "리뷰어"}
+    pid = interests.save_custom("보드게임", "kr", [{"kind": "search", "name": "보드게임", "region": "kr",
+                                                  "news": "보드게임", "news_count": 3}], [], final)
+    p = next(x for x in catalog.profiles() if x["id"] == pid)
+    assert p["summary"] == "보드게임 신작·대회 소식" and "criteria" not in p
+    assert "[보드게임] 보드게임 신작·수입·대회·행사와 플레이어들의 후기·화제" in briefing.rules_for(news(interests=[pid]))["criteria"]
+
+
+def test_old_custom_file_keeps_its_scope_line_not_its_drop_rules():
+    """2026-11-26 전에 만든 관심사 파일: criteria의 「범위:」 줄은 넓은 범위로 쓰고, 「버린다」는 안 쓴다 (2차 검토 #68)."""
+    catalog.CUSTOM_DIR.mkdir(parents=True, exist_ok=True)
+    (catalog.CUSTOM_DIR / "custom-old.toml").write_text(
+        'id = "custom-old"\nname = "축구"\ntag = "축구"\nsummary = "프리미어리그 이적·경기 결과"\nstatus = "ready"\n'
+        'criteria = "- 범위: 유럽 축구 리그·대표팀의 경기·이적·부상·감독 교체, 팬들 사이 화제.\\n- 버린다: 가십."\n',
+        encoding="utf-8")
+    catalog._profiles.cache_clear()
+    crit = briefing.rules_for(news(interests=["custom-old"]))["criteria"]
+    assert "[축구] 유럽 축구 리그·대표팀의 경기·이적·부상·감독 교체, 팬들 사이 화제." in crit and "가십" not in crit
+    assert catalog.legacy_about("- 국내 대회를 먼저 고른다.\n- 버린다: 후기") == ""  # 범위 줄이 없으면 summary로
 
 
 def test_verify_and_save_custom(monkeypatch):
@@ -261,7 +289,8 @@ def test_verify_and_save_custom(monkeypatch):
     assert "news" not in quiet  # 기사가 안 나오는 검색어도
     cfg = news(interests=[pid])
     assert {a["handle"] for a in catalog.x_accounts(cfg)} == {"ManCity"}
-    assert "- 이적 먼저" in briefing.rules_for(cfg)["criteria"]
+    crit = briefing.rules_for(cfg)["criteria"]
+    assert "[축구] 축구 소식" in crit and "가십 빼기" not in crit  # 저장은 하되 지시문엔 이름·설명만
 
 
 def test_save_picks_and_preset_view():
@@ -511,7 +540,7 @@ def test_pack_subs_filter_feeds_people_and_scope():
     assert team["kind"] == "target" and team["news"] == "전북 현대 축구"  # 고른 응원 팀도 뉴스로 받는다
     assert all(catalog.in_subs(e, ["K리그"]) for e in ents if e["kind"] != "target")
     crit = briefing.rules_for(kl)["criteria"]
-    assert "보는 범위: K리그만" in crit and "응원하는 팀: 전북 현대" in crit
+    assert "보는 범위: K리그 — 이 소식을 먼저" in crit and "K리그만" not in crit and "응원하는 팀: 전북 현대" in crit
 
 
 def test_pack_view_and_save_subs():

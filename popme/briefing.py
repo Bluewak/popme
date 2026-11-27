@@ -38,13 +38,13 @@ TITLE_RULES = """제목 규칙 (가장 중요 — 제목만 읽고 무슨 소식
 BRIEFING_RULES = """아래 데이터로 오늘 아침 브리핑을 '소식 카드' 목록으로 만들어라.
 출력은 JSON 하나만. 코드블록·설명 없이.
 
-고르는 기준 (내 관심사별 — 범위와 버릴 것. 그 밖의 좁히는 조건은 없다)
+내 관심사 (아래 어느 하나에 해당하는 것 같으면 고른다. 「먼저」 줄은 순서를 정할 때만 쓰고 거르는 데 쓰지 않는다)
 __CRITERIA__
 
 공통 기준
-- 범위 안에서 실제 작업·판단에 영향 있는 소식을 고른다. 공식 발표만 소식이 아니다: 업계에서 화제가 된 것,
-  써 본 사람의 평가·비교·불만, 새로 뜨는 흐름도 소식이다 (데이터의 X·Threads·커뮤니티 구획).
-  잡담·홍보·과장은 버린다.
+- 관심사에 해당하는 것 같으면 넣는다. 공식 발표, 업계에서 화제가 된 것, 써 본 사람의 평가·비교·후기·불만,
+  행사·대회·모집, 새로 뜨는 흐름이 모두 소식이다 (데이터의 X·Threads·커뮤니티·뉴스 구획).
+  버리는 것은 광고·홍보(제품 판매·구독·강의·이벤트 유도)뿐이다.
 - 같은 소식은 카드 하나. 같은 모델·릴리스·사건이 공식 블로그·여러 커뮤니티·여러 사람 글에 동시에 실리는 일이 흔하다
   (오픈 모델 하나가 열 곳 넘게 실리기도 한다). 그럴 땐 카드는 하나로 합치고, 링크는 공식 출처 하나와
   가장 화제가 된 글(X·Threads·커뮤니티) 하나를 단다. 공식 출처가 없으면 화제가 된 글만.
@@ -108,7 +108,9 @@ def interests_for_brief(cfg):
 
 
 def rules_for(cfg):
-    """관심사 → 지시문 조각 {criteria, discovery, tags_rule, tags_example}. 태그는 관심사를 2개 이상 골랐을 때만 묻는다."""
+    """관심사 → 지시문 조각 {criteria, discovery, tags_rule, tags_example}. 태그는 관심사를 2개 이상 골랐을 때만 묻는다.
+    criteria 자리에는 관심사마다 이름·한 줄 설명과 「먼저」 힌트만 넣는다. 관심사 파일의 criteria 문장(넣을 것·버릴 것 목록)은
+    쓰지 않는다 — 2026-11 그 목록이 「~만」·「후기는 버린다」처럼 좁혀서, 카카오 AI TOP 100처럼 범위 안의 큰 소식이 빠졌다."""
     from popme import taste  # taste → interests → briefing 순으로 불러서 여기서
     profs = interests_for_brief(cfg)
 
@@ -123,14 +125,12 @@ def rules_for(cfg):
         pk = catalog.picks(cfg, p["id"])  # ④ 취향 문답: 묶음은 config picks, 새 관심사는 파일의 [taste]
         liked = ({"summary": pk.get("taste", ""), "likes": pk.get("likes", []), "less": pk.get("less", [])}
                  if "taste" in pk or "likes" in pk else p.get("taste"))
-        return (p["criteria"].strip() + (f"\n- 특히 궁금한 것: {'·'.join(topics_)} — 이 주제를 먼저 고른다." if topics_ else "")
-                + (f"\n- 고른 것: {picked} — 이것과 관련된 소식을 먼저 고른다." if picked else "")
-                + (f"\n- 보는 범위: {'·'.join(chosen_subs)}만." if chosen_subs else "")
+        return ((f"\n- 특히 궁금한 것: {'·'.join(topics_)} — 이 주제를 먼저." if topics_ else "")
+                + (f"\n- 고른 것: {picked} — 이것과 관련된 소식을 먼저." if picked else "")
+                + (f"\n- 보는 범위: {'·'.join(chosen_subs)} — 이 소식을 먼저." if chosen_subs else "")
                 + (used_line if used else "") + taste.line(liked))
-    if len(profs) == 1:
-        criteria = crit(profs[0])
-    else:
-        criteria = "\n".join(f"[{p['tag']}] {p['summary']}\n{crit(p)}" for p in profs)
+    # about: 기본 관심사의 넓은 범위 설명 (예전 criteria의 「범위:」 줄). 화면용 summary는 짧아서 범위가 좁아 보인다 (검토 #68)
+    criteria = "\n".join(f"[{p['tag']}] {p.get('about') or p.get('summary') or p['name']}{crit(p)}" for p in profs)
     discovery = " 또는 ".join(dict.fromkeys(p["discovery"] for p in profs if p.get("discovery"))) or "실질 정보를 주는 사람"
     tags = [p["tag"] for p in catalog.chosen(cfg)]
     if len(tags) >= 2:
