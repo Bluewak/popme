@@ -22,7 +22,10 @@ BLOCK_MARKERS = ("/login", "/i/flow/login", "/account/access", "/i/flow/consent"
 # 돌아가며 보는 계정(since_by)은 며칠 치를 내려가야 해서 스크롤 상한을 따로. 5~6일에 한 번 여는 계정이라
 # 하루로 나누면 매일 열어 1번 스크롤하던 때와 요청 수가 같다. 그래도 못 닿으면 로그를 남긴다
 DEEP_SCROLLS = 6
-LIST_SCROLLS = 20  # 리스트 한 번에 최대 스크롤. 한 번에 글 약 90개 — 계정 100개의 하루치가 5번 안팎 (2026-11 시험)
+# 리스트 한 번에 최대 스크롤. 한 번에 글 약 90개 — 계정 100개의 하루치가 5번 안팎 (2026-11 시험).
+# 20번이던 때 멤버 163개의 하루치(1,500~2,400개)가 넘쳐 2026-11-24~26 내리 못 닿았다. 40번이면 이틀치쯤
+LIST_SCROLLS = 40
+LIST_DEEP = LIST_SCROLLS // 2  # 끝까지 못 갔어도 글 담긴 응답이 이만큼이면 「깊이 읽었다」 (2026-11-24 실제: 스크롤 20번에 응답 23개)
 
 
 def list_id(url):
@@ -95,6 +98,14 @@ def timeline_entries(obj, out=None):
         for v in obj:
             timeline_entries(v, out)
     return out
+
+
+def _local(iso):
+    """UTC ISO → 「11/23 09:32」 (내 컴퓨터 시각). 모르면 「?」."""
+    try:
+        return datetime.fromisoformat(iso).astimezone().strftime("%m/%d %H:%M")
+    except (TypeError, ValueError):
+        return "?"
 
 
 def _list_reached(dates, since):
@@ -277,8 +288,9 @@ def check_profiles(ctx, handles, progress=lambda s: None, users=None):
 
 
 def _visit_list(page, url, via, since, sink, ops_seen, users=None, meta=None):
-    """리스트 타임라인 → (받은 글 수, since까지 내려갔는가). since(UTC ISO)까지 내려가면 멈춘다 (최대 LIST_SCROLLS번).
-    못 내려갔으면 「봤다」로 남기면 안 된다 — 다음 기준 시각이 지금으로 당겨져 그 사이 글을 영영 못 받는다 (Codex 리뷰 #61).
+    """리스트 타임라인 → (받은 글 수, since까지 내려갔는가, 내려간 데까지의 시각 UTC ISO | None, 글이 담긴 응답 수).
+    since(UTC ISO)까지 내려가면 멈춘다 (최대 LIST_SCROLLS번). 못 내려갔을 때 「봤다」로 남길지는 collect가 정한다
+    (응답 수로 「깊이 읽었는데 글이 많았다」와 「더 불러와지지 않았다」를 가른다).
     리스트는 보는 계정 전체의 글을 시간순으로 한 페이지에 준다 — 계정 페이지를 30개씩 돌아가며 열면 한 바퀴에 5일쯤 걸려,
     그 사이 글의 56%가 어느 브리핑에도 못 들어갔다(2026-11-04~18). 계정 페이지가 안 주는 리트윗도 온다."""
     responses, parsed, tops = [], [], []  # tops: 응답마다 타임라인 글의 시각
@@ -323,9 +335,11 @@ def _visit_list(page, url, via, since, sink, ops_seen, users=None, meta=None):
     finally:
         page.remove_listener("response", handler)
     drain()
-    complete = not since or _list_reached(next((d for d in reversed(tops) if d), []), since)
+    last = sorted(next((d for d in reversed(tops) if d), []))
+    reached = last[len(last) // 2] if last else None  # 마지막 응답의 가운데 시각 (고정글·늦게 퍼진 리트윗 하나에 안 끌리게)
+    complete = not since or _list_reached(last, since)
     if not complete:
-        log.info("X 리스트: 스크롤 %d번으로 %s까지 못 내려감 — 본 것으로 남기지 않음", done, since[:16])
+        log.info("X 리스트: 스크롤 %d번으로 %s까지 못 내려감 (%s까지 봄)", done, since[:16], (reached or "?")[:16])
     got = 0
     for r, data, tweets in parsed:
         if not tweets:
@@ -336,16 +350,17 @@ def _visit_list(page, url, via, since, sink, ops_seen, users=None, meta=None):
         sink.extend(tweets)
         got += len(tweets)
     log.info("X 리스트: 트윗 %d개 (GraphQL 응답 %d개, 스크롤 %d번)", got, len(responses), done)
-    return got, complete
+    return got, complete, reached, sum(1 for d in tops if d)
 
 
 def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None, on_batch=None, since_by=None,
-            visited=None, list_since=None, list_meta=None):
+            visited=None, list_since=None, list_meta=None, gaps=None):
     """accounts: 핵심 계정 handle 목록. since(UTC ISO): 계정 페이지는 이 시각 이전 글까지만 스크롤.
     since_by({handle 소문자: UTC ISO}): 그 계정만 다른 시각까지, 스크롤도 DEEP_SCROLLS번까지 (돌아가며 보는 계정 — 지난번에 본 시각).
     [x] list_url이 있으면 계정 페이지를 다 본 뒤 리스트도 본다 (list_since까지). 같은 글은 처음 받은 경로(via)가 남으므로
     맨 마지막에 봐야 날마다 여는 계정의 글이 계정 페이지 경로로 남는다 — 리스트로 옮기기 전 나란히 견줘 보는 기간.
-    리스트를 list_since까지 다 봤으면 visited에 "list:<ID>"를 넣는다. list_meta(dict)에는 리스트 이름을 담는다 (동기화용).
+    리스트에서 글을 받았으면 visited에 "list:<ID>"를 넣는다. list_since까지 못 내려갔으면 gaps(list)에 사람 말로 남긴다.
+    list_meta(dict)에는 리스트 이름을 담는다 (동기화용).
     visited(list): 정상으로 연 계정 페이지(글이 0개여도)의 handle을 차례로 넣는다 (중간에 실패해도 그때까지 본 것).
     users(dict): 응답에 실린 계정 규모(팔로워 등)를 모아 둘 곳. 반환: 파싱된 트윗 리스트.
     on_batch(새 트윗들): 페이지 하나를 볼 때마다 — 중간에 끊겨도 모은 데까지 저장되게."""
@@ -389,12 +404,20 @@ def collect(ctx, cfg, accounts, progress=lambda s: None, since=None, users=None,
         if lid:
             progress("X 리스트 수집 중")
             before = len(out)
-            got, complete = _visit_list(page, f"https://x.com/i/lists/{lid}", f"{VIA_X_LIST}{lid}", list_since or since, out,
-                                        ops_seen, users, list_meta)
-            # 끝까지 못 내려갔으면 본 것으로 남기지 않는다: 다음에도 같은 기준 시각부터 읽고,
-            # 48시간이 지나면 리스트 계정이 다시 계정 페이지로 돌아간다 (accounts.list_members)
-            if got and complete and visited is not None:
+            start = list_since or since
+            got, complete, reached, pages = _visit_list(page, f"https://x.com/i/lists/{lid}", f"{VIA_X_LIST}{lid}", start,
+                                                        out, ops_seen, users, list_meta)
+            # 끝까지 못 내려갔어도 깊이 읽었으면(글이 많았을 뿐) 본 것으로 남기고, 빠진 구간은 경고로 알린다.
+            # 예전엔 남기지 않았다(Codex 리뷰 #61) — 그러면 다음 기준 시각이 그대로라 날마다 더 멀어져 다시는 닿지 못했고,
+            # 48시간 뒤 리스트 계정 전부가 계정 페이지 돌아가며 보기로 돌아갔다 (2026-11-23~26: 152개, 한 바퀴 10일).
+            # 더 불러와지지 않아 얕게 끝났으면(429·화면 구조 변경) 남기지 않는다 — 계속 그러면 48시간 뒤 계정 페이지로 돌아가게
+            deep = pages >= LIST_DEEP
+            if got and (complete or deep) and visited is not None:
                 visited.append(f"{VIA_X_LIST}{lid}")
+            if got and not complete and gaps is not None:
+                gaps.append(f"X 리스트를 {_local(reached)}까지만 내려가서 {_local(start)}~그 사이 글은 빠졌어요" if deep else
+                            f"X 리스트가 더 불러와지지 않아 {_local(reached)}까지만 받았어요 "
+                            "(이틀 넘게 이러면 계정 페이지로 돌아가며 봐요)")
             if on_batch and len(out) > before:
                 on_batch(out[before:])
     finally:

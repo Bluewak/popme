@@ -233,7 +233,7 @@ class Jobs:
                 # 페이지 하나 볼 때마다 저장 — 중간에 Chrome이 닫혀도 모은 데까지는 남는다
                 x.collect(ctx, self.cfg, handles, progress, since, users, on_batch=saver,
                           since_by=since_by, visited=visited, list_since=accounts.list_since(self.cfg, since),
-                          list_meta=meta)
+                          list_meta=meta, gaps=warnings)
             finally:
                 accounts.mark_x_visited(visited)
             saver.flush()  # 새 글 없이 끝난 페이지의 계정 규모도

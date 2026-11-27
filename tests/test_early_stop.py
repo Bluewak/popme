@@ -192,19 +192,59 @@ def test_x_list_scrolls_until_since_then_stops(monkeypatch):
     page = ListPage([batch(0, NEW), batch(10, NEW), batch(20, OLD), batch(30, OLD)])
     page.goto = lambda url, **_: (setattr(page, "url", LIST_GQL), page.emit())
     out = []
-    got, complete = x._visit_list(page, "https://x.com/i/lists/123456789", "list:123456789", SINCE, out, set())
+    got, complete, reached, pages = x._visit_list(page, "https://x.com/i/lists/123456789", "list:123456789", SINCE, out, set())
     assert page.scrolls == 2 and got == 15 and complete and {t["via"] for t in out} == {"list:123456789"}
+    assert reached == OLD and pages == 3
 
 
 def test_x_list_not_complete_when_scrolls_run_out(monkeypatch):
-    """Codex 리뷰(#61): since까지 못 내려갔으면 받은 글은 두되 「다 봤다」고 하지 않는다 (본 것으로 남기면 그 사이 글을 영영 놓침)."""
+    """since까지 못 내려갔으면 받은 글은 두고 「끝까지 못 봤다」와 내려간 데까지의 시각을 알린다."""
     monkeypatch.setattr(x, "dump_raw", lambda *a, **k: None)
     monkeypatch.setattr(x, "LIST_SCROLLS", 2)
     batch = lambda start: list_batch([x_tweet(start + i, "me", NEW) for i in range(5)])
     page = ListPage([batch(0), batch(10), batch(20), batch(30)])
     page.goto = lambda url, **_: (setattr(page, "url", LIST_GQL), page.emit())
-    got, complete = x._visit_list(page, "https://x.com/i/lists/123456789", "list:123456789", SINCE, [], set())
-    assert page.scrolls == 2 and got == 15 and not complete
+    got, complete, reached, pages = x._visit_list(page, "https://x.com/i/lists/123456789", "list:123456789", SINCE, [], set())
+    assert page.scrolls == 2 and got == 15 and not complete and reached == NEW and pages == 3
+
+
+def test_x_list_counts_only_pages_that_loaded(monkeypatch):
+    """스크롤해도 더 불러와지지 않으면(429·화면 구조 변경) 글 담긴 응답은 첫 장 하나 — 「깊이 읽었다」가 아니다."""
+    monkeypatch.setattr(x, "dump_raw", lambda *a, **k: None)
+    page = ListPage([list_batch([x_tweet(i, "me", NEW) for i in range(5)])])
+    page.goto = lambda url, **_: (setattr(page, "url", LIST_GQL), page.emit())
+    got, complete, _, pages = x._visit_list(page, "https://x.com/i/lists/123456789", "list:123456789", SINCE, [], set())
+    assert got == 5 and not complete and pages == 1
+
+
+def _collect_with_list(monkeypatch, complete, pages):
+    from tests.test_collect_feedback import FakeCtx
+    monkeypatch.setattr(x, "_visit", lambda *a, **k: 0)
+    monkeypatch.setattr(x, "_visit_list", lambda *a, **k: (7, complete, NEW, pages))
+    monkeypatch.setattr(x.random, "uniform", lambda a, b: 0)
+    visited, gaps = [], []
+    x.collect(FakeCtx(), {"x": {"list_url": "https://x.com/i/lists/123456789"}}, [], since=SINCE,
+              visited=visited, list_since=OLD, gaps=gaps)
+    return visited, gaps
+
+
+def test_x_list_marked_seen_when_read_deep_but_not_to_the_end(monkeypatch):
+    """2026-11-23~26 고착: 글이 많아 못 내려갔다고 「봤다」로 안 남기면 기준 시각이 그대로라 날마다 더 멀어져 다시는 닿지 못했다.
+    깊이 읽었으면 남기고, 빠진 구간은 수집 경고로."""
+    visited, gaps = _collect_with_list(monkeypatch, complete=False, pages=x.LIST_DEEP)
+    assert visited == ["list:123456789"]
+    assert len(gaps) == 1 and gaps[0].startswith("X 리스트를 ") and "빠졌어요" in gaps[0]
+
+
+def test_x_list_not_marked_when_it_stops_loading(monkeypatch):
+    """더 불러와지지 않아 얕게 끝났으면 남기지 않는다 — 계속되면 48시간 뒤 계정 페이지 돌아가며 보기로 (자가 복구)."""
+    visited, gaps = _collect_with_list(monkeypatch, complete=False, pages=1)
+    assert visited == [] and len(gaps) == 1 and "더 불러와지지 않아" in gaps[0]
+
+
+def test_x_list_complete_has_no_gap_warning(monkeypatch):
+    visited, gaps = _collect_with_list(monkeypatch, complete=True, pages=2)
+    assert visited == ["list:123456789"] and gaps == []
 
 
 def test_x_list_does_not_stop_on_old_originals_inside_new_retweets(monkeypatch):
